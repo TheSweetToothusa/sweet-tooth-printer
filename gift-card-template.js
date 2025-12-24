@@ -5,14 +5,18 @@
 // =============================================================================
 
 function generateGiftCardHTML(data) {
-  const { giftReceiver, giftMessage, giftSender, recipient } = data;
+  const { giftReceiver, giftMessage, giftSender, recipient, fontFamily, fontSize } = data;
 
   // Use recipient name if no separate gift receiver specified
   const receiverName = giftReceiver || recipient.name;
   
   // Format address lines separately
   const addressLine1 = [recipient.address1, recipient.address2].filter(Boolean).join(', ');
-  const addressLine2 = `${recipient.city}, ${recipient.province} ${recipient.zip}`;
+  const addressLine2 = recipient.city ? `${recipient.city}, ${recipient.province} ${recipient.zip}` : '';
+
+  // Default font settings
+  const messageFontFamily = fontFamily || 'Arial, sans-serif';
+  const messageFontSize = fontSize || '12pt';
 
   return `<!DOCTYPE html>
 <html dir="ltr">
@@ -81,7 +85,8 @@ function generateGiftCardHTML(data) {
     }
     
     .gift-message {
-      font-size: 12pt;
+      font-family: ${messageFontFamily};
+      font-size: ${messageFontSize};
       font-weight: bold;
       line-height: 1.5;
       color: #000;
@@ -89,7 +94,8 @@ function generateGiftCardHTML(data) {
     
     .gift-sender {
       margin-top: 16px;
-      font-size: 12pt;
+      font-family: ${messageFontFamily};
+      font-size: ${messageFontSize};
       font-weight: bold;
       color: #000;
     }
@@ -101,15 +107,14 @@ function generateGiftCardHTML(data) {
     <div class="top-section">
       <div class="recipient-name">${receiverName}</div>
       <div class="recipient-address">
-        ${addressLine1}<br>
-        ${addressLine2}
+        ${addressLine1}${addressLine2 ? '<br>' + addressLine2 : ''}
       </div>
     </div>
     
     <!-- BOTTOM: Gift Message (centered in bottom half) -->
     <div class="message-section">
       <div class="gift-message">${giftMessage.replace(/\n/g, '<br>')}</div>
-      ${giftSender ? `<div class="gift-sender">${giftSender}</div>` : ''}
+      ${giftSender ? \`<div class="gift-sender">${giftSender}</div>\` : ''}
     </div>
   </div>
 </body>
