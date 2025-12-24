@@ -5,122 +5,41 @@
 // =============================================================================
 
 function generateGiftCardHTML(data) {
-  const { giftReceiver, giftMessage, giftSender, recipient, fontFamily, fontSize } = data;
+  const { giftReceiver, giftMessage, giftSender, recipient } = data;
 
-  // Use recipient name if no separate gift receiver specified
-  const receiverName = giftReceiver || recipient.name;
-  
-  // Format address lines separately
-  const addressLine1 = [recipient.address1, recipient.address2].filter(Boolean).join(', ');
-  const addressLine2 = recipient.city ? `${recipient.city}, ${recipient.province} ${recipient.zip}` : '';
+  var receiverName = giftReceiver || recipient.name;
+  var addressLine1 = [recipient.address1, recipient.address2].filter(Boolean).join(', ');
+  var addressLine2 = recipient.city ? (recipient.city + ', ' + recipient.province + ' ' + recipient.zip) : '';
+  var senderDiv = giftSender ? '<div class="gift-sender">' + giftSender + '</div>' : '';
+  var formattedMessage = (giftMessage || '').replace(/\n/g, '<br>');
 
-  // Default font settings
-  const messageFontFamily = fontFamily || 'Arial, sans-serif';
-  const messageFontSize = fontSize || '12pt';
+  var html = '<!DOCTYPE html><html dir="ltr"><head>';
+  html += '<title>Gift Card</title><meta charset="UTF-8">';
+  html += '<style>';
+  html += '@page { size: 4.2in 8.5in; margin: 0; }';
+  html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
+  html += 'body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: white; }';
+  html += '.card { width: 4.2in; height: 8.5in; position: relative; background: white; }';
+  html += '.top-section { position: absolute; top: 0.5in; left: 0; right: 0; text-align: center; padding: 0 0.3in; }';
+  html += '.recipient-name { font-size: 14pt; font-weight: bold; margin-bottom: 16px; color: #000; }';
+  html += '.recipient-address { font-size: 12pt; font-weight: bold; line-height: 1.4; color: #000; }';
+  html += '.message-section { position: absolute; top: 4.8in; left: 0; right: 0; text-align: center; padding: 0 0.4in; }';
+  html += '.gift-message { font-size: 12pt; font-weight: bold; line-height: 1.5; color: #000; }';
+  html += '.gift-sender { margin-top: 16px; font-size: 12pt; font-weight: bold; color: #000; }';
+  html += '</style></head><body>';
+  html += '<div class="card">';
+  html += '<div class="top-section">';
+  html += '<div class="recipient-name">' + receiverName + '</div>';
+  html += '<div class="recipient-address">' + addressLine1 + (addressLine2 ? '<br>' + addressLine2 : '') + '</div>';
+  html += '</div>';
+  html += '<div class="message-section">';
+  html += '<div class="gift-message">' + formattedMessage + '</div>';
+  html += senderDiv;
+  html += '</div>';
+  html += '</div>';
+  html += '</body></html>';
 
-  return `<!DOCTYPE html>
-<html dir="ltr">
-<head>
-  <title>Gift Card - ${receiverName}</title>
-  <meta charset="UTF-8">
-  <style>
-    @page {
-      size: 4.2in 8.5in;
-      margin: 0;
-    }
-    
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: Arial, sans-serif;
-      background: white;
-    }
-    
-    .card {
-      width: 4.2in;
-      height: 8.5in;
-      position: relative;
-      background: white;
-    }
-    
-    /* TOP SECTION - Recipient Name & Address */
-    .top-section {
-      position: absolute;
-      top: 0.5in;
-      left: 0;
-      right: 0;
-      text-align: center;
-      padding: 0 0.3in;
-    }
-    
-    .recipient-name {
-      font-size: 14pt;
-      font-weight: bold;
-      margin-bottom: 16px;
-      color: #000;
-    }
-    
-    .recipient-address {
-      font-size: 12pt;
-      font-weight: bold;
-      line-height: 1.4;
-      color: #000;
-    }
-    
-    /* MESSAGE SECTION - Centered in bottom half */
-    /* Fold line is at 4.25in, message centered below */
-    .message-section {
-      position: absolute;
-      top: 4.8in;
-      left: 0;
-      right: 0;
-      text-align: center;
-      padding: 0 0.4in;
-    }
-    
-    .gift-message {
-      font-family: ${messageFontFamily};
-      font-size: ${messageFontSize};
-      font-weight: bold;
-      line-height: 1.5;
-      color: #000;
-    }
-    
-    .gift-sender {
-      margin-top: 16px;
-      font-family: ${messageFontFamily};
-      font-size: ${messageFontSize};
-      font-weight: bold;
-      color: #000;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <!-- TOP: Recipient Name & Address -->
-    <div class="top-section">
-      <div class="recipient-name">${receiverName}</div>
-      <div class="recipient-address">
-        ${addressLine1}${addressLine2 ? '<br>' + addressLine2 : ''}
-      </div>
-    </div>
-    
-    <!-- BOTTOM: Gift Message (centered in bottom half) -->
-    <div class="message-section">
-      <div class="gift-message">${giftMessage.replace(/\n/g, '<br>')}</div>
-      ${giftSender ? \`<div class="gift-sender">${giftSender}</div>\` : ''}
-    </div>
-  </div>
-</body>
-</html>`;
+  return html;
 }
 
-module.exports = {
-  generateGiftCardHTML
-};
+module.exports = { generateGiftCardHTML };
