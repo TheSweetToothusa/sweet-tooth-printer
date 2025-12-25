@@ -366,13 +366,8 @@ app.post('/dashboard/print-custom/:orderId', express.urlencoded({ extended: true
       customData.recipient.city = req.body.address2;
     }
     var giftCardHTML = generateGiftCardHTML(customData);
-    var giftCardPdf = await giftCardToPdfBase64(giftCardHTML);
-    if (CONFIG.printNode.giftCardPrinterId) {
-      await sendToPrintNode(giftCardPdf, CONFIG.printNode.giftCardPrinterId, 'Gift Card - ' + req.body.recipientName);
-      res.send('<!DOCTYPE html><html><head><title>Print Sent</title></head><body style="font-family: sans-serif; text-align: center; padding: 50px;"><h1>Gift Card Sent to Printer</h1><p>Recipient: ' + req.body.recipientName + '</p><a href="/dashboard" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #2196F3; color: white; text-decoration: none; border-radius: 4px;">Back to Dashboard</a></body></html>');
-    } else {
-      res.status(500).send('Gift card printer not configured');
-    }
+    // Show printable page - user prints with Cmd+P and chooses their printer
+    res.send('<!DOCTYPE html><html><head><title>Print Gift Card</title><style>@media print { .no-print { display: none !important; } body { margin: 0; } } .no-print { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #4CAF50; color: white; padding: 12px 24px; border-radius: 6px; font-family: sans-serif; font-size: 14px; cursor: pointer; border: none; box-shadow: 0 2px 10px rgba(0,0,0,0.2); z-index: 1000; } .no-print:hover { background: #43A047; } .back-link { position: fixed; top: 20px; left: 20px; font-family: sans-serif; font-size: 14px; color: #333; text-decoration: none; } .back-link:hover { text-decoration: underline; }</style></head><body><a href="/dashboard" class="back-link no-print">← Back to Dashboard</a><button class="no-print" onclick="window.print()">Print (Cmd+P)</button>' + giftCardHTML + '<script>setTimeout(function(){window.print();},500);</script></body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
