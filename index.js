@@ -214,6 +214,110 @@ app.get('/debug/:orderId', async (req, res) => {
 
 app.get('/health', (req, res) => { res.json({ status: 'ok' }); });
 
+// ============ HELPER: Fetch 250 orders ============
+async function fetchOrders(limit) {
+  limit = limit || 250;
+  var allOrders = [];
+  var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?limit=250&status=any';
+  
+  while (allOrders.length < limit && url) {
+    var response = await fetch(url, { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    var data = await response.json();
+    allOrders = allOrders.concat(data.orders || []);
+    
+    // Check for next page
+    var linkHeader = response.headers.get('link');
+    if (linkHeader && linkHeader.indexOf('rel="next"') > -1) {
+      var match = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
+      url = match ? match[1] : null;
+    } else {
+      url = null;
+    }
+    
+    if (allOrders.length >= limit) break;
+  }
+  
+  return allOrders.slice(0, limit);
+}
+
+// ============ HELPER: Build comprehensive search string ============
+function buildSearchString(order) {
+  var parts = [];
+  
+  // Order number
+  parts.push(order.name || '');
+  parts.push(order.order_number ? order.order_number.toString() : '');
+  
+  // Customer info
+  if (order.customer) {
+    parts.push(order.customer.first_name || '');
+    parts.push(order.customer.last_name || '');
+    parts.push(order.customer.email || '');
+    parts.push(order.customer.phone || '');
+  }
+  
+  // Billing address
+  if (order.billing_address) {
+    parts.push(order.billing_address.first_name || '');
+    parts.push(order.billing_address.last_name || '');
+    parts.push(order.billing_address.name || '');
+    parts.push(order.billing_address.city || '');
+    parts.push(order.billing_address.company || '');
+    parts.push(order.billing_address.phone || '');
+  }
+  
+  // Shipping address (recipient)
+  if (order.shipping_address) {
+    parts.push(order.shipping_address.first_name || '');
+    parts.push(order.shipping_address.last_name || '');
+    parts.push(order.shipping_address.name || '');
+    parts.push(order.shipping_address.city || '');
+    parts.push(order.shipping_address.company || '');
+    parts.push(order.shipping_address.phone || '');
+    parts.push(order.shipping_address.address1 || '');
+  }
+  
+  // Note attributes (gift sender, gift receiver, etc.)
+  if (order.note_attributes) {
+    for (var i = 0; i < order.note_attributes.length; i++) {
+      parts.push(order.note_attributes[i].value || '');
+    }
+  }
+  
+  // Product names and SKUs
+  if (order.line_items) {
+    for (var j = 0; j < order.line_items.length; j++) {
+      var item = order.line_items[j];
+      parts.push(item.title || '');
+      parts.push(item.sku || '');
+      parts.push(item.variant_title || '');
+      parts.push(item.vendor || '');
+    }
+  }
+  
+  // Shipping method
+  if (order.shipping_lines && order.shipping_lines[0]) {
+    parts.push(order.shipping_lines[0].title || '');
+  }
+  
+  // Order date
+  if (order.created_at) {
+    var d = new Date(order.created_at);
+    parts.push(d.toLocaleDateString());
+  }
+  
+  // Total
+  parts.push(order.total_price || '');
+  
+  // Tags
+  parts.push(order.tags || '');
+  
+  // Order note
+  parts.push(order.note || '');
+  
+  return parts.join(' ').toLowerCase();
+}
+
 // ============ STYLES ============
 var dashboardStyles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -224,8 +328,11 @@ var dashboardStyles = `
   .tab { padding: 10px 20px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; text-decoration: none; }
   .tab.active { background: #2196F3; color: white; }
   .tab:not(.active) { background: #e0e0e0; color: #333; }
-  .search-box { width: 100%; padding: 12px 16px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 20px; }
+  .search-container { position: relative; margin-bottom: 20px; }
+  .search-box { width: 100%; padding: 12px 16px; font-size: 16px; border: 1px solid #ddd; border-radius: 8px; }
   .search-box:focus { outline: none; border-color: #2196F3; }
+  .search-hint { font-size: 12px; color: #888; margin-top: 6px; }
+  .order-count { font-size: 13px; color: #666; margin-bottom: 16px; }
   .order-card { background: white; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
   .order-card.hidden { display: none; }
   .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -235,6 +342,7 @@ var dashboardStyles = `
   .order-details { display: flex; gap: 16px; margin: 8px 0; font-size: 13px; color: #666; }
   .gift-message, .special-notes { background: #f9f9f9; padding: 10px; border-radius: 4px; margin: 8px 0; font-size: 14px; line-height: 1.5; }
   .sender { font-style: italic; color: #666; font-size: 13px; }
+  .products { font-size: 12px; color: #888; margin-top: 6px; }
   .actions { margin-top: 12px; }
   .btn { display: inline-block; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 13px; font-weight: 500; margin-right: 8px; cursor: pointer; border: none; }
   .btn-edit { background: #2196F3; color: white; }
@@ -242,6 +350,7 @@ var dashboardStyles = `
   .empty { text-align: center; padding: 40px; color: #666; }
   .no-results { text-align: center; padding: 40px; color: #666; display: none; }
   .note { background: #fff3cd; padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 13px; color: #856404; }
+  .loading { text-align: center; padding: 40px; color: #666; }
 `;
 
 var editStyles = `
@@ -272,12 +381,11 @@ var editStyles = `
 // ============ GIFT CARD DASHBOARD ============
 app.get('/dashboard', async (req, res) => {
   try {
-    var response = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?limit=50&status=any', { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
-    var data = await response.json();
+    var orders = await fetchOrders(250);
     var ordersWithGifts = [];
     
-    for (var i = 0; i < data.orders.length; i++) {
-      var order = data.orders[i];
+    for (var i = 0; i < orders.length; i++) {
+      var order = orders[i];
       var notes = {};
       if (order.note_attributes) {
         for (var j = 0; j < order.note_attributes.length; j++) {
@@ -287,17 +395,30 @@ app.get('/dashboard', async (req, res) => {
       if (notes['Gift Message'] && notes['Gift Message'].trim()) {
         var recipient = order.shipping_address ? order.shipping_address.name : 'N/A';
         var sender = notes['Gift Sender'] || '';
+        var giftReceiver = notes['Gift Receiver'] || recipient;
         var orderDate = new Date(order.created_at).toLocaleDateString();
         var total = order.total_price || '0.00';
+        
+        // Get product names
+        var products = [];
+        if (order.line_items) {
+          for (var p = 0; p < order.line_items.length; p++) {
+            products.push(order.line_items[p].title);
+          }
+        }
+        
         ordersWithGifts.push({
           id: order.id,
           name: order.name,
           created: orderDate,
           recipient: recipient,
+          giftReceiver: giftReceiver,
           giftMessage: notes['Gift Message'],
           giftSender: sender,
           total: total,
-          searchStr: (order.name + ' ' + recipient + ' ' + sender + ' ' + orderDate + ' ' + total).toLowerCase()
+          products: products.join(', '),
+          city: order.shipping_address ? order.shipping_address.city : '',
+          searchStr: buildSearchString(order)
         });
       }
     }
@@ -305,22 +426,28 @@ app.get('/dashboard', async (req, res) => {
     var orderCards = '';
     for (var k = 0; k < ordersWithGifts.length; k++) {
       var o = ordersWithGifts[k];
-      orderCards += '<div class="order-card" data-search="' + o.searchStr + '">' +
+      var msgPreview = o.giftMessage.length > 150 ? o.giftMessage.substring(0, 150) + '...' : o.giftMessage;
+      orderCards += '<div class="order-card" data-search="' + o.searchStr.replace(/"/g, '&quot;') + '">' +
         '<div class="order-header"><span class="order-number">' + o.name + '</span><span class="order-date">' + o.created + '</span></div>' +
-        '<div class="recipient">To: <strong>' + o.recipient + '</strong></div>' +
-        '<div class="gift-message">' + o.giftMessage + '</div>' +
+        '<div class="recipient">To: <strong>' + o.giftReceiver + '</strong>' + (o.city ? ' — ' + o.city : '') + '</div>' +
+        '<div class="gift-message">' + msgPreview.replace(/\n/g, '<br>') + '</div>' +
         '<div class="sender">From: ' + (o.giftSender || 'Not specified') + '</div>' +
+        '<div class="products">Products: ' + (o.products || 'N/A') + '</div>' +
         '<div class="actions"><a href="/dashboard/edit/' + o.id + '" class="btn btn-edit">Edit & Print</a></div></div>';
     }
     
     var html = '<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><style>' + dashboardStyles + '</style></head><body>' +
       '<h1>Dashboard</h1>' +
       '<div class="tabs"><a href="/dashboard" class="tab active">Gift Cards</a><a href="/dashboard/invoices" class="tab">Invoices</a></div>' +
-      '<div class="note">📋 Data is pulled from Shopify in real-time. Edits are for printing only and do not update Shopify.</div>' +
-      '<input type="text" class="search-box" id="searchBox" placeholder="Search by order #, name, date, amount..." oninput="filterOrders()">' +
+      '<div class="note">📋 Showing last 250 orders from Shopify. Search by order #, name, city, product, etc.</div>' +
+      '<div class="search-container">' +
+      '<input type="text" class="search-box" id="searchBox" placeholder="Search by order #, customer name, recipient, city, product..." oninput="filterOrders()">' +
+      '<div class="search-hint">Try: "Mike", "Miami", "truffle", "#34032", etc.</div>' +
+      '</div>' +
+      '<div class="order-count" id="orderCount">' + ordersWithGifts.length + ' orders with gift messages</div>' +
       (ordersWithGifts.length === 0 ? '<div class="empty">No orders with gift messages found</div>' : orderCards) +
       '<div class="no-results" id="noResults">No matching orders found</div>' +
-      '<script>function filterOrders(){var q=document.getElementById("searchBox").value.toLowerCase().trim();var cards=document.querySelectorAll(".order-card");var found=0;for(var i=0;i<cards.length;i++){var card=cards[i];var searchData=card.getAttribute("data-search");if(!q||searchData.indexOf(q)>-1){card.classList.remove("hidden");found++;}else{card.classList.add("hidden");}}var nr=document.getElementById("noResults");if(nr)nr.style.display=(found===0&&q)?"block":"none";}</script></body></html>';
+      '<script>function filterOrders(){var q=document.getElementById("searchBox").value.toLowerCase().trim();var cards=document.querySelectorAll(".order-card");var found=0;for(var i=0;i<cards.length;i++){var card=cards[i];var searchData=card.getAttribute("data-search");if(!q||searchData.indexOf(q)>-1){card.classList.remove("hidden");found++;}else{card.classList.add("hidden");}}document.getElementById("orderCount").textContent=found+" orders"+(q?" matching \\""+q+"\\"":"");var nr=document.getElementById("noResults");if(nr)nr.style.display=(found===0&&q)?"block":"none";}</script></body></html>';
     
     res.send(html);
   } catch (error) { res.status(500).send('Error: ' + error.message); }
@@ -329,34 +456,50 @@ app.get('/dashboard', async (req, res) => {
 // ============ INVOICE DASHBOARD ============
 app.get('/dashboard/invoices', async (req, res) => {
   try {
-    var response = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?limit=50&status=any', { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
-    var data = await response.json();
+    var orders = await fetchOrders(250);
     var orderCards = '';
     
-    for (var i = 0; i < data.orders.length; i++) {
-      var order = data.orders[i];
-      var recipient = order.shipping_address ? order.shipping_address.name : 'N/A';
-      var shippingType = order.shipping_lines && order.shipping_lines[0] ? order.shipping_lines[0].title : 'Standard';
+    for (var i = 0; i < orders.length; i++) {
+      var order = orders[i];
+      var recipient = order.shipping_address ? order.shipping_address.name : (order.customer ? (order.customer.first_name + ' ' + order.customer.last_name) : 'N/A');
+      var city = order.shipping_address ? order.shipping_address.city : '';
+      var shippingType = order.shipping_lines && order.shipping_lines[0] ? order.shipping_lines[0].title : (isInStoreOrder(order) ? 'In Store' : 'Standard');
       var orderDate = new Date(order.created_at).toLocaleDateString();
       var total = '$' + (order.total_price || '0.00');
-      var itemCount = order.line_items ? order.line_items.length : 0;
-      var searchStr = (order.name + ' ' + recipient + ' ' + shippingType + ' ' + orderDate + ' ' + total).toLowerCase();
       
-      orderCards += '<div class="order-card" data-search="' + searchStr + '">' +
+      // Get product names
+      var products = [];
+      if (order.line_items) {
+        for (var p = 0; p < order.line_items.length; p++) {
+          var title = order.line_items[p].title;
+          if (title.toLowerCase().indexOf('tip') === -1) {
+            products.push(title);
+          }
+        }
+      }
+      
+      var searchStr = buildSearchString(order);
+      
+      orderCards += '<div class="order-card" data-search="' + searchStr.replace(/"/g, '&quot;') + '">' +
         '<div class="order-header"><span class="order-number">' + order.name + '</span><span class="order-date">' + orderDate + '</span></div>' +
-        '<div class="recipient">To: <strong>' + recipient + '</strong></div>' +
-        '<div class="order-details"><span>' + shippingType + '</span><span>' + itemCount + ' item(s)</span><span>' + total + '</span></div>' +
+        '<div class="recipient">To: <strong>' + recipient + '</strong>' + (city ? ' — ' + city : '') + '</div>' +
+        '<div class="order-details"><span>' + shippingType + '</span><span>' + products.length + ' item(s)</span><span>' + total + '</span></div>' +
+        '<div class="products">Products: ' + (products.join(', ') || 'N/A') + '</div>' +
         '<div class="actions"><a href="/dashboard/invoice/edit/' + order.id + '" class="btn btn-edit">Edit & Print</a></div></div>';
     }
     
     var html = '<!DOCTYPE html><html><head><title>Invoice Dashboard</title><style>' + dashboardStyles + '</style></head><body>' +
       '<h1>Dashboard</h1>' +
       '<div class="tabs"><a href="/dashboard" class="tab">Gift Cards</a><a href="/dashboard/invoices" class="tab active">Invoices</a></div>' +
-      '<div class="note">📋 Data is pulled from Shopify in real-time. Edits are for printing only and do not update Shopify.</div>' +
-      '<input type="text" class="search-box" id="searchBox" placeholder="Search by order #, name, delivery type, date, amount..." oninput="filterOrders()">' +
+      '<div class="note">📋 Showing last 250 orders from Shopify. Search by order #, name, city, product, etc.</div>' +
+      '<div class="search-container">' +
+      '<input type="text" class="search-box" id="searchBox" placeholder="Search by order #, customer name, recipient, city, product..." oninput="filterOrders()">' +
+      '<div class="search-hint">Try: "Mike", "Miami", "truffle", "#34032", "delivery", etc.</div>' +
+      '</div>' +
+      '<div class="order-count" id="orderCount">' + orders.length + ' orders</div>' +
       orderCards +
       '<div class="no-results" id="noResults">No matching orders found</div>' +
-      '<script>function filterOrders(){var q=document.getElementById("searchBox").value.toLowerCase().trim();var cards=document.querySelectorAll(".order-card");var found=0;for(var i=0;i<cards.length;i++){var card=cards[i];var searchData=card.getAttribute("data-search");if(!q||searchData.indexOf(q)>-1){card.classList.remove("hidden");found++;}else{card.classList.add("hidden");}}var nr=document.getElementById("noResults");if(nr)nr.style.display=(found===0&&q)?"block":"none";}</script></body></html>';
+      '<script>function filterOrders(){var q=document.getElementById("searchBox").value.toLowerCase().trim();var cards=document.querySelectorAll(".order-card");var found=0;for(var i=0;i<cards.length;i++){var card=cards[i];var searchData=card.getAttribute("data-search");if(!q||searchData.indexOf(q)>-1){card.classList.remove("hidden");found++;}else{card.classList.add("hidden");}}document.getElementById("orderCount").textContent=found+" orders"+(q?" matching \\""+q+"\\"":"");var nr=document.getElementById("noResults");if(nr)nr.style.display=(found===0&&q)?"block":"none";}</script></body></html>';
     
     res.send(html);
   } catch (error) { res.status(500).send('Error: ' + error.message); }
