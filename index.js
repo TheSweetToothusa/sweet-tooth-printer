@@ -23,6 +23,13 @@ const CONFIG = {
   }
 };
 
+// Log config on startup (without sensitive values)
+console.log('=== Sweet Tooth Printer Starting ===');
+console.log('Invoice Printer ID:', CONFIG.printNode.invoicePrinterId || 'NOT SET');
+console.log('Gift Card Printer ID:', CONFIG.printNode.giftCardPrinterId || 'NOT SET');
+console.log('Shopify Store:', CONFIG.shopify.store || 'NOT SET');
+console.log('=====================================');
+
 app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
@@ -59,6 +66,7 @@ async function giftCardToPdfBase64(html) {
 }
 
 async function sendToPrintNode(pdfBase64, printerId, title) {
+  console.log('Sending to PrintNode - Printer:', printerId, 'Title:', title);
   var response = await fetch('https://api.printnode.com/printjobs', {
     method: 'POST',
     headers: {
@@ -67,49 +75,140 @@ async function sendToPrintNode(pdfBase64, printerId, title) {
     },
     body: JSON.stringify({ printerId: parseInt(printerId), title: title, contentType: 'pdf_base64', content: pdfBase64, source: 'Sweet Tooth Order Printer' })
   });
-  if (!response.ok) { throw new Error('PrintNode error: ' + response.status); }
-  return await response.json();
+  if (!response.ok) { 
+    var errorText = await response.text();
+    console.log('PrintNode ERROR:', response.status, errorText);
+    throw new Error('PrintNode error: ' + response.status); 
+  }
+  var result = await response.json();
+  console.log('PrintNode SUCCESS - Job ID:', result);
+  return result;
+}
+
+// Check if order is from POS (in-store)
+function isInStoreOrder(order) {
+  var sourceName = (order.source_name || '').toLowerCase();
+  return sourceName === 'pos' || sourceName === 'shopify_pos' || sourceName.indexOf('pos') > -1;
 }
 
 async function printOrder(order) {
+  var orderName = order.name || ('#' + order.order_number);
+  console.log('');
+  console.log('========== PROCESSING ORDER:', orderName, '==========');
+  console.log('Source:', order.source_name);
+  
   try {
     var orderData = extractOrderData(order);
+    console.log('Delivery Type:', orderData.deliveryType);
+    console.log('Gift Message:', orderData.giftMessage ? 'YES (' + orderData.giftMessage.substring(0, 50) + '...)' : 'NO');
+    
+    // Print invoice
     var invoiceHTML = generateInvoiceHTML(orderData);
     var invoicePdf = await htmlToPdfBase64(invoiceHTML);
     if (CONFIG.printNode.invoicePrinterId) {
       await sendToPrintNode(invoicePdf, CONFIG.printNode.invoicePrinterId, 'Invoice ' + orderData.orderNumber);
+      console.log('✓ Invoice sent to printer');
+    } else {
+      console.log('✗ Invoice printer not configured');
     }
-    if (orderData.giftMessage && orderData.giftMessage.trim()) {
+    
+    // Print gift card ONLY if:
+    // 1. NOT an in-store order
+    // 2. Has a gift message
+    // 3. Gift card printer is configured
+    var inStore = isInStoreOrder(order);
+    console.log('Is In-Store Order:', inStore);
+    
+    if (inStore) {
+      console.log('→ Skipping gift card (in-store order)');
+    } else if (!orderData.giftMessage || !orderData.giftMessage.trim()) {
+      console.log('→ No gift card (no gift message)');
+    } else if (!CONFIG.printNode.giftCardPrinterId) {
+      console.log('✗ Gift card printer not configured!');
+    } else {
+      console.log('→ Printing gift card...');
       var giftCardHTML = generateGiftCardHTML(orderData);
       var giftCardPdf = await giftCardToPdfBase64(giftCardHTML);
-      if (CONFIG.printNode.giftCardPrinterId) {
-        await sendToPrintNode(giftCardPdf, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderData.orderNumber);
-      }
+      await sendToPrintNode(giftCardPdf, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderData.orderNumber);
+      console.log('✓ Gift card sent to printer');
     }
+    
+    console.log('========== ORDER COMPLETE:', orderName, '==========');
+    console.log('');
     return { success: true, orderNumber: orderData.orderNumber };
   } catch (error) {
+    console.log('✗ ERROR processing order:', error.message);
     return { success: false, error: error.message };
   }
 }
 
 // Webhooks
 app.post('/webhook/orders/create', async (req, res) => {
-  if (!verifyShopifyWebhook(req)) { return res.status(401).send('Unauthorized'); }
+  console.log('');
+  console.log('>>> WEBHOOK RECEIVED: orders/create');
+  
+  if (!verifyShopifyWebhook(req)) { 
+    console.log('>>> WEBHOOK REJECTED: Invalid signature');
+    return res.status(401).send('Unauthorized'); 
+  }
+  
   res.status(200).send('OK');
-  await printOrder(JSON.parse(req.body));
+  console.log('>>> WEBHOOK VERIFIED - Processing...');
+  
+  var order = JSON.parse(req.body);
+  await printOrder(order);
 });
 
 app.post('/webhook/orders/paid', async (req, res) => {
-  if (!verifyShopifyWebhook(req)) { return res.status(401).send('Unauthorized'); }
+  console.log('');
+  console.log('>>> WEBHOOK RECEIVED: orders/paid');
+  
+  if (!verifyShopifyWebhook(req)) { 
+    console.log('>>> WEBHOOK REJECTED: Invalid signature');
+    return res.status(401).send('Unauthorized'); 
+  }
+  
   res.status(200).send('OK');
-  await printOrder(JSON.parse(req.body));
+  console.log('>>> WEBHOOK VERIFIED - Processing...');
+  
+  var order = JSON.parse(req.body);
+  await printOrder(order);
 });
 
 app.get('/print/:orderId', async (req, res) => {
+  console.log('Manual print requested for order ID:', req.params.orderId);
   try {
     var response = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + req.params.orderId + '.json', { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
     if (!response.ok) { return res.status(404).json({ error: 'Order not found' }); }
     res.json(await printOrder((await response.json()).order));
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+// Debug endpoint to check gift message extraction
+app.get('/debug/:orderId', async (req, res) => {
+  try {
+    var response = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + req.params.orderId + '.json', { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    if (!response.ok) { return res.status(404).json({ error: 'Order not found' }); }
+    var data = await response.json();
+    var order = data.order;
+    var orderData = extractOrderData(order);
+    
+    res.json({
+      orderNumber: order.name,
+      source_name: order.source_name,
+      isInStore: isInStoreOrder(order),
+      note_attributes: order.note_attributes,
+      extracted: {
+        deliveryType: orderData.deliveryType,
+        giftMessage: orderData.giftMessage,
+        giftSender: orderData.giftSender,
+        giftReceiver: orderData.giftReceiver
+      },
+      config: {
+        invoicePrinterConfigured: !!CONFIG.printNode.invoicePrinterId,
+        giftCardPrinterConfigured: !!CONFIG.printNode.giftCardPrinterId
+      }
+    });
   } catch (error) { res.status(500).json({ error: error.message }); }
 });
 
