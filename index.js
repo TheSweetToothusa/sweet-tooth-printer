@@ -301,7 +301,8 @@ app.get('/dashboard/edit/:orderId', async (req, res) => {
 'function updatePreview() {' +
 '  document.getElementById("previewRecipient").textContent = document.getElementById("recipientName").value;' +
 '  document.getElementById("previewAddress").innerHTML = document.getElementById("address1").value + "<br>" + document.getElementById("address2").value;' +
-'  document.getElementById("previewMessage").textContent = document.getElementById("giftMessage").value;' +
+'  var msgText = document.getElementById("giftMessage").value;' +
+'  document.getElementById("previewMessage").innerHTML = msgText.replace(/\\n/g, "<br>");' +
 '  document.getElementById("previewSender").textContent = document.getElementById("giftSender").value;' +
 '  var fontFamily = document.getElementById("fontFamily").value;' +
 '  var fontSize = document.getElementById("fontSize").value + "pt";' +
