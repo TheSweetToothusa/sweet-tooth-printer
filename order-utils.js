@@ -15,8 +15,14 @@ function extractOrderData(order) {
   if (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) {
     shippingTitle = order.shipping_lines[0].title.toLowerCase();
   }
+  
+  // Check if this is a POS (in-store) order FIRST
+  var sourceName = (order.source_name || '').toLowerCase();
   var deliveryType = 'shipping';
-  if (shippingTitle.indexOf('local') > -1 || shippingTitle.indexOf('delivery') > -1) {
+  
+  if (sourceName === 'pos' || sourceName === 'shopify_pos' || sourceName.indexOf('pos') > -1) {
+    deliveryType = 'instore';
+  } else if (shippingTitle.indexOf('local') > -1 || shippingTitle.indexOf('delivery') > -1) {
     deliveryType = 'local-delivery';
   } else if (shippingTitle.indexOf('pickup') > -1 || shippingTitle.indexOf('pick up') > -1) {
     deliveryType = 'pickup';
@@ -169,7 +175,11 @@ function generateInvoiceHTML(data) {
   var cityDisplay = '';
   var dateLabel = 'Ship By Date';
 
-  if (deliveryType === 'local-delivery') {
+  if (deliveryType === 'instore') {
+    badgeText = 'IN STORE';
+    cityDisplay = '';
+    dateLabel = 'Order Date';
+  } else if (deliveryType === 'local-delivery') {
     badgeText = 'LOCAL DELIVERY';
     cityDisplay = recipient.city.toUpperCase();
     dateLabel = 'Delivery Date';
@@ -197,7 +207,9 @@ function generateInvoiceHTML(data) {
 
   // Top right section varies by type
   var topRightHTML = '';
-  if (deliveryType === 'local-delivery') {
+  if (deliveryType === 'instore') {
+    topRightHTML = '<div class="pickup-info"><div class="pickup-label">In Store Purchase</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
+  } else if (deliveryType === 'local-delivery') {
     topRightHTML = '<div class="city-badge"><div class="city-label">Delivering To</div><div class="city-name">' + cityDisplay + '</div></div>';
   } else if (deliveryType === 'pickup') {
     topRightHTML = '<div class="pickup-info"><div class="pickup-label">Pickup Location</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
@@ -206,13 +218,18 @@ function generateInvoiceHTML(data) {
   }
 
   // Recipient card label
-  var recipientLabel = deliveryType === 'pickup' ? 'Customer Picking Up' : 'Recipient — Deliver To';
+  var recipientLabel = 'Recipient — Deliver To';
+  if (deliveryType === 'pickup') {
+    recipientLabel = 'Customer Picking Up';
+  } else if (deliveryType === 'instore') {
+    recipientLabel = 'Customer';
+  }
 
   // Phone HTML
   var phoneHTML = recipient.phone ? '<div class="recipient-phone">☎ ' + recipient.phone + '</div>' : '';
   
-  // Address HTML (hide for pickup)
-  var addressHTML = deliveryType !== 'pickup' ? '<div class="recipient-address">' + addressLines + '</div>' : '';
+  // Address HTML (hide for pickup and instore)
+  var addressHTML = (deliveryType !== 'pickup' && deliveryType !== 'instore') ? '<div class="recipient-address">' + addressLines + '</div>' : '';
   
   // Giver details
   var giverEmailHTML = giver.email ? '<div class="giver-detail">' + giver.email + '</div>' : '';
