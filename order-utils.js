@@ -15,14 +15,8 @@ function extractOrderData(order) {
   if (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) {
     shippingTitle = order.shipping_lines[0].title.toLowerCase();
   }
-  
-  // Check if this is a POS (in-store) order FIRST
-  var sourceName = (order.source_name || '').toLowerCase();
   var deliveryType = 'shipping';
-  
-  if (sourceName === 'pos' || sourceName === 'shopify_pos' || sourceName.indexOf('pos') > -1) {
-    deliveryType = 'instore';
-  } else if (shippingTitle.indexOf('local') > -1 || shippingTitle.indexOf('delivery') > -1) {
+  if (shippingTitle.indexOf('local') > -1 || shippingTitle.indexOf('delivery') > -1) {
     deliveryType = 'local-delivery';
   } else if (shippingTitle.indexOf('pickup') > -1 || shippingTitle.indexOf('pick up') > -1) {
     deliveryType = 'pickup';
@@ -141,11 +135,29 @@ function extractOrderData(order) {
     year: 'numeric'
   });
 
+  // Format delivery date with day of week
+  var deliveryDateRaw = notes['Delivery Date'] || '';
+  var deliveryDateFormatted = 'TBD';
+  if (deliveryDateRaw) {
+    try {
+      var dateObj = new Date(deliveryDateRaw);
+      if (!isNaN(dateObj.getTime())) {
+        var dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        var monthDay = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        deliveryDateFormatted = dayOfWeek + '  ' + monthDay;
+      } else {
+        deliveryDateFormatted = deliveryDateRaw;
+      }
+    } catch (e) {
+      deliveryDateFormatted = deliveryDateRaw;
+    }
+  }
+
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
     deliveryType: deliveryType,
-    deliveryDate: notes['Delivery Date'] || 'TBD',
+    deliveryDate: deliveryDateFormatted,
     recipient: recipient,
     giver: giver,
     items: items,
@@ -175,11 +187,7 @@ function generateInvoiceHTML(data) {
   var cityDisplay = '';
   var dateLabel = 'Ship By Date';
 
-  if (deliveryType === 'instore') {
-    badgeText = 'IN STORE';
-    cityDisplay = '';
-    dateLabel = 'Order Date';
-  } else if (deliveryType === 'local-delivery') {
+  if (deliveryType === 'local-delivery') {
     badgeText = 'LOCAL DELIVERY';
     cityDisplay = recipient.city.toUpperCase();
     dateLabel = 'Delivery Date';
@@ -198,18 +206,16 @@ function generateInvoiceHTML(data) {
   }
   var addressLines = addressParts.join('<br>');
 
-  // Generate items rows
+  // Generate items rows - LARGER AND BOLD item names
   var itemRows = '';
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    itemRows += '<tr><td>' + item.title + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
+    itemRows += '<tr><td class="item-name">' + item.title + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
   }
 
   // Top right section varies by type
   var topRightHTML = '';
-  if (deliveryType === 'instore') {
-    topRightHTML = '<div class="pickup-info"><div class="pickup-label">In Store Purchase</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
-  } else if (deliveryType === 'local-delivery') {
+  if (deliveryType === 'local-delivery') {
     topRightHTML = '<div class="city-badge"><div class="city-label">Delivering To</div><div class="city-name">' + cityDisplay + '</div></div>';
   } else if (deliveryType === 'pickup') {
     topRightHTML = '<div class="pickup-info"><div class="pickup-label">Pickup Location</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
@@ -218,18 +224,13 @@ function generateInvoiceHTML(data) {
   }
 
   // Recipient card label
-  var recipientLabel = 'Recipient — Deliver To';
-  if (deliveryType === 'pickup') {
-    recipientLabel = 'Customer Picking Up';
-  } else if (deliveryType === 'instore') {
-    recipientLabel = 'Customer';
-  }
+  var recipientLabel = deliveryType === 'pickup' ? 'Customer Picking Up' : 'Recipient — Deliver To';
 
   // Phone HTML
   var phoneHTML = recipient.phone ? '<div class="recipient-phone">☎ ' + recipient.phone + '</div>' : '';
   
-  // Address HTML (hide for pickup and instore)
-  var addressHTML = (deliveryType !== 'pickup' && deliveryType !== 'instore') ? '<div class="recipient-address">' + addressLines + '</div>' : '';
+  // Address HTML (hide for pickup)
+  var addressHTML = deliveryType !== 'pickup' ? '<div class="recipient-address">' + addressLines + '</div>' : '';
   
   // Giver details
   var giverEmailHTML = giver.email ? '<div class="giver-detail">' + giver.email + '</div>' : '';
@@ -252,8 +253,9 @@ function generateInvoiceHTML(data) {
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
   html += 'body { font-family: Manrope, -apple-system, sans-serif; font-size: 11px; line-height: 1.4; color: #000; background: white; }';
   html += '.invoice-page { width: 8.5in; min-height: 11in; padding: 0.5in; background: white; }';
-  html += '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #000; }';
+  html += '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #000; }';
   html += '.delivery-badge { display: inline-block; padding: 10px 20px; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 3px solid #000; }';
+  html += '.order-number-header { font-size: 28px; font-weight: 800; text-align: center; }';
   html += '.city-badge, .pickup-info, .shipping-info { text-align: right; }';
   html += '.city-label, .pickup-label, .shipping-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px; }';
   html += '.city-name { font-size: 26px; font-weight: 800; text-transform: uppercase; }';
@@ -261,12 +263,10 @@ function generateInvoiceHTML(data) {
   html += '.pickup-address { font-size: 10px; margin-top: 4px; line-height: 1.4; }';
   html += '.shipping-destination { font-size: 18px; font-weight: 800; text-transform: uppercase; }';
   html += '.shipping-state { font-size: 11px; margin-top: 2px; }';
-  html += '.order-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; margin-bottom: 16px; border-bottom: 1px solid #000; }';
-  html += '.order-number { font-size: 14px; font-weight: 700; }';
-  html += '.order-number span { font-weight: 400; }';
+  html += '.date-bar { display: flex; justify-content: flex-end; padding: 10px 0; margin-bottom: 16px; border-bottom: 1px solid #000; }';
   html += '.delivery-date { text-align: right; }';
   html += '.delivery-date-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }';
-  html += '.delivery-date-value { font-size: 16px; font-weight: 800; }';
+  html += '.delivery-date-value { font-size: 14px; font-weight: 800; }';
   html += '.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }';
   html += '.info-card { border: 1px solid #000; padding: 14px; }';
   html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #000; }';
@@ -281,8 +281,8 @@ function generateInvoiceHTML(data) {
   html += '.items-table { width: 100%; border-collapse: collapse; }';
   html += '.items-table th { text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-top: 2px solid #000; border-bottom: 1px solid #000; }';
   html += '.items-table th:last-child { text-align: right; }';
-  html += '.items-table td { padding: 8px 10px; border-bottom: 1px solid #ccc; font-size: 11px; }';
-  html += '.items-table td:first-child { font-weight: 500; }';
+  html += '.items-table td { padding: 10px 10px; border-bottom: 1px solid #ccc; font-size: 11px; }';
+  html += '.items-table td.item-name { font-size: 16px; font-weight: 800; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
   html += '.special-notes { border: 2px dashed #000; padding: 14px; }';
@@ -294,8 +294,8 @@ function generateInvoiceHTML(data) {
   html += '.print-timestamp { font-size: 9px; }';
   html += '</style></head><body>';
   html += '<div class="invoice-page">';
-  html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div>' + topRightHTML + '</div>';
-  html += '<div class="order-bar"><div class="order-number"><span>Order</span> ' + orderNumber + '</div><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div><div class="delivery-date-value">' + deliveryDate + '</div></div></div>';
+  html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
+  html += '<div class="date-bar"><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div><div class="delivery-date-value">' + deliveryDate + '</div></div></div>';
   html += '<div class="content-grid">';
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
   html += '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
