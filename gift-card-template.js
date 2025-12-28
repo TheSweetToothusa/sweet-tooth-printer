@@ -8,7 +8,7 @@ function generateGiftCardHTML(data) {
   var fontWeight = data.fontWeight || 'bold';
   var fontStyle = data.fontStyle || 'normal';
   var topPosition = data.topPosition || '0.5in';
-  var messagePosition = data.messagePosition || '4.8in';
+  var messagePosition = data.messagePosition || '3.8in';
 
   var receiverName = giftReceiver || recipient.name;
   var addressLine1 = [recipient.address1, recipient.address2].filter(Boolean).join(', ');
@@ -34,10 +34,10 @@ function generateGiftCardHTML(data) {
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
   html += 'body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: white; }';
   html += '.card { width: 4.2in; height: 8.5in; position: relative; background: white; }';
-  html += '.top-section { position: absolute; top: ' + topInches + '; left: 0; right: 0; text-align: center; padding: 0 0.3in; }';
+  html += '.top-section { position: absolute; top: ' + topInches + '; left: 0; right: 0; text-align: center; padding: 0 0.5in; }';
   html += '.recipient-name { font-size: 14pt; font-weight: bold; margin-bottom: 16px; color: #000; }';
-  html += '.recipient-address { font-size: 12pt; font-weight: bold; line-height: 1.4; color: #000; }';
-  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0; right: 0; text-align: center; padding: 0 0.4in; }';
+  html += '.recipient-address { font-size: 11pt; font-weight: bold; line-height: 1.4; color: #000; }';
+  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0; right: 0; text-align: center; padding: 0 0.5in; }';
   html += '.gift-message { font-family: ' + fontFamily + '; font-size: ' + fontSize + '; font-weight: ' + fontWeight + '; font-style: ' + fontStyle + '; line-height: 1.5; color: #000; }';
   html += '.gift-sender { margin-top: 16px; font-family: ' + fontFamily + '; font-size: ' + fontSize + '; font-weight: ' + fontWeight + '; font-style: ' + fontStyle + '; color: #000; }';
   html += '</style></head><body>';
