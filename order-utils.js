@@ -135,7 +135,7 @@ function extractOrderData(order) {
     year: 'numeric'
   });
 
-  // Format delivery date with day of week
+  // Format delivery date with day of week and abbreviated month
   var deliveryDateRaw = notes['Delivery Date'] || '';
   var deliveryDateFormatted = 'TBD';
   if (deliveryDateRaw) {
@@ -143,8 +143,10 @@ function extractOrderData(order) {
       var dateObj = new Date(deliveryDateRaw);
       if (!isNaN(dateObj.getTime())) {
         var dayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-        var monthDay = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        deliveryDateFormatted = dayOfWeek + '  ' + monthDay;
+        var month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        var day = dateObj.getDate();
+        var year = dateObj.getFullYear();
+        deliveryDateFormatted = dayOfWeek + '  ' + month + ' ' + day + ', ' + year;
       } else {
         deliveryDateFormatted = deliveryDateRaw;
       }
@@ -181,11 +183,13 @@ function generateInvoiceHTML(data) {
   var orderNumber = data.orderNumber;
   var deliveryDate = data.deliveryDate;
   var specialInstructions = data.specialInstructions;
+  var giftMessage = data.giftMessage;
+  var giftSender = data.giftSender;
 
   // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
   var cityDisplay = '';
-  var dateLabel = 'Ship By Date';
+  var dateLabel = 'Ship Date';
 
   if (deliveryType === 'local-delivery') {
     badgeText = 'LOCAL DELIVERY';
@@ -241,6 +245,13 @@ function generateInvoiceHTML(data) {
   var instructionsClass = specialInstructions ? '' : 'no-notes';
   var instructionsContent = specialInstructions ? instructionsDisplay : 'No special instructions';
 
+  // Gift message section
+  var giftMessageHTML = '';
+  if (giftMessage && giftMessage.trim()) {
+    var formattedGiftMessage = giftMessage.replace(/\n/g, '<br>');
+    giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
+  }
+
   // Print timestamp
   var now = new Date();
   var printTimestamp = now.toLocaleString('en-US', { 
@@ -285,10 +296,14 @@ function generateInvoiceHTML(data) {
   html += '.items-table td.item-name { font-size: 16px; font-weight: 800; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
-  html += '.special-notes { border: 2px dashed #000; padding: 14px; }';
+  html += '.special-notes { border: 2px dashed #000; padding: 14px; margin-bottom: 20px; }';
   html += '.special-notes-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }';
   html += '.special-notes-content { font-size: 12px; line-height: 1.6; font-weight: 500; }';
   html += '.no-notes { font-style: italic; color: #666; }';
+  html += '.gift-message-section { border: 2px solid #000; padding: 14px; margin-bottom: 20px; background: #fafafa; }';
+  html += '.gift-message-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }';
+  html += '.gift-message-content { font-size: 13px; line-height: 1.6; font-style: italic; margin-bottom: 8px; }';
+  html += '.gift-message-from { font-size: 12px; font-weight: 700; text-align: right; }';
   html += '.footer { margin-top: 24px; padding-top: 10px; border-top: 1px solid #000; display: flex; justify-content: space-between; align-items: center; }';
   html += '.logo-area { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }';
   html += '.print-timestamp { font-size: 9px; }';
@@ -302,6 +317,7 @@ function generateInvoiceHTML(data) {
   html += '</div>';
   html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table></div>';
   html += '<div class="special-notes"><div class="special-notes-header">⚠ Special Instructions</div><div class="special-notes-content ' + instructionsClass + '">' + instructionsContent + '</div></div>';
+  html += giftMessageHTML;
   html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + '</div></div>';
   html += '</div></body></html>';
 
