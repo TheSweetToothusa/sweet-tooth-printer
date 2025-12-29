@@ -10,6 +10,9 @@ function extractOrderData(order) {
     notes[noteAttrs[i].name] = noteAttrs[i].value;
   }
 
+  // Check if this is a POS (in-store) order
+  var isPOS = order.source_name === 'pos' || order.source_name === 'shopify_pos';
+
   // Determine delivery type from shipping line
   var shippingTitle = '';
   if (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) {
@@ -17,7 +20,11 @@ function extractOrderData(order) {
   }
   var shippingTitleLower = shippingTitle.toLowerCase();
   var deliveryType = 'shipping';
-  if (shippingTitleLower.indexOf('local') > -1 || shippingTitleLower.indexOf('delivery') > -1) {
+  
+  // POS orders are in-store
+  if (isPOS) {
+    deliveryType = 'in-store';
+  } else if (shippingTitleLower.indexOf('local') > -1 || shippingTitleLower.indexOf('delivery') > -1) {
     deliveryType = 'local-delivery';
   } else if (shippingTitleLower.indexOf('pickup') > -1 || shippingTitleLower.indexOf('pick up') > -1) {
     deliveryType = 'pickup';
@@ -33,22 +40,26 @@ function extractOrderData(order) {
 
   // Extract recipient info
   var shipping = order.shipping_address || {};
-  var firstName = shipping.first_name || '';
-  var lastName = shipping.last_name || '';
+  var billing = order.billing_address || {};
+  var customer = order.customer || {};
+  
+  // For POS orders, use billing or customer info since there's no shipping
+  var addressSource = isPOS ? (billing.address1 ? billing : {}) : shipping;
+  
+  var firstName = addressSource.first_name || customer.first_name || '';
+  var lastName = addressSource.last_name || customer.last_name || '';
   var recipient = {
-    name: shipping.name || (firstName + ' ' + lastName).trim(),
-    phone: shipping.phone || (order.customer ? order.customer.phone : '') || '',
-    address1: shipping.address1 || '',
-    address2: shipping.address2 || '',
-    city: shipping.city || '',
-    province: shipping.province || '',
-    zip: shipping.zip || '',
-    country: shipping.country || ''
+    name: addressSource.name || customer.first_name && customer.last_name ? (customer.first_name + ' ' + customer.last_name) : (firstName + ' ' + lastName).trim(),
+    phone: addressSource.phone || customer.phone || '',
+    address1: addressSource.address1 || '',
+    address2: addressSource.address2 || '',
+    city: addressSource.city || '',
+    province: addressSource.province || '',
+    zip: addressSource.zip || '',
+    country: addressSource.country || ''
   };
 
   // Extract gift giver info
-  var billing = order.billing_address || {};
-  var customer = order.customer || {};
   var billingFirstName = billing.first_name || '';
   var billingLastName = billing.last_name || '';
   var giver = {
@@ -194,6 +205,11 @@ function extractOrderData(order) {
     }
   }
 
+  // Extract totals for POS orders
+  var subtotal = order.subtotal_price || '0.00';
+  var totalTax = order.total_tax || '0.00';
+  var totalPrice = order.total_price || '0.00';
+
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
@@ -207,7 +223,11 @@ function extractOrderData(order) {
     giftReceiver: notes['Gift Receiver'] || recipient.name,
     giftSender: notes['Gift Sender'] || giver.name,
     specialInstructions: specialInstructions,
-    shippingMethod: shippingTitle
+    shippingMethod: shippingTitle,
+    isPOS: isPOS,
+    subtotal: subtotal,
+    totalTax: totalTax,
+    totalPrice: totalPrice
   };
 }
 
@@ -227,6 +247,10 @@ function generateInvoiceHTML(data) {
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var shippingMethod = data.shippingMethod;
+  var isPOS = data.isPOS;
+  var subtotal = data.subtotal;
+  var totalTax = data.totalTax;
+  var totalPrice = data.totalPrice;
 
   // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
@@ -234,8 +258,18 @@ function generateInvoiceHTML(data) {
   var dateLabel = 'Ship Date';
   var recipientLabel = 'Recipient — Ship To';
   var topRightLabel = 'Shipping To';
+  var showTopRight = true;
+  var showDateBar = true;
 
-  if (deliveryType === 'local-delivery') {
+  if (deliveryType === 'in-store') {
+    badgeText = 'IN STORE';
+    cityDisplay = '';
+    dateLabel = '';
+    recipientLabel = 'Customer';
+    topRightLabel = '';
+    showTopRight = false;
+    showDateBar = false;
+  } else if (deliveryType === 'local-delivery') {
     badgeText = 'LOCAL DELIVERY';
     cityDisplay = recipient.city.toUpperCase();
     dateLabel = 'Delivery Date';
@@ -247,6 +281,7 @@ function generateInvoiceHTML(data) {
     dateLabel = 'Ready for Pickup';
     recipientLabel = 'Customer Picking Up';
     topRightLabel = '';
+    showTopRight = false;
   }
 
   // Format recipient address
@@ -267,36 +302,52 @@ function generateInvoiceHTML(data) {
 
   // Top right section varies by type
   var topRightHTML = '';
-  if (deliveryType === 'local-delivery') {
-    topRightHTML = '<div class="city-badge"><div class="city-label">' + topRightLabel + '</div><div class="city-name">' + cityDisplay + '</div></div>';
+  if (showTopRight) {
+    if (deliveryType === 'local-delivery') {
+      topRightHTML = '<div class="city-badge"><div class="city-label">' + topRightLabel + '</div><div class="city-name">' + cityDisplay + '</div></div>';
+    } else if (deliveryType === 'shipping') {
+      // Shipping - show city/state and shipping service
+      var shippingServiceHTML = shippingMethod ? '<div class="shipping-service">' + shippingMethod + '</div>' : '';
+      topRightHTML = '<div class="shipping-info"><div class="shipping-label">' + topRightLabel + '</div><div class="shipping-destination">' + recipient.city.toUpperCase() + '</div><div class="shipping-state">' + recipient.province + '</div>' + shippingServiceHTML + '</div>';
+    }
   } else if (deliveryType === 'pickup') {
     topRightHTML = '<div class="pickup-info"><div class="pickup-label">Pickup Location</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
-  } else {
-    // Shipping - show city/state and shipping service
-    var shippingServiceHTML = shippingMethod ? '<div class="shipping-service">' + shippingMethod + '</div>' : '';
-    topRightHTML = '<div class="shipping-info"><div class="shipping-label">' + topRightLabel + '</div><div class="shipping-destination">' + recipient.city.toUpperCase() + '</div><div class="shipping-state">' + recipient.province + '</div>' + shippingServiceHTML + '</div>';
   }
 
   // Phone HTML
   var phoneHTML = recipient.phone ? '<div class="recipient-phone">☎ ' + recipient.phone + '</div>' : '';
   
-  // Address HTML (hide for pickup)
-  var addressHTML = deliveryType !== 'pickup' ? '<div class="recipient-address">' + addressLines + '</div>' : '';
+  // Address HTML (hide for pickup and in-store)
+  var addressHTML = (deliveryType !== 'pickup' && deliveryType !== 'in-store' && addressLines) ? '<div class="recipient-address">' + addressLines + '</div>' : '';
   
-  // Giver details
-  var giverEmailHTML = giver.email ? '<div class="giver-detail">' + giver.email + '</div>' : '';
-  var giverPhoneHTML = giver.phone ? '<div class="giver-detail">' + giver.phone + '</div>' : '';
+  // Giver details - hide for in-store
+  var giverCardHTML = '';
+  if (deliveryType !== 'in-store') {
+    var giverEmailHTML = giver.email ? '<div class="giver-detail">' + giver.email + '</div>' : '';
+    var giverPhoneHTML = giver.phone ? '<div class="giver-detail">' + giver.phone + '</div>' : '';
+    giverCardHTML = '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
+  }
 
   // Special instructions - convert newlines to <br> for display
   var instructionsDisplay = specialInstructions ? specialInstructions.replace(/\n/g, '<br>') : '';
   var instructionsClass = specialInstructions ? '' : 'no-notes';
   var instructionsContent = specialInstructions ? instructionsDisplay : 'No special instructions';
 
-  // Gift message section
+  // Gift message section - hide for in-store
   var giftMessageHTML = '';
-  if (giftMessage && giftMessage.trim()) {
+  if (giftMessage && giftMessage.trim() && deliveryType !== 'in-store') {
     var formattedGiftMessage = giftMessage.replace(/\n/g, '<br>');
     giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
+  }
+
+  // Totals section for POS orders
+  var totalsHTML = '';
+  if (isPOS) {
+    totalsHTML = '<div class="totals-section">';
+    totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
+    totalsHTML += '<div class="totals-row"><span>Tax:</span><span>$' + parseFloat(totalTax).toFixed(2) + '</span></div>';
+    totalsHTML += '<div class="totals-row totals-total"><span>Total:</span><span>$' + parseFloat(totalPrice).toFixed(2) + '</span></div>';
+    totalsHTML += '</div>';
   }
 
   // Print timestamp
@@ -306,12 +357,19 @@ function generateInvoiceHTML(data) {
   });
 
   // Date display - day of week on top, date underneath
-  var dateDisplayHTML = '';
-  if (deliveryDayOfWeek) {
-    dateDisplayHTML = '<div class="delivery-day">' + deliveryDayOfWeek + '</div><div class="delivery-date-value">' + deliveryDate + '</div>';
-  } else {
-    dateDisplayHTML = '<div class="delivery-date-value">' + deliveryDate + '</div>';
+  var dateBarHTML = '';
+  if (showDateBar) {
+    var dateDisplayHTML = '';
+    if (deliveryDayOfWeek) {
+      dateDisplayHTML = '<div class="delivery-day">' + deliveryDayOfWeek + '</div><div class="delivery-date-value">' + deliveryDate + '</div>';
+    } else {
+      dateDisplayHTML = '<div class="delivery-date-value">' + deliveryDate + '</div>';
+    }
+    dateBarHTML = '<div class="date-bar"><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div>' + dateDisplayHTML + '</div></div>';
   }
+
+  // Content grid - full width for in-store (no giver card)
+  var gridClass = deliveryType === 'in-store' ? 'content-grid-single' : 'content-grid';
 
   var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invoice ' + orderNumber + '</title>';
   html += '<style>';
@@ -336,6 +394,8 @@ function generateInvoiceHTML(data) {
   html += '.delivery-day { font-size: 16px; font-weight: 800; margin-top: 4px; }';
   html += '.delivery-date-value { font-size: 14px; font-weight: 700; }';
   html += '.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }';
+  html += '.content-grid-single { display: block; margin-bottom: 20px; }';
+  html += '.content-grid-single .info-card { max-width: 50%; }';
   html += '.info-card { border: 1px solid #000; padding: 14px; }';
   html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #000; }';
   html += '.recipient-card { border: 3px solid #000; }';
@@ -353,6 +413,9 @@ function generateInvoiceHTML(data) {
   html += '.items-table td.item-name { font-size: 16px; font-weight: 800; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
+  html += '.totals-section { margin-bottom: 20px; padding: 14px; border: 2px solid #000; max-width: 300px; margin-left: auto; }';
+  html += '.totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }';
+  html += '.totals-total { font-size: 16px; font-weight: 800; border-top: 1px solid #000; margin-top: 8px; padding-top: 8px; }';
   html += '.special-notes { border: 2px dashed #000; padding: 14px; margin-bottom: 20px; }';
   html += '.special-notes-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }';
   html += '.special-notes-content { font-size: 12px; line-height: 1.6; font-weight: 500; }';
@@ -367,12 +430,13 @@ function generateInvoiceHTML(data) {
   html += '</style></head><body>';
   html += '<div class="invoice-page">';
   html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
-  html += '<div class="date-bar"><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div>' + dateDisplayHTML + '</div></div>';
-  html += '<div class="content-grid">';
+  html += dateBarHTML;
+  html += '<div class="' + gridClass + '">';
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
-  html += '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
+  html += giverCardHTML;
   html += '</div>';
   html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table></div>';
+  html += totalsHTML;
   html += '<div class="special-notes"><div class="special-notes-header">⚠ Special Instructions</div><div class="special-notes-content ' + instructionsClass + '">' + instructionsContent + '</div></div>';
   html += giftMessageHTML;
   html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + '</div></div>';
