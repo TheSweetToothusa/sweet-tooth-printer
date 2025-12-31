@@ -3,12 +3,9 @@ function generateGiftCardHTML(data) {
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var recipient = data.recipient;
-  var fontFamily = data.fontFamily || 'Arial, sans-serif';
-  var fontSize = data.fontSize || '12pt';
-  var fontWeight = data.fontWeight || 'bold';
-  var fontStyle = data.fontStyle || 'normal';
   var topPosition = data.topPosition || '0.25in';
-  var messagePosition = data.messagePosition || '3.8in';
+  // Message position moved down 0.75in (was 3.8in, now 4.55in)
+  var messagePosition = data.messagePosition || '4.55in';
 
   var receiverName = giftReceiver || recipient.name;
   var addressLine1 = [recipient.address1, recipient.address2].filter(Boolean).join(', ');
@@ -28,18 +25,22 @@ function generateGiftCardHTML(data) {
 
   var html = '<!DOCTYPE html><html><head>';
   html += '<title> </title><meta charset="UTF-8">';
-  html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Poppins:ital,wght@0,400;0,700;1,400;1,700&family=Lato:ital,wght@0,400;0,700;1,400;1,700&family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@0,400;0,700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
   html += '<style>';
   html += '@page { size: 4.2in 8.5in; margin: 0; }';
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
-  html += 'body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: white; }';
+  html += 'body { margin: 0; padding: 0; font-family: Montserrat, Arial, sans-serif; background: white; }';
   html += '.card { width: 4.2in; height: 8.5in; position: relative; background: white; }';
   html += '.top-section { position: absolute; top: ' + topInches + '; left: 0; right: 0; text-align: center; padding: 0 0.5in; }';
-  html += '.recipient-name { font-size: 14pt; font-weight: bold; margin-bottom: 16px; color: #000; }';
-  html += '.recipient-address { font-size: 11pt; font-weight: bold; line-height: 1.4; color: #000; }';
+  // Recipient name: 14pt reduced by 15% = 11.9pt, Montserrat Regular (400)
+  html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: 11.9pt; font-weight: 400; margin-bottom: 16px; color: #000; }';
+  // Recipient address: 11pt reduced by 15% = 9.35pt, Montserrat Regular (400)
+  html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: 9.35pt; font-weight: 400; line-height: 1.4; color: #000; }';
   html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0; right: 0; text-align: center; padding: 0 0.5in; }';
-  html += '.gift-message { font-family: ' + fontFamily + '; font-size: ' + fontSize + '; font-weight: ' + fontWeight + '; font-style: ' + fontStyle + '; line-height: 1.5; color: #000; }';
-  html += '.gift-sender { margin-top: 16px; font-family: ' + fontFamily + '; font-size: ' + fontSize + '; font-weight: ' + fontWeight + '; font-style: ' + fontStyle + '; color: #000; }';
+  // Gift message: 12pt reduced by 15% = 10.2pt, Montserrat Bold (700)
+  html += '.gift-message { font-family: Montserrat, sans-serif; font-size: 10.2pt; font-weight: 700; font-style: normal; line-height: 1.5; color: #000; }';
+  // Gift sender: same as message - 10.2pt, Montserrat Bold (700)
+  html += '.gift-sender { margin-top: 16px; font-family: Montserrat, sans-serif; font-size: 10.2pt; font-weight: 700; font-style: normal; color: #000; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
