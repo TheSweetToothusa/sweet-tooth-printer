@@ -88,8 +88,10 @@ function extractOrderData(order) {
       continue;
     }
     
+    // CRITICAL: Extract variant_title for dietary designation (Dairy, Vegan/Parve, etc.)
     items.push({
       title: itemTitle,
+      variant: item.variant_title || '',
       sku: item.sku || '',
       quantity: item.quantity,
       price: parseFloat(item.price).toFixed(2)
@@ -124,41 +126,12 @@ function extractOrderData(order) {
     allInstructions.push(notes['special instructions'].trim());
   }
   
-  // 3. Note attributes - Delivery Instructions (check ALL variations - THIS IS CRITICAL)
-  if (notes['Delivery Instructions'] && notes['Delivery Instructions'].trim()) {
-    allInstructions.push('DELIVERY: ' + notes['Delivery Instructions'].trim());
-  }
+  // 3. Delivery instructions
   if (notes['Delivery instructions'] && notes['Delivery instructions'].trim()) {
-    allInstructions.push('DELIVERY: ' + notes['Delivery instructions'].trim());
-  }
-  if (notes['delivery instructions'] && notes['delivery instructions'].trim()) {
-    allInstructions.push('DELIVERY: ' + notes['delivery instructions'].trim());
-  }
-  if (notes['DeliveryInstructions'] && notes['DeliveryInstructions'].trim()) {
-    allInstructions.push('DELIVERY: ' + notes['DeliveryInstructions'].trim());
+    allInstructions.push('Delivery: ' + notes['Delivery instructions'].trim());
   }
   
-  // 4. Also check for any note attribute containing "instruction" in the name
-  for (var key in notes) {
-    if (notes.hasOwnProperty(key)) {
-      var keyLower = key.toLowerCase();
-      if (keyLower.indexOf('instruction') > -1 && notes[key] && notes[key].trim()) {
-        // Check if we already added this
-        var alreadyAdded = false;
-        for (var x = 0; x < allInstructions.length; x++) {
-          if (allInstructions[x].indexOf(notes[key].trim()) > -1) {
-            alreadyAdded = true;
-            break;
-          }
-        }
-        if (!alreadyAdded) {
-          allInstructions.push(notes[key].trim());
-        }
-      }
-    }
-  }
-  
-  // 5. Line item properties (already collected above)
+  // 4. Line item properties (already collected above)
   for (var m = 0; m < lineItemInstructions.length; m++) {
     // Avoid duplicates
     var inst = lineItemInstructions[m];
@@ -214,25 +187,31 @@ function extractOrderData(order) {
   var totalTax = order.total_tax || '0.00';
   var totalPrice = order.total_price || '0.00';
 
+  // Get gift message and receiver info
+  var giftMessage = notes['Gift Message'] || '';
+  var giftSender = notes['Gift Sender'] || giver.name;
+  var giftReceiver = notes['Gift Receiver'] || recipient.name;
+  var shippingMethod = shippingTitle;
+
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
     deliveryType: deliveryType,
-    deliveryDayOfWeek: deliveryDayOfWeek,
     deliveryDate: deliveryDateFormatted,
+    deliveryDayOfWeek: deliveryDayOfWeek,
     deliveryFee: deliveryFee,
     recipient: recipient,
     giver: giver,
     items: items,
-    giftMessage: notes['Gift Message'] || '',
-    giftReceiver: notes['Gift Receiver'] || recipient.name,
-    giftSender: notes['Gift Sender'] || giver.name,
     specialInstructions: specialInstructions,
-    shippingMethod: shippingTitle,
-    isPOS: isPOS,
+    giftMessage: giftMessage,
+    giftSender: giftSender,
+    giftReceiver: giftReceiver,
+    shippingMethod: shippingMethod,
     subtotal: subtotal,
     totalTax: totalTax,
-    totalPrice: totalPrice
+    totalPrice: totalPrice,
+    isPOS: isPOS
   };
 }
 
@@ -241,30 +220,31 @@ function extractOrderData(order) {
 // =============================================================================
 
 function generateInvoiceHTML(data) {
+  var orderNumber = data.orderNumber;
   var deliveryType = data.deliveryType;
+  var deliveryDate = data.deliveryDate;
+  var deliveryDayOfWeek = data.deliveryDayOfWeek;
+  var deliveryFee = data.deliveryFee;
   var recipient = data.recipient;
   var giver = data.giver;
   var items = data.items;
-  var orderNumber = data.orderNumber;
-  var deliveryDayOfWeek = data.deliveryDayOfWeek;
-  var deliveryDate = data.deliveryDate;
-  var deliveryFee = data.deliveryFee;
   var specialInstructions = data.specialInstructions;
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var shippingMethod = data.shippingMethod;
-  var isPOS = data.isPOS;
   var subtotal = data.subtotal;
   var totalTax = data.totalTax;
   var totalPrice = data.totalPrice;
+  var isPOS = data.isPOS;
 
-  // Determine badge and city display based on delivery type
+  // Determine badge text, layout, and labels based on delivery type
   var badgeText = 'SHIPPING';
   var cityDisplay = '';
   var recipientLabel = 'Recipient — Ship To';
   var topRightLabel = 'Shipping To';
   var showTopRight = true;
   var showDeliveryDate = true;
+  var gridClass = 'info-grid';
 
   if (deliveryType === 'in-store') {
     badgeText = 'IN STORE';
@@ -295,11 +275,13 @@ function generateInvoiceHTML(data) {
   }
   var addressLines = addressParts.join('<br>');
 
-  // Generate items rows - LARGER AND BOLD item names
+  // Generate items rows - WITH VARIANT/DIETARY DESIGNATION
   var itemRows = '';
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    itemRows += '<tr><td class="item-name">' + item.title + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
+    // CRITICAL: Show variant (Dairy, Vegan/Parve) below item name
+    var variantHTML = item.variant ? '<div class="item-variant">' + item.variant + '</div>' : '';
+    itemRows += '<tr><td class="item-name">' + item.title + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
   }
 
   // Top right section varies by type
@@ -371,52 +353,51 @@ function generateInvoiceHTML(data) {
   var deliveryDateHeaderHTML = '';
   if (showDeliveryDate && deliveryDate && deliveryDate !== 'TBD') {
     var fullDeliveryDisplay = deliveryDayOfWeek ? deliveryDayOfWeek + ', ' + deliveryDate : deliveryDate;
-    deliveryDateHeaderHTML = '<div class="header-delivery-date">📅 ' + fullDeliveryDisplay + '</div>';
-  } else if (showDeliveryDate) {
-    deliveryDateHeaderHTML = '<div class="header-delivery-date">📅 TBD</div>';
+    deliveryDateHeaderHTML = '<div class="delivery-date-inline">📅 ' + fullDeliveryDisplay + '</div>';
   }
 
-  // Content grid - full width for in-store (no giver card)
-  var gridClass = deliveryType === 'in-store' ? 'content-grid-single' : 'content-grid';
-
-  var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invoice ' + orderNumber + '</title>';
+  // Build the HTML
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
   html += '<style>';
-  html += '@import url(\'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap\');';
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
-  html += 'body { font-family: Manrope, -apple-system, sans-serif; font-size: 11px; line-height: 1.4; color: #000; background: white; }';
-  html += '.invoice-page { width: 8.5in; min-height: 11in; padding: 0.5in; background: white; }';
-  html += '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #000; }';
-  html += '.header-left { display: flex; flex-direction: column; gap: 8px; }';
-  html += '.delivery-badge { display: inline-block; padding: 10px 20px; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 3px solid #000; }';
-  html += '.header-center { display: flex; flex-direction: column; align-items: center; gap: 6px; }';
-  html += '.order-number-header { font-size: 28px; font-weight: 800; text-align: center; }';
-  html += '.header-delivery-date { font-size: 16px; font-weight: 700; text-align: center; }';
-  html += '.city-badge, .pickup-info, .shipping-info { text-align: right; }';
-  html += '.city-label, .pickup-label, .shipping-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px; }';
-  html += '.city-name { font-size: 26px; font-weight: 800; text-transform: uppercase; }';
-  html += '.pickup-location { font-size: 13px; font-weight: 700; }';
-  html += '.pickup-address { font-size: 10px; margin-top: 4px; line-height: 1.4; }';
-  html += '.shipping-destination { font-size: 18px; font-weight: 800; text-transform: uppercase; }';
-  html += '.shipping-state { font-size: 11px; margin-top: 2px; }';
-  html += '.shipping-service { font-size: 12px; font-weight: 700; margin-top: 6px; padding: 4px 8px; background: #000; color: #fff; display: inline-block; }';
-  html += '.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }';
-  html += '.content-grid-single { display: block; margin-bottom: 20px; }';
-  html += '.content-grid-single .info-card { max-width: 50%; }';
-  html += '.info-card { border: 1px solid #000; padding: 14px; }';
-  html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #000; }';
-  html += '.recipient-card { border: 3px solid #000; }';
-  html += '.recipient-name { font-size: 16px; font-weight: 800; margin-bottom: 8px; }';
-  html += '.recipient-phone { display: inline-block; border: 2px solid #000; padding: 4px 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 10px; }';
-  html += '.recipient-address { font-size: 12px; line-height: 1.5; }';
-  html += '.giver-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }';
-  html += '.giver-detail { font-size: 11px; margin-bottom: 3px; }';
-  html += '.items-section { margin-bottom: 20px; }';
-  html += '.items-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }';
+  html += 'body { font-family: "Manrope", sans-serif; font-size: 12px; line-height: 1.4; background: #fff; color: #000; }';
+  html += '.invoice-page { width: 4in; padding: 0.25in; }';
+  html += '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 12px; }';
+  html += '.header-left { flex-shrink: 0; }';
+  html += '.header-center { flex-grow: 1; text-align: center; padding: 0 12px; }';
+  html += '.delivery-badge { display: inline-block; background: #000; color: #fff; padding: 6px 14px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }';
+  html += '.order-number-header { font-size: 20px; font-weight: 800; margin-bottom: 4px; }';
+  html += '.delivery-date-inline { font-size: 12px; font-weight: 600; }';
+  html += '.city-badge { text-align: right; }';
+  html += '.city-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
+  html += '.city-name { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; }';
+  html += '.shipping-info { text-align: right; }';
+  html += '.shipping-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
+  html += '.shipping-destination { font-size: 14px; font-weight: 800; }';
+  html += '.shipping-state { font-size: 12px; font-weight: 600; }';
+  html += '.shipping-service { font-size: 10px; font-weight: 500; margin-top: 4px; padding: 2px 6px; background: #f0f0f0; display: inline-block; }';
+  html += '.pickup-info { text-align: right; }';
+  html += '.pickup-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
+  html += '.pickup-location { font-size: 14px; font-weight: 800; }';
+  html += '.pickup-address { font-size: 10px; font-weight: 500; line-height: 1.3; }';
+  html += '.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }';
+  html += '.info-card { border: 2px solid #000; padding: 10px; }';
+  html += '.recipient-card { border-width: 3px; }';
+  html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; }';
+  html += '.recipient-name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }';
+  html += '.recipient-phone { font-size: 13px; font-weight: 600; margin-bottom: 4px; }';
+  html += '.recipient-address { font-size: 11px; line-height: 1.4; }';
+  html += '.giver-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }';
+  html += '.giver-detail { font-size: 10px; color: #333; }';
+  html += '.items-section { margin-bottom: 16px; }';
+  html += '.items-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }';
   html += '.items-table { width: 100%; border-collapse: collapse; }';
-  html += '.items-table th { text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-top: 2px solid #000; border-bottom: 1px solid #000; }';
-  html += '.items-table th:last-child { text-align: right; }';
-  html += '.items-table td { padding: 10px 10px; border-bottom: 1px solid #ccc; font-size: 11px; }';
-  html += '.items-table td.item-name { font-size: 16px; font-weight: 800; }';
+  html += '.items-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 6px 4px; border-bottom: 2px solid #000; }';
+  html += '.items-table td { padding: 8px 4px; border-bottom: 1px solid #ddd; vertical-align: top; }';
+  html += '.items-table .item-name { font-size: 13px; font-weight: 800; }';
+  // CRITICAL: Style for variant/dietary designation
+  html += '.items-table .item-variant { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 3px; background: #f0f0f0; padding: 2px 6px; display: inline-block; letter-spacing: 0.5px; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
   html += '.totals-section { margin-bottom: 20px; padding: 14px; border: 2px solid #000; max-width: 300px; margin-left: auto; }';
