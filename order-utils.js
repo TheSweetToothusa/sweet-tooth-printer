@@ -15,13 +15,13 @@ function extractOrderData(order) {
 
   // Determine delivery type from shipping line
   var shippingTitle = '';
-  var deliveryFee = '0.00';
+  var shippingPrice = '0.00';
   if (order.shipping_lines && order.shipping_lines[0]) {
     if (order.shipping_lines[0].title) {
       shippingTitle = order.shipping_lines[0].title;
     }
     if (order.shipping_lines[0].price) {
-      deliveryFee = parseFloat(order.shipping_lines[0].price).toFixed(2);
+      shippingPrice = order.shipping_lines[0].price;
     }
   }
   var shippingTitleLower = shippingTitle.toLowerCase();
@@ -55,7 +55,7 @@ function extractOrderData(order) {
   var firstName = addressSource.first_name || customer.first_name || '';
   var lastName = addressSource.last_name || customer.last_name || '';
   var recipient = {
-    name: addressSource.name || customer.first_name && customer.last_name ? (customer.first_name + ' ' + customer.last_name) : (firstName + ' ' + lastName).trim(),
+    name: addressSource.name || (customer.first_name && customer.last_name ? (customer.first_name + ' ' + customer.last_name) : (firstName + ' ' + lastName).trim()),
     phone: addressSource.phone || customer.phone || '',
     address1: addressSource.address1 || '',
     address2: addressSource.address2 || '',
@@ -78,23 +78,30 @@ function extractOrderData(order) {
   var items = [];
   var lineItemInstructions = [];
   var lineItems = order.line_items || [];
+  var itemsSubtotal = 0;
   
   for (var j = 0; j < lineItems.length; j++) {
     var item = lineItems[j];
     var itemTitle = item.title || '';
     
-    // Skip tips
+    // Skip tips completely
     if (itemTitle.toLowerCase().indexOf('tip') > -1) {
       continue;
     }
     
-    // CRITICAL: Extract variant_title for dietary designation (Dairy, Vegan/Parve, etc.)
+    // Get variant title (Dairy, Vegan/Parve, etc.)
+    var variantTitle = item.variant_title || '';
+    
+    var itemPrice = parseFloat(item.price) || 0;
+    var itemQty = item.quantity || 1;
+    itemsSubtotal += itemPrice * itemQty;
+    
     items.push({
       title: itemTitle,
-      variant: item.variant_title || '',
+      variant: variantTitle,
       sku: item.sku || '',
-      quantity: item.quantity,
-      price: parseFloat(item.price).toFixed(2)
+      quantity: itemQty,
+      price: itemPrice.toFixed(2)
     });
     
     // Check line item properties for special instructions
@@ -126,12 +133,41 @@ function extractOrderData(order) {
     allInstructions.push(notes['special instructions'].trim());
   }
   
-  // 3. Delivery instructions
+  // 3. Note attributes - Delivery Instructions (check ALL variations - THIS IS CRITICAL)
+  if (notes['Delivery Instructions'] && notes['Delivery Instructions'].trim()) {
+    allInstructions.push('DELIVERY: ' + notes['Delivery Instructions'].trim());
+  }
   if (notes['Delivery instructions'] && notes['Delivery instructions'].trim()) {
-    allInstructions.push('Delivery: ' + notes['Delivery instructions'].trim());
+    allInstructions.push('DELIVERY: ' + notes['Delivery instructions'].trim());
+  }
+  if (notes['delivery instructions'] && notes['delivery instructions'].trim()) {
+    allInstructions.push('DELIVERY: ' + notes['delivery instructions'].trim());
+  }
+  if (notes['DeliveryInstructions'] && notes['DeliveryInstructions'].trim()) {
+    allInstructions.push('DELIVERY: ' + notes['DeliveryInstructions'].trim());
   }
   
-  // 4. Line item properties (already collected above)
+  // 4. Also check for any note attribute containing "instruction" in the name
+  for (var key in notes) {
+    if (notes.hasOwnProperty(key)) {
+      var keyLower = key.toLowerCase();
+      if (keyLower.indexOf('instruction') > -1 && notes[key] && notes[key].trim()) {
+        // Check if we already added this
+        var alreadyAdded = false;
+        for (var x = 0; x < allInstructions.length; x++) {
+          if (allInstructions[x].indexOf(notes[key].trim()) > -1) {
+            alreadyAdded = true;
+            break;
+          }
+        }
+        if (!alreadyAdded) {
+          allInstructions.push(notes[key].trim());
+        }
+      }
+    }
+  }
+  
+  // 5. Line item properties (already collected above)
   for (var m = 0; m < lineItemInstructions.length; m++) {
     // Avoid duplicates
     var inst = lineItemInstructions[m];
@@ -158,7 +194,7 @@ function extractOrderData(order) {
     year: 'numeric'
   });
 
-  // Format delivery date with day of week and abbreviated month
+  // Format delivery date with day of week and abbreviated month (separate lines)
   var deliveryDateRaw = notes['Delivery Date'] || '';
   var deliveryDayOfWeek = notes['Delivery Day'] || '';
   var deliveryDateFormatted = 'TBD';
@@ -168,9 +204,11 @@ function extractOrderData(order) {
       var dateObj = new Date(deliveryDateRaw);
       if (!isNaN(dateObj.getTime())) {
         if (!deliveryDayOfWeek) {
-          deliveryDayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+          deliveryDayOfWeek = dateObj.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        } else {
+          deliveryDayOfWeek = deliveryDayOfWeek.toUpperCase();
         }
-        var month = dateObj.toLocaleDateString('en-US', { month: 'short' });
+        var month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
         var day = dateObj.getDate();
         var year = dateObj.getFullYear();
         deliveryDateFormatted = month + ' ' + day + ', ' + year;
@@ -182,36 +220,29 @@ function extractOrderData(order) {
     }
   }
 
-  // Extract totals
-  var subtotal = order.subtotal_price || '0.00';
+  // Extract totals - use calculated subtotal for items (excludes tips)
+  var subtotal = itemsSubtotal.toFixed(2);
   var totalTax = order.total_tax || '0.00';
-  var totalPrice = order.total_price || '0.00';
-
-  // Get gift message and receiver info
-  var giftMessage = notes['Gift Message'] || '';
-  var giftSender = notes['Gift Sender'] || giver.name;
-  var giftReceiver = notes['Gift Receiver'] || recipient.name;
-  var shippingMethod = shippingTitle;
+  var deliveryFee = shippingPrice;
 
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
     deliveryType: deliveryType,
-    deliveryDate: deliveryDateFormatted,
     deliveryDayOfWeek: deliveryDayOfWeek,
-    deliveryFee: deliveryFee,
+    deliveryDate: deliveryDateFormatted,
     recipient: recipient,
     giver: giver,
     items: items,
+    giftMessage: notes['Gift Message'] || '',
+    giftReceiver: notes['Gift Receiver'] || recipient.name,
+    giftSender: notes['Gift Sender'] || giver.name,
     specialInstructions: specialInstructions,
-    giftMessage: giftMessage,
-    giftSender: giftSender,
-    giftReceiver: giftReceiver,
-    shippingMethod: shippingMethod,
+    shippingMethod: shippingTitle,
+    isPOS: isPOS,
     subtotal: subtotal,
     totalTax: totalTax,
-    totalPrice: totalPrice,
-    isPOS: isPOS
+    deliveryFee: deliveryFee
   };
 }
 
@@ -220,50 +251,56 @@ function extractOrderData(order) {
 // =============================================================================
 
 function generateInvoiceHTML(data) {
-  var orderNumber = data.orderNumber;
   var deliveryType = data.deliveryType;
-  var deliveryDate = data.deliveryDate;
-  var deliveryDayOfWeek = data.deliveryDayOfWeek;
-  var deliveryFee = data.deliveryFee;
   var recipient = data.recipient;
   var giver = data.giver;
   var items = data.items;
+  var orderNumber = data.orderNumber;
+  var deliveryDayOfWeek = data.deliveryDayOfWeek;
+  var deliveryDate = data.deliveryDate;
   var specialInstructions = data.specialInstructions;
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var shippingMethod = data.shippingMethod;
+  var isPOS = data.isPOS;
   var subtotal = data.subtotal;
   var totalTax = data.totalTax;
-  var totalPrice = data.totalPrice;
-  var isPOS = data.isPOS;
+  var deliveryFee = data.deliveryFee;
 
-  // Determine badge text, layout, and labels based on delivery type
+  // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
   var cityDisplay = '';
+  var dateLabel = 'Ship Date';
   var recipientLabel = 'Recipient — Ship To';
   var topRightLabel = 'Shipping To';
   var showTopRight = true;
-  var showDeliveryDate = true;
-  var gridClass = 'info-grid';
+  var showDateBar = true;
+  var deliveryFeeLabel = 'Shipping';
 
   if (deliveryType === 'in-store') {
     badgeText = 'IN STORE';
     cityDisplay = '';
+    dateLabel = '';
     recipientLabel = 'Customer';
     topRightLabel = '';
     showTopRight = false;
-    showDeliveryDate = false;
+    showDateBar = false;
+    deliveryFeeLabel = '';
   } else if (deliveryType === 'local-delivery') {
     badgeText = 'LOCAL DELIVERY';
     cityDisplay = recipient.city.toUpperCase();
+    dateLabel = 'Delivery Date';
     recipientLabel = 'Recipient — Deliver To';
     topRightLabel = 'Delivering To';
+    deliveryFeeLabel = 'Delivery';
   } else if (deliveryType === 'pickup') {
     badgeText = 'PICKUP';
     cityDisplay = '';
+    dateLabel = 'Ready for Pickup';
     recipientLabel = 'Customer Picking Up';
     topRightLabel = '';
     showTopRight = false;
+    deliveryFeeLabel = '';
   }
 
   // Format recipient address
@@ -275,13 +312,15 @@ function generateInvoiceHTML(data) {
   }
   var addressLines = addressParts.join('<br>');
 
-  // Generate items rows - WITH VARIANT/DIETARY DESIGNATION
+  // Generate items rows - LARGER AND BOLD item names, with variant tag
   var itemRows = '';
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
-    // CRITICAL: Show variant (Dairy, Vegan/Parve) below item name
-    var variantHTML = item.variant ? '<div class="item-variant">' + item.variant + '</div>' : '';
-    itemRows += '<tr><td class="item-name">' + item.title + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
+    var variantHTML = '';
+    if (item.variant) {
+      variantHTML = '<span class="variant-tag">' + item.variant + '</span>';
+    }
+    itemRows += '<tr><td class="item-name">' + item.title + ' ' + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
   }
 
   // Top right section varies by type
@@ -290,7 +329,6 @@ function generateInvoiceHTML(data) {
     if (deliveryType === 'local-delivery') {
       topRightHTML = '<div class="city-badge"><div class="city-label">' + topRightLabel + '</div><div class="city-name">' + cityDisplay + '</div></div>';
     } else if (deliveryType === 'shipping') {
-      // Shipping - show city/state and shipping service
       var shippingServiceHTML = shippingMethod ? '<div class="shipping-service">' + shippingMethod + '</div>' : '';
       topRightHTML = '<div class="shipping-info"><div class="shipping-label">' + topRightLabel + '</div><div class="shipping-destination">' + recipient.city.toUpperCase() + '</div><div class="shipping-state">' + recipient.province + '</div>' + shippingServiceHTML + '</div>';
     }
@@ -317,89 +355,89 @@ function generateInvoiceHTML(data) {
   var instructionsClass = specialInstructions ? '' : 'no-notes';
   var instructionsContent = specialInstructions ? instructionsDisplay : 'No special instructions';
 
-  // Gift message section - hide for in-store (NOW WITH 💌 EMOJI)
+  // Gift message section
   var giftMessageHTML = '';
-  if (giftMessage && giftMessage.trim() && deliveryType !== 'in-store') {
+  if (giftMessage && giftMessage.trim()) {
     var formattedGiftMessage = giftMessage.replace(/\n/g, '<br>');
-    giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">💌 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
+    giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
   }
 
-  // Totals section - show for POS orders AND local delivery orders
-  var totalsHTML = '';
-  if (isPOS || deliveryType === 'local-delivery') {
-    totalsHTML = '<div class="totals-section">';
-    totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
-    totalsHTML += '<div class="totals-row"><span>Tax:</span><span>$' + parseFloat(totalTax).toFixed(2) + '</span></div>';
-    if (deliveryType === 'local-delivery') {
-      totalsHTML += '<div class="totals-row"><span>Delivery Fee:</span><span>$' + parseFloat(deliveryFee).toFixed(2) + '</span></div>';
-    }
-    totalsHTML += '<div class="totals-row totals-total"><span>Total:</span><span>$' + parseFloat(totalPrice).toFixed(2) + '</span></div>';
-    totalsHTML += '</div>';
+  // Totals section - show on ALL invoices (Subtotal, Delivery/Shipping Fee, Tax) - NO TIP
+  var totalsHTML = '<div class="totals-section">';
+  totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
+  if (deliveryFeeLabel && parseFloat(deliveryFee) > 0) {
+    totalsHTML += '<div class="totals-row"><span>' + deliveryFeeLabel + ':</span><span>$' + parseFloat(deliveryFee).toFixed(2) + '</span></div>';
   }
+  totalsHTML += '<div class="totals-row"><span>Tax:</span><span>$' + parseFloat(totalTax).toFixed(2) + '</span></div>';
+  var total = parseFloat(subtotal) + parseFloat(deliveryFee) + parseFloat(totalTax);
+  totalsHTML += '<div class="totals-row totals-total"><span>Total:</span><span>$' + total.toFixed(2) + '</span></div>';
+  totalsHTML += '</div>';
 
-  // Print timestamp - FORCE EST TIMEZONE
+  // Print timestamp in EST
   var now = new Date();
   var printTimestamp = now.toLocaleString('en-US', { 
     timeZone: 'America/New_York',
-    month: 'short', 
-    day: 'numeric', 
-    year: 'numeric', 
-    hour: 'numeric', 
-    minute: '2-digit', 
-    hour12: true 
-  });
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true 
+  }) + ' EST';
 
-  // Build delivery date display for header (day of week + date on same line as order #)
-  var deliveryDateHeaderHTML = '';
-  if (showDeliveryDate && deliveryDate && deliveryDate !== 'TBD') {
-    var fullDeliveryDisplay = deliveryDayOfWeek ? deliveryDayOfWeek + ', ' + deliveryDate : deliveryDate;
-    deliveryDateHeaderHTML = '<div class="delivery-date-inline">📅 ' + fullDeliveryDisplay + '</div>';
+  // Date display - day of week on top, date underneath
+  var dateBarHTML = '';
+  if (showDateBar) {
+    var dateDisplayHTML = '';
+    if (deliveryDayOfWeek) {
+      dateDisplayHTML = '<div class="delivery-day">' + deliveryDayOfWeek + '</div><div class="delivery-date-value">' + deliveryDate + '</div>';
+    } else {
+      dateDisplayHTML = '<div class="delivery-date-value">' + deliveryDate + '</div>';
+    }
+    dateBarHTML = '<div class="date-bar"><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div>' + dateDisplayHTML + '</div></div>';
   }
 
-  // Build the HTML
-  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">';
-  html += '<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
+  // Content grid - full width for in-store (no giver card)
+  var gridClass = deliveryType === 'in-store' ? 'content-grid-single' : 'content-grid';
+
+  var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invoice ' + orderNumber + '</title>';
   html += '<style>';
+  html += '@import url(\'https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap\');';
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
-  html += 'body { font-family: "Manrope", sans-serif; font-size: 12px; line-height: 1.4; background: #fff; color: #000; }';
-  html += '.invoice-page { width: 4in; padding: 0.25in; }';
-  html += '.header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 2px solid #000; padding-bottom: 12px; }';
-  html += '.header-left { flex-shrink: 0; }';
-  html += '.header-center { flex-grow: 1; text-align: center; padding: 0 12px; }';
-  html += '.delivery-badge { display: inline-block; background: #000; color: #fff; padding: 6px 14px; font-size: 11px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }';
-  html += '.order-number-header { font-size: 20px; font-weight: 800; margin-bottom: 4px; }';
-  html += '.delivery-date-inline { font-size: 12px; font-weight: 600; }';
-  html += '.city-badge { text-align: right; }';
-  html += '.city-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
-  html += '.city-name { font-size: 16px; font-weight: 800; letter-spacing: 0.5px; }';
-  html += '.shipping-info { text-align: right; }';
-  html += '.shipping-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
-  html += '.shipping-destination { font-size: 14px; font-weight: 800; }';
-  html += '.shipping-state { font-size: 12px; font-weight: 600; }';
-  html += '.shipping-service { font-size: 10px; font-weight: 500; margin-top: 4px; padding: 2px 6px; background: #f0f0f0; display: inline-block; }';
-  html += '.pickup-info { text-align: right; }';
-  html += '.pickup-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }';
-  html += '.pickup-location { font-size: 14px; font-weight: 800; }';
-  html += '.pickup-address { font-size: 10px; font-weight: 500; line-height: 1.3; }';
-  html += '.info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }';
-  html += '.info-card { border: 2px solid #000; padding: 10px; }';
-  html += '.recipient-card { border-width: 3px; }';
-  html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; border-bottom: 1px solid #000; padding-bottom: 4px; }';
-  html += '.recipient-name { font-size: 16px; font-weight: 800; margin-bottom: 4px; }';
-  html += '.recipient-phone { font-size: 13px; font-weight: 600; margin-bottom: 4px; }';
-  html += '.recipient-address { font-size: 11px; line-height: 1.4; }';
-  html += '.giver-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }';
-  html += '.giver-detail { font-size: 10px; color: #333; }';
-  html += '.items-section { margin-bottom: 16px; }';
-  html += '.items-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 8px; }';
+  html += 'body { font-family: Manrope, -apple-system, sans-serif; font-size: 11px; line-height: 1.4; color: #000; background: white; }';
+  html += '.invoice-page { width: 8.5in; min-height: 11in; padding: 0.5in; background: white; }';
+  html += '.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #000; }';
+  html += '.delivery-badge { display: inline-block; padding: 10px 20px; font-size: 20px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; border: 3px solid #000; }';
+  html += '.order-number-header { font-size: 28px; font-weight: 800; text-align: center; }';
+  html += '.city-badge, .pickup-info, .shipping-info { text-align: right; }';
+  html += '.city-label, .pickup-label, .shipping-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px; }';
+  html += '.city-name { font-size: 26px; font-weight: 800; text-transform: uppercase; }';
+  html += '.pickup-location { font-size: 13px; font-weight: 700; }';
+  html += '.pickup-address { font-size: 10px; margin-top: 4px; line-height: 1.4; }';
+  html += '.shipping-destination { font-size: 18px; font-weight: 800; text-transform: uppercase; }';
+  html += '.shipping-state { font-size: 11px; margin-top: 2px; }';
+  html += '.shipping-service { font-size: 12px; font-weight: 700; margin-top: 6px; padding: 4px 8px; background: #000; color: #fff; display: inline-block; }';
+  html += '.date-bar { display: flex; justify-content: flex-end; padding: 10px 0; margin-bottom: 16px; border-bottom: 1px solid #000; }';
+  html += '.delivery-date { text-align: right; }';
+  html += '.delivery-date-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }';
+  html += '.delivery-day { font-size: 16px; font-weight: 800; margin-top: 4px; }';
+  html += '.delivery-date-value { font-size: 14px; font-weight: 700; }';
+  html += '.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }';
+  html += '.content-grid-single { display: block; margin-bottom: 20px; }';
+  html += '.content-grid-single .info-card { max-width: 50%; }';
+  html += '.info-card { border: 1px solid #000; padding: 14px; }';
+  html += '.info-card-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid #000; }';
+  html += '.recipient-card { border: 3px solid #000; }';
+  html += '.recipient-name { font-size: 16px; font-weight: 800; margin-bottom: 8px; }';
+  html += '.recipient-phone { display: inline-block; border: 2px solid #000; padding: 4px 10px; font-size: 13px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 10px; }';
+  html += '.recipient-address { font-size: 12px; line-height: 1.5; }';
+  html += '.giver-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }';
+  html += '.giver-detail { font-size: 11px; margin-bottom: 3px; }';
+  html += '.items-section { margin-bottom: 20px; }';
+  html += '.items-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 8px; }';
   html += '.items-table { width: 100%; border-collapse: collapse; }';
-  html += '.items-table th { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; padding: 6px 4px; border-bottom: 2px solid #000; }';
-  html += '.items-table td { padding: 8px 4px; border-bottom: 1px solid #ddd; vertical-align: top; }';
-  html += '.items-table .item-name { font-size: 13px; font-weight: 800; }';
-  // CRITICAL: Style for variant/dietary designation
-  html += '.items-table .item-variant { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-top: 3px; background: #f0f0f0; padding: 2px 6px; display: inline-block; letter-spacing: 0.5px; }';
+  html += '.items-table th { text-align: left; padding: 8px 10px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-top: 2px solid #000; border-bottom: 1px solid #000; }';
+  html += '.items-table th:last-child { text-align: right; }';
+  html += '.items-table td { padding: 10px 10px; border-bottom: 1px solid #ccc; font-size: 11px; }';
+  html += '.items-table td.item-name { font-size: 16px; font-weight: 800; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
+  html += '.variant-tag { display: inline-block; background: #000; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 8px; margin-left: 8px; vertical-align: middle; text-transform: uppercase; }';
   html += '.totals-section { margin-bottom: 20px; padding: 14px; border: 2px solid #000; max-width: 300px; margin-left: auto; }';
   html += '.totals-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }';
   html += '.totals-total { font-size: 16px; font-weight: 800; border-top: 1px solid #000; margin-top: 8px; padding-top: 8px; }';
@@ -416,18 +454,17 @@ function generateInvoiceHTML(data) {
   html += '.print-timestamp { font-size: 9px; }';
   html += '</style></head><body>';
   html += '<div class="invoice-page">';
-  // HEADER: Badge on left, Order # + Delivery Date in center, City/Location on right
-  html += '<div class="header"><div class="header-left"><div class="delivery-badge">' + badgeText + '</div></div><div class="header-center"><div class="order-number-header">' + orderNumber + '</div>' + deliveryDateHeaderHTML + '</div>' + topRightHTML + '</div>';
+  html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
+  html += dateBarHTML;
   html += '<div class="' + gridClass + '">';
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
   html += giverCardHTML;
   html += '</div>';
   html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table></div>';
   html += totalsHTML;
-  // GIFT MESSAGE NOW COMES BEFORE SPECIAL INSTRUCTIONS
   html += giftMessageHTML;
   html += '<div class="special-notes"><div class="special-notes-header">⚠ Special Instructions</div><div class="special-notes-content ' + instructionsClass + '">' + instructionsContent + '</div></div>';
-  html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + ' EST</div></div>';
+  html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + '</div></div>';
   html += '</div></body></html>';
 
   return html;
