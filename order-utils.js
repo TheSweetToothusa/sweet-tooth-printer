@@ -74,11 +74,12 @@ function extractOrderData(order) {
     phone: billing.phone || customer.phone || ''
   };
 
-  // Extract line items (NO TIP!) and collect special instructions from line item properties
+  // Extract line items (NO TIP!) and collect special instructions AND occasion from line item properties
   var items = [];
   var lineItemInstructions = [];
   var lineItems = order.line_items || [];
   var itemsSubtotal = 0;
+  var occasion = ''; // Will be extracted from line item properties
   
   for (var j = 0; j < lineItems.length; j++) {
     var item = lineItems[j];
@@ -104,12 +105,22 @@ function extractOrderData(order) {
       price: itemPrice.toFixed(2)
     });
     
-    // Check line item properties for special instructions
+    // Check line item properties for special instructions AND occasion
     var props = item.properties || [];
     for (var k = 0; k < props.length; k++) {
-      var propName = (props[k].name || '').toLowerCase();
+      var propName = (props[k].name || '');
+      var propNameLower = propName.toLowerCase();
       var propValue = props[k].value || '';
-      if (propName.indexOf('special') > -1 || propName.indexOf('instruction') > -1 || propName.indexOf('note') > -1) {
+      
+      // Extract occasion from line item properties (check for _Occasion, Occasion, etc.)
+      if (!occasion && propValue && propValue.trim()) {
+        if (propNameLower === '_occasion' || propNameLower === 'occasion' || propNameLower === 'order occasion') {
+          occasion = propValue.trim();
+        }
+      }
+      
+      // Extract special instructions
+      if (propNameLower.indexOf('special') > -1 || propNameLower.indexOf('instruction') > -1 || propNameLower.indexOf('note') > -1) {
         if (propValue && propValue.trim()) {
           lineItemInstructions.push(propValue.trim());
         }
@@ -225,6 +236,11 @@ function extractOrderData(order) {
   var totalTax = order.total_tax || '0.00';
   var deliveryFee = shippingPrice;
 
+  // Also check note_attributes for occasion as fallback
+  if (!occasion) {
+    occasion = notes['Occasion'] || notes['occasion'] || notes['Order Occasion'] || notes['_Occasion'] || '';
+  }
+
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
@@ -242,7 +258,8 @@ function extractOrderData(order) {
     isPOS: isPOS,
     subtotal: subtotal,
     totalTax: totalTax,
-    deliveryFee: deliveryFee
+    deliveryFee: deliveryFee,
+    occasion: occasion
   };
 }
 
@@ -266,6 +283,7 @@ function generateInvoiceHTML(data) {
   var subtotal = data.subtotal;
   var totalTax = data.totalTax;
   var deliveryFee = data.deliveryFee;
+  var occasion = data.occasion;
 
   // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
@@ -362,6 +380,12 @@ function generateInvoiceHTML(data) {
     giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
   }
 
+  // Occasion section - prominent display when present
+  var occasionHTML = '';
+  if (occasion && occasion.trim()) {
+    occasionHTML = '<div class="occasion-section"><div class="occasion-label">Occasion</div><div class="occasion-value">' + occasion + '</div></div>';
+  }
+
   // Totals section - show on ALL invoices (Subtotal, Delivery/Shipping Fee, Tax) - NO TIP
   var totalsHTML = '<div class="totals-section">';
   totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
@@ -428,6 +452,9 @@ function generateInvoiceHTML(data) {
   html += '.recipient-address { font-size: 11px; line-height: 1.4; }';
   html += '.giver-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }';
   html += '.giver-detail { font-size: 10px; margin-bottom: 2px; }';
+  html += '.occasion-section { background: #000; color: #fff; padding: 10px 14px; margin-bottom: 12px; display: inline-block; }';
+  html += '.occasion-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 2px; }';
+  html += '.occasion-value { font-size: 18px; font-weight: 800; text-transform: uppercase; }';
   html += '.items-section { margin-bottom: 12px; }';
   html += '.items-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }';
   html += '.items-table { width: 100%; border-collapse: collapse; }';
@@ -456,6 +483,7 @@ function generateInvoiceHTML(data) {
   html += '<div class="invoice-page">';
   html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
   html += dateBarHTML;
+  html += occasionHTML;
   html += '<div class="' + gridClass + '">';
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
   html += giverCardHTML;
