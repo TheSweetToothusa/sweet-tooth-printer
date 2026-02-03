@@ -80,6 +80,7 @@ function extractOrderData(order) {
   var lineItems = order.line_items || [];
   var itemsSubtotal = 0;
   var occasion = ''; // Will be extracted from line item properties
+  var babyGender = ''; // Will be extracted from line item properties (Boy or Girl)
   
   for (var j = 0; j < lineItems.length; j++) {
     var item = lineItems[j];
@@ -105,7 +106,7 @@ function extractOrderData(order) {
       price: itemPrice.toFixed(2)
     });
     
-    // Check line item properties for special instructions AND occasion
+    // Check line item properties for special instructions, occasion, AND baby gender
     var props = item.properties || [];
     for (var k = 0; k < props.length; k++) {
       var propName = (props[k].name || '');
@@ -116,6 +117,13 @@ function extractOrderData(order) {
       if (!occasion && propValue && propValue.trim()) {
         if (propNameLower === '_occasion' || propNameLower === 'occasion' || propNameLower === 'order occasion') {
           occasion = propValue.trim();
+        }
+      }
+      
+      // Extract baby gender from line item properties
+      if (!babyGender && propValue && propValue.trim()) {
+        if (propNameLower === 'baby gender' || propNameLower === '_baby gender' || propNameLower === 'baby_gender') {
+          babyGender = propValue.trim();
         }
       }
       
@@ -241,6 +249,11 @@ function extractOrderData(order) {
     occasion = notes['Occasion'] || notes['occasion'] || notes['Order Occasion'] || notes['_Occasion'] || '';
   }
 
+  // Also check note_attributes for baby gender as fallback
+  if (!babyGender) {
+    babyGender = notes['Baby Gender'] || notes['baby gender'] || notes['_Baby Gender'] || notes['baby_gender'] || '';
+  }
+
   return {
     orderNumber: order.name || ('#' + order.order_number),
     orderDate: orderDate,
@@ -259,7 +272,8 @@ function extractOrderData(order) {
     subtotal: subtotal,
     totalTax: totalTax,
     deliveryFee: deliveryFee,
-    occasion: occasion
+    occasion: occasion,
+    babyGender: babyGender
   };
 }
 
@@ -284,6 +298,7 @@ function generateInvoiceHTML(data) {
   var totalTax = data.totalTax;
   var deliveryFee = data.deliveryFee;
   var occasion = data.occasion;
+  var babyGender = data.babyGender;
 
   // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
@@ -386,6 +401,25 @@ function generateInvoiceHTML(data) {
     occasionHTML = '<div class="occasion-section"><div class="occasion-label">Occasion</div><div class="occasion-value">' + occasion + '</div></div>';
   }
 
+  // Baby Gender section - BIG and prominent so production team can't miss it
+  var babyGenderHTML = '';
+  if (babyGender && babyGender.trim()) {
+    var genderUpper = babyGender.trim().toUpperCase();
+    var genderBg = '#000';
+    var genderColor = '#fff';
+    var genderIcon = '👶';
+    if (genderUpper === 'BOY') {
+      genderBg = '#1565C0';
+      genderColor = '#fff';
+      genderIcon = '👶💙';
+    } else if (genderUpper === 'GIRL') {
+      genderBg = '#D81B60';
+      genderColor = '#fff';
+      genderIcon = '👶💗';
+    }
+    babyGenderHTML = '<div class="baby-gender-section" style="background:' + genderBg + ';color:' + genderColor + ';padding:12px 20px;margin-bottom:12px;display:inline-block;"><div class="baby-gender-label" style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Baby Gender</div><div class="baby-gender-value" style="font-size:22px;font-weight:800;text-transform:uppercase;">' + genderIcon + ' ' + genderUpper + '</div></div>';
+  }
+
   // Totals section - show on ALL invoices (Subtotal, Delivery/Shipping Fee, Tax) - NO TIP
   var totalsHTML = '<div class="totals-section">';
   totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
@@ -484,6 +518,7 @@ function generateInvoiceHTML(data) {
   html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
   html += dateBarHTML;
   html += occasionHTML;
+  html += babyGenderHTML;
   html += '<div class="' + gridClass + '">';
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
   html += giverCardHTML;
