@@ -1,4 +1,42 @@
 // =============================================================================
+// GIFT FIELD NORMALIZATION — handles old/new/alternate field name formats
+// =============================================================================
+
+function normalizeGiftFields(notes) {
+  // Build case-insensitive, separator-stripped lookup from all existing notes
+  var ci = {};
+  var keys = Object.keys(notes);
+  for (var i = 0; i < keys.length; i++) {
+    var normalized = keys[i].toLowerCase().replace(/[\s_\-]+/g, '');
+    if (!ci[normalized]) ci[normalized] = notes[keys[i]];
+  }
+
+  // Current theme format:  Gift Message, Gift Sender, Gift Receiver, Gift Wrap
+  // Old/alternate format:  gift_message, gift_message_from, gift_message_to, gift_message_is_gift
+  //                        gift_message_text, gift_from, gift_to
+
+  if (!notes['Gift Message'] || !notes['Gift Message'].trim()) {
+    notes['Gift Message'] = ci['giftmessage'] || ci['giftmessagetext'] || '';
+  }
+
+  if (!notes['Gift Sender'] || !notes['Gift Sender'].trim()) {
+    notes['Gift Sender'] = ci['giftsender'] || ci['giftmessagefrom'] || ci['giftfrom'] || '';
+  }
+
+  if (!notes['Gift Receiver'] || !notes['Gift Receiver'].trim()) {
+    notes['Gift Receiver'] = ci['giftreceiver'] || ci['giftmessageto'] || ci['giftto'] || '';
+  }
+
+  if (!notes['Gift Wrap'] || !notes['Gift Wrap'].trim()) {
+    var wrapVal = ci['giftwrap'] || ci['giftmessageisgift'] || ci['isgift'] || '';
+    if (wrapVal === 'true' || wrapVal === '1' || wrapVal === 'yes' || wrapVal === 'Yes') {
+      wrapVal = 'true';
+    }
+    notes['Gift Wrap'] = wrapVal;
+  }
+}
+
+// =============================================================================
 // ORDER DATA EXTRACTION
 // =============================================================================
 
@@ -9,6 +47,31 @@ function extractOrderData(order) {
   for (var i = 0; i < noteAttrs.length; i++) {
     notes[noteAttrs[i].name] = noteAttrs[i].value;
   }
+
+  // Also check cart_attributes (some themes send gift data here)
+  var cartAttrs = order.cart_attributes || [];
+  for (var ca = 0; ca < cartAttrs.length; ca++) {
+    if (cartAttrs[ca].name && !notes[cartAttrs[ca].name]) {
+      notes[cartAttrs[ca].name] = cartAttrs[ca].value;
+    }
+  }
+
+  // Scan line_item properties for gift-related fields (fallback source)
+  var allLineItems = order.line_items || [];
+  for (var li = 0; li < allLineItems.length; li++) {
+    var liProps = allLineItems[li].properties || [];
+    for (var lp = 0; lp < liProps.length; lp++) {
+      var lpName = (liProps[lp].name || '').toLowerCase();
+      if (lpName.indexOf('gift') > -1) {
+        if (!notes[liProps[lp].name]) {
+          notes[liProps[lp].name] = liProps[lp].value;
+        }
+      }
+    }
+  }
+
+  // Normalize gift field names (handles old/new/alternate formats)
+  normalizeGiftFields(notes);
 
   // Check if this is a POS (in-store) order
   var isPOS = order.source_name === 'pos' || order.source_name === 'shopify_pos';
