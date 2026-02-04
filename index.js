@@ -92,18 +92,54 @@ async function printOrder(order) {
   } catch (error) { console.log('✗ ERROR processing order:', error.message); return { success: false, error: error.message }; }
 }
 
+// =============================================================================
+// WEBHOOKS — Always return 200 FIRST to prevent Shopify from deleting webhook
+// =============================================================================
+
 app.post('/webhook/orders/create', async (req, res) => {
-  console.log(''); console.log('>>> WEBHOOK RECEIVED: orders/create');
-  if (!verifyShopifyWebhook(req)) { console.log('>>> WEBHOOK REJECTED'); return res.status(401).send('Unauthorized'); }
-  res.status(200).send('OK'); console.log('>>> WEBHOOK VERIFIED');
-  var order = JSON.parse(req.body); await printOrder(order);
+  // ALWAYS return 200 immediately — Shopify deletes webhooks after 19 consecutive failures
+  res.status(200).send('OK');
+
+  try {
+    console.log('');
+    console.log('>>> WEBHOOK RECEIVED: orders/create');
+
+    if (!verifyShopifyWebhook(req)) {
+      console.log('>>> WEBHOOK REJECTED: Invalid signature (200 still sent to Shopify)');
+      return;
+    }
+
+    console.log('>>> WEBHOOK VERIFIED - Processing...');
+    var order = JSON.parse(req.body);
+    await printOrder(order);
+  } catch (error) {
+    console.error('>>> WEBHOOK ERROR (orders/create):', error.message);
+    console.error(error.stack);
+    // Error is logged but NOT sent to Shopify — 200 was already returned
+  }
 });
 
 app.post('/webhook/orders/paid', async (req, res) => {
-  console.log(''); console.log('>>> WEBHOOK RECEIVED: orders/paid');
-  if (!verifyShopifyWebhook(req)) { console.log('>>> WEBHOOK REJECTED'); return res.status(401).send('Unauthorized'); }
-  res.status(200).send('OK'); console.log('>>> WEBHOOK VERIFIED');
-  var order = JSON.parse(req.body); await printOrder(order);
+  // ALWAYS return 200 immediately — Shopify deletes webhooks after 19 consecutive failures
+  res.status(200).send('OK');
+
+  try {
+    console.log('');
+    console.log('>>> WEBHOOK RECEIVED: orders/paid');
+
+    if (!verifyShopifyWebhook(req)) {
+      console.log('>>> WEBHOOK REJECTED: Invalid signature (200 still sent to Shopify)');
+      return;
+    }
+
+    console.log('>>> WEBHOOK VERIFIED - Processing...');
+    var order = JSON.parse(req.body);
+    await printOrder(order);
+  } catch (error) {
+    console.error('>>> WEBHOOK ERROR (orders/paid):', error.message);
+    console.error(error.stack);
+    // Error is logged but NOT sent to Shopify — 200 was already returned
+  }
 });
 
 app.get('/print/:orderId', async (req, res) => {
