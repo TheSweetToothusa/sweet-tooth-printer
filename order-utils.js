@@ -3,17 +3,12 @@
 // =============================================================================
 
 function normalizeGiftFields(notes) {
-  // Build case-insensitive, separator-stripped lookup from all existing notes
   var ci = {};
   var keys = Object.keys(notes);
   for (var i = 0; i < keys.length; i++) {
     var normalized = keys[i].toLowerCase().replace(/[\s_\-]+/g, '');
     if (!ci[normalized]) ci[normalized] = notes[keys[i]];
   }
-
-  // Current theme format:  Gift Message, Gift Sender, Gift Receiver, Gift Wrap
-  // Old/alternate format:  gift_message, gift_message_from, gift_message_to, gift_message_is_gift
-  //                        gift_message_text, gift_from, gift_to
 
   if (!notes['Gift Message'] || !notes['Gift Message'].trim()) {
     notes['Gift Message'] = ci['giftmessage'] || ci['giftmessagetext'] || '';
@@ -41,14 +36,12 @@ function normalizeGiftFields(notes) {
 // =============================================================================
 
 function extractOrderData(order) {
-  // Get note attributes as key-value object
   var notes = {};
   var noteAttrs = order.note_attributes || [];
   for (var i = 0; i < noteAttrs.length; i++) {
     notes[noteAttrs[i].name] = noteAttrs[i].value;
   }
 
-  // Also check cart_attributes (some themes send gift data here)
   var cartAttrs = order.cart_attributes || [];
   for (var ca = 0; ca < cartAttrs.length; ca++) {
     if (cartAttrs[ca].name && !notes[cartAttrs[ca].name]) {
@@ -56,7 +49,6 @@ function extractOrderData(order) {
     }
   }
 
-  // Scan line_item properties for gift-related fields (fallback source)
   var allLineItems = order.line_items || [];
   for (var li = 0; li < allLineItems.length; li++) {
     var liProps = allLineItems[li].properties || [];
@@ -70,13 +62,10 @@ function extractOrderData(order) {
     }
   }
 
-  // Normalize gift field names (handles old/new/alternate formats)
   normalizeGiftFields(notes);
 
-  // Check if this is a POS (in-store) order
   var isPOS = order.source_name === 'pos' || order.source_name === 'shopify_pos';
 
-  // Determine delivery type from shipping line
   var shippingTitle = '';
   var shippingPrice = '0.00';
   if (order.shipping_lines && order.shipping_lines[0]) {
@@ -90,7 +79,6 @@ function extractOrderData(order) {
   var shippingTitleLower = shippingTitle.toLowerCase();
   var deliveryType = 'shipping';
   
-  // POS orders are in-store
   if (isPOS) {
     deliveryType = 'in-store';
   } else if (shippingTitleLower.indexOf('local') > -1 || shippingTitleLower.indexOf('delivery') > -1) {
@@ -99,7 +87,6 @@ function extractOrderData(order) {
     deliveryType = 'pickup';
   }
 
-  // Also check note_attributes for Delivery Method
   var deliveryMethod = (notes['Delivery Method'] || '').toLowerCase();
   if (deliveryMethod.indexOf('pickup') > -1 || deliveryMethod.indexOf('pick up') > -1) {
     deliveryType = 'pickup';
@@ -107,12 +94,10 @@ function extractOrderData(order) {
     deliveryType = 'local-delivery';
   }
 
-  // Extract recipient info
   var shipping = order.shipping_address || {};
   var billing = order.billing_address || {};
   var customer = order.customer || {};
   
-  // For POS orders, use billing or customer info since there's no shipping
   var addressSource = isPOS ? (billing.address1 ? billing : {}) : shipping;
   
   var firstName = addressSource.first_name || customer.first_name || '';
@@ -128,7 +113,6 @@ function extractOrderData(order) {
     country: addressSource.country || ''
   };
 
-  // Extract gift giver info
   var billingFirstName = billing.first_name || '';
   var billingLastName = billing.last_name || '';
   var giver = {
@@ -137,24 +121,21 @@ function extractOrderData(order) {
     phone: billing.phone || customer.phone || ''
   };
 
-  // Extract line items (NO TIP!) and collect special instructions AND occasion from line item properties
   var items = [];
   var lineItemInstructions = [];
   var lineItems = order.line_items || [];
   var itemsSubtotal = 0;
-  var occasion = ''; // Will be extracted from line item properties
-  var babyGender = ''; // Will be extracted from line item properties (Boy or Girl)
+  var occasion = '';
+  var babyGender = '';
   
   for (var j = 0; j < lineItems.length; j++) {
     var item = lineItems[j];
     var itemTitle = item.title || '';
     
-    // Skip tips completely
     if (itemTitle.toLowerCase().indexOf('tip') > -1) {
       continue;
     }
     
-    // Get variant title (Dairy, Vegan/Parve, etc.)
     var variantTitle = item.variant_title || '';
     
     var itemPrice = parseFloat(item.price) || 0;
@@ -169,28 +150,24 @@ function extractOrderData(order) {
       price: itemPrice.toFixed(2)
     });
     
-    // Check line item properties for special instructions, occasion, AND baby gender
     var props = item.properties || [];
     for (var k = 0; k < props.length; k++) {
       var propName = (props[k].name || '');
       var propNameLower = propName.toLowerCase();
       var propValue = props[k].value || '';
       
-      // Extract occasion from line item properties (check for _Occasion, Occasion, etc.)
       if (!occasion && propValue && propValue.trim()) {
         if (propNameLower === '_occasion' || propNameLower === 'occasion' || propNameLower === 'order occasion') {
           occasion = propValue.trim();
         }
       }
       
-      // Extract baby gender from line item properties
       if (!babyGender && propValue && propValue.trim()) {
         if (propNameLower === 'baby gender' || propNameLower === '_baby gender' || propNameLower === 'baby_gender') {
           babyGender = propValue.trim();
         }
       }
       
-      // Extract special instructions
       if (propNameLower.indexOf('special') > -1 || propNameLower.indexOf('instruction') > -1 || propNameLower.indexOf('note') > -1) {
         if (propValue && propValue.trim()) {
           lineItemInstructions.push(propValue.trim());
@@ -199,15 +176,12 @@ function extractOrderData(order) {
     }
   }
 
-  // Gather ALL special instructions from multiple sources
   var allInstructions = [];
   
-  // 1. Order-level note (order.note)
   if (order.note && order.note.trim()) {
     allInstructions.push(order.note.trim());
   }
   
-  // 2. Note attributes - Special Instructions (check multiple variations)
   if (notes['Special Instructions'] && notes['Special Instructions'].trim()) {
     allInstructions.push(notes['Special Instructions'].trim());
   }
@@ -215,7 +189,6 @@ function extractOrderData(order) {
     allInstructions.push(notes['special instructions'].trim());
   }
   
-  // 3. Note attributes - Delivery Instructions (check ALL variations - THIS IS CRITICAL)
   if (notes['Delivery Instructions'] && notes['Delivery Instructions'].trim()) {
     allInstructions.push('DELIVERY: ' + notes['Delivery Instructions'].trim());
   }
@@ -229,12 +202,10 @@ function extractOrderData(order) {
     allInstructions.push('DELIVERY: ' + notes['DeliveryInstructions'].trim());
   }
   
-  // 4. Also check for any note attribute containing "instruction" in the name
   for (var key in notes) {
     if (notes.hasOwnProperty(key)) {
       var keyLower = key.toLowerCase();
       if (keyLower.indexOf('instruction') > -1 && notes[key] && notes[key].trim()) {
-        // Check if we already added this
         var alreadyAdded = false;
         for (var x = 0; x < allInstructions.length; x++) {
           if (allInstructions[x].indexOf(notes[key].trim()) > -1) {
@@ -249,9 +220,7 @@ function extractOrderData(order) {
     }
   }
   
-  // 5. Line item properties (already collected above)
   for (var m = 0; m < lineItemInstructions.length; m++) {
-    // Avoid duplicates
     var inst = lineItemInstructions[m];
     var isDuplicate = false;
     for (var n = 0; n < allInstructions.length; n++) {
@@ -265,10 +234,8 @@ function extractOrderData(order) {
     }
   }
   
-  // Combine all instructions
   var specialInstructions = allInstructions.join('\n\n');
 
-  // Format order date
   var orderDateObj = new Date(order.created_at);
   var orderDate = orderDateObj.toLocaleDateString('en-US', {
     month: 'short',
@@ -276,7 +243,6 @@ function extractOrderData(order) {
     year: 'numeric'
   });
 
-  // Format delivery date with day of week and abbreviated month (separate lines)
   var deliveryDateRaw = notes['Delivery Date'] || '';
   var deliveryDayOfWeek = notes['Delivery Day'] || '';
   var deliveryDateFormatted = 'TBD';
@@ -302,17 +268,14 @@ function extractOrderData(order) {
     }
   }
 
-  // Extract totals - use calculated subtotal for items (excludes tips)
   var subtotal = itemsSubtotal.toFixed(2);
   var totalTax = order.total_tax || '0.00';
   var deliveryFee = shippingPrice;
 
-  // Also check note_attributes for occasion as fallback
   if (!occasion) {
     occasion = notes['Occasion'] || notes['occasion'] || notes['Order Occasion'] || notes['_Occasion'] || '';
   }
 
-  // Also check note_attributes for baby gender as fallback
   if (!babyGender) {
     babyGender = notes['Baby Gender'] || notes['baby gender'] || notes['_Baby Gender'] || notes['baby_gender'] || '';
   }
@@ -363,7 +326,6 @@ function generateInvoiceHTML(data) {
   var occasion = data.occasion;
   var babyGender = data.babyGender;
 
-  // Determine badge and city display based on delivery type
   var badgeText = 'SHIPPING';
   var cityDisplay = '';
   var dateLabel = 'Ship Date';
@@ -399,7 +361,6 @@ function generateInvoiceHTML(data) {
     deliveryFeeLabel = '';
   }
 
-  // Format recipient address
   var addressParts = [];
   if (recipient.address1) addressParts.push(recipient.address1);
   if (recipient.address2) addressParts.push(recipient.address2);
@@ -408,7 +369,6 @@ function generateInvoiceHTML(data) {
   }
   var addressLines = addressParts.join('<br>');
 
-  // Generate items rows - LARGER AND BOLD item names, with variant tag
   var itemRows = '';
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
@@ -419,7 +379,6 @@ function generateInvoiceHTML(data) {
     itemRows += '<tr><td class="item-name">' + item.title + ' ' + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
   }
 
-  // Top right section varies by type
   var topRightHTML = '';
   if (showTopRight) {
     if (deliveryType === 'local-delivery') {
@@ -432,13 +391,10 @@ function generateInvoiceHTML(data) {
     topRightHTML = '<div class="pickup-info"><div class="pickup-label">Pickup Location</div><div class="pickup-location">The Sweet Tooth</div><div class="pickup-address">18435 NE 19th Ave<br>North Miami Beach, FL 33179</div></div>';
   }
 
-  // Phone HTML
   var phoneHTML = recipient.phone ? '<div class="recipient-phone">☎ ' + recipient.phone + '</div>' : '';
   
-  // Address HTML (hide for pickup and in-store)
   var addressHTML = (deliveryType !== 'pickup' && deliveryType !== 'in-store' && addressLines) ? '<div class="recipient-address">' + addressLines + '</div>' : '';
   
-  // Giver details - hide for in-store
   var giverCardHTML = '';
   if (deliveryType !== 'in-store') {
     var giverEmailHTML = giver.email ? '<div class="giver-detail">' + giver.email + '</div>' : '';
@@ -446,25 +402,25 @@ function generateInvoiceHTML(data) {
     giverCardHTML = '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
   }
 
-  // Special instructions - convert newlines to <br> for display
   var instructionsDisplay = specialInstructions ? specialInstructions.replace(/\n/g, '<br>') : '';
   var instructionsClass = specialInstructions ? '' : 'no-notes';
   var instructionsContent = specialInstructions ? instructionsDisplay : 'No special instructions';
 
-  // Gift message section
+  // FIXED: Gift message section — show "NO GIFT MESSAGE" when empty
   var giftMessageHTML = '';
   if (giftMessage && giftMessage.trim()) {
     var formattedGiftMessage = giftMessage.replace(/\n/g, '<br>');
-    giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Message</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
+    giftMessageHTML = '<div class="gift-message-section"><div class="gift-message-header">🎁 Gift Card Included</div><div class="gift-message-content">"' + formattedGiftMessage + '"</div><div class="gift-message-from">— ' + giftSender + '</div></div>';
+  } else {
+    // NO GIFT MESSAGE — big visible indicator so factory team knows
+    giftMessageHTML = '<div class="no-gift-message-section"><div class="no-gift-message">NO GIFT MESSAGE</div></div>';
   }
 
-  // Occasion section - prominent display when present
   var occasionHTML = '';
   if (occasion && occasion.trim()) {
     occasionHTML = '<div class="occasion-section"><div class="occasion-label">Occasion</div><div class="occasion-value">' + occasion + '</div></div>';
   }
 
-  // Baby Gender section - BIG and prominent so production team can't miss it
   var babyGenderHTML = '';
   if (babyGender && babyGender.trim()) {
     var genderUpper = babyGender.trim().toUpperCase();
@@ -483,7 +439,6 @@ function generateInvoiceHTML(data) {
     babyGenderHTML = '<div class="baby-gender-section" style="background:' + genderBg + ';color:' + genderColor + ';padding:12px 20px;margin-bottom:12px;display:inline-block;"><div class="baby-gender-label" style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:2px;">Baby Gender</div><div class="baby-gender-value" style="font-size:22px;font-weight:800;text-transform:uppercase;">' + genderIcon + ' ' + genderUpper + '</div></div>';
   }
 
-  // Totals section - show on ALL invoices (Subtotal, Delivery/Shipping Fee, Tax) - NO TIP
   var totalsHTML = '<div class="totals-section">';
   totalsHTML += '<div class="totals-row"><span>Subtotal:</span><span>$' + parseFloat(subtotal).toFixed(2) + '</span></div>';
   if (deliveryFeeLabel && parseFloat(deliveryFee) > 0) {
@@ -494,14 +449,12 @@ function generateInvoiceHTML(data) {
   totalsHTML += '<div class="totals-row totals-total"><span>Total:</span><span>$' + total.toFixed(2) + '</span></div>';
   totalsHTML += '</div>';
 
-  // Print timestamp in EST
   var now = new Date();
   var printTimestamp = now.toLocaleString('en-US', { 
     timeZone: 'America/New_York',
     month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true 
   }) + ' EST';
 
-  // Date display - day of week on top, date underneath
   var dateBarHTML = '';
   if (showDateBar) {
     var dateDisplayHTML = '';
@@ -513,7 +466,6 @@ function generateInvoiceHTML(data) {
     dateBarHTML = '<div class="date-bar"><div class="delivery-date"><div class="delivery-date-label">' + dateLabel + '</div>' + dateDisplayHTML + '</div></div>';
   }
 
-  // Content grid - full width for in-store (no giver card)
   var gridClass = deliveryType === 'in-store' ? 'content-grid-single' : 'content-grid';
 
   var html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Invoice ' + orderNumber + '</title>';
@@ -569,6 +521,9 @@ function generateInvoiceHTML(data) {
   html += '.gift-message-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }';
   html += '.gift-message-content { font-size: 12px; line-height: 1.5; font-style: italic; margin-bottom: 6px; }';
   html += '.gift-message-from { font-size: 11px; font-weight: 700; text-align: right; }';
+  // FIXED: Style for "NO GIFT MESSAGE" indicator
+  html += '.no-gift-message-section { border: 2px dashed #999; padding: 10px; margin-bottom: 12px; text-align: center; }';
+  html += '.no-gift-message { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #666; }';
   html += '.special-notes { border: 2px dashed #000; padding: 10px; margin-bottom: 12px; }';
   html += '.special-notes-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }';
   html += '.special-notes-content { font-size: 11px; line-height: 1.5; font-weight: 500; }';
