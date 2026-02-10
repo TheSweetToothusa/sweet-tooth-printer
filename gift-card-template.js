@@ -3,7 +3,7 @@ function generateGiftCardHTML(data) {
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var recipient = data.recipient;
-  // FIXED: Default positions moved UP for better print placement
+  // Default positions
   var topPosition = data.topPosition || '0.15in';
   var messagePosition = data.messagePosition || '4.30in';
   var receiverName = giftReceiver || recipient.name;
@@ -11,7 +11,7 @@ function generateGiftCardHTML(data) {
   var addressLine2 = recipient.city ? (recipient.city + ', ' + recipient.province + ' ' + recipient.zip) : '';
   var senderDiv = giftSender ? '<div class="gift-sender">' + giftSender + '</div>' : '';
 
-  // FIXED: Enforce 300 character max on gift messages
+  // Enforce 300 character max on gift messages
   var truncatedMessage = (giftMessage || '');
   if (truncatedMessage.length > 300) {
     truncatedMessage = truncatedMessage.substring(0, 300);
@@ -54,21 +54,22 @@ function generateGiftCardHTML(data) {
     msgInches = (parseFloat(messagePosition) / 72) + 'in';
   }
 
-  // FIXED: No "Gift Card" title — the <title> tag is blank and there is NO header text
+  // FIX: Wider margins (0.55in each side) and hard overflow constraints
+  // Card width reduced to 4.15in with overflow:hidden on all text containers
   var html = '<!DOCTYPE html><html><head>';
   html += '<title> </title><meta charset="UTF-8">';
   html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
   html += '<style>';
-  html += '@page { size: 4.2in 8.5in; margin: 0; }';
+  html += '@page { size: 4.15in 8.5in; margin: 0; }';
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
   html += 'body { margin: 0; padding: 0; font-family: Montserrat, Arial, sans-serif; background: white; }';
-  html += '.card { width: 4.2in; height: 8.5in; position: relative; background: white; overflow: hidden; }';
-  html += '.top-section { position: absolute; top: ' + topInches + '; left: 0; right: 0; text-align: center; padding: 0 0.4in; }';
-  html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: 11.9pt; font-weight: 400; margin-bottom: 12px; color: #000; }';
-  html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: 9.35pt; font-weight: 400; line-height: 1.4; color: #000; }';
-  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0; right: 0; text-align: center; padding: 0 0.4in; }';
-  html += '.gift-message { font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
-  html += '.gift-sender { margin-top: 12px; font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; color: #000; }';
+  html += '.card { width: 4.15in; height: 8.5in; position: relative; background: white; overflow: hidden; }';
+  html += '.top-section { position: absolute; top: ' + topInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
+  html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: 11.9pt; font-weight: 400; margin-bottom: 12px; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: 9.35pt; font-weight: 400; line-height: 1.4; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
+  html += '.gift-message { font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
+  html += '.gift-sender { margin-top: 12px; font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
