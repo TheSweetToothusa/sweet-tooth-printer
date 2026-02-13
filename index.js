@@ -23,14 +23,12 @@ const CONFIG = {
   }
 };
 
-// Log config on startup (without sensitive values)
 console.log('=== Sweet Tooth Printer Starting ===');
 console.log('Invoice Printer ID:', CONFIG.printNode.invoicePrinterId || 'NOT SET');
 console.log('Gift Card Printer ID:', CONFIG.printNode.giftCardPrinterId || 'NOT SET');
 console.log('Shopify Store:', CONFIG.shopify.store || 'NOT SET');
 console.log('=====================================');
 
-// In-memory order store (last 250 orders)
 var recentOrders = [];
 var MAX_ORDERS = 250;
 
@@ -106,11 +104,9 @@ async function printOrder(order) {
     console.log('Delivery Type:', orderData.deliveryType);
     console.log('Gift Message:', orderData.giftMessage ? orderData.giftMessage.substring(0, 50) + '...' : 'NONE');
 
-    // Store in memory
     recentOrders.unshift({ order: order, data: orderData, timestamp: new Date() });
     if (recentOrders.length > MAX_ORDERS) recentOrders.pop();
 
-    // Print Invoice
     if (CONFIG.printNode.invoicePrinterId) {
       console.log('Printing invoice...');
       var invoiceHTML = generateInvoiceHTML(orderData);
@@ -121,7 +117,6 @@ async function printOrder(order) {
       console.log('✗ Invoice printer not configured!');
     }
 
-    // Print Gift Card (skip for POS/in-store orders)
     if (orderData.giftMessage && orderData.giftMessage.trim() && !isInStoreOrder(order)) {
       if (CONFIG.printNode.giftCardPrinterId) {
         console.log('Printing gift card...');
@@ -172,7 +167,6 @@ app.post('/webhook/orders/paid', async (req, res) => {
     var order = JSON.parse(req.body);
     console.log('Webhook received: orders/paid for', order.name);
     res.status(200).send('OK');
-    // Only process if not already in memory
     var exists = recentOrders.find(function(o) { return o.order.id === order.id; });
     if (!exists) {
       await printOrder(order);
@@ -207,27 +201,49 @@ async function searchShopifyOrders(query) {
   return data.orders || [];
 }
 
+// ============ HELPER: Always load orders from Shopify + merge with webhook memory ============
+
+async function loadAllRecentOrders() {
+  var shopifyOrders = [];
+  try {
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=50';
+    var response = await fetch(url, {
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }
+    });
+    if (response.ok) {
+      var data = await response.json();
+      shopifyOrders = data.orders || [];
+    }
+  } catch (e) {
+    console.log('Error fetching Shopify orders:', e.message);
+  }
+
+  var mergedMap = {};
+  for (var i = 0; i < shopifyOrders.length; i++) {
+    var od = extractOrderData(shopifyOrders[i]);
+    mergedMap[shopifyOrders[i].id] = { order: shopifyOrders[i], data: od, timestamp: new Date(shopifyOrders[i].created_at) };
+  }
+  for (var j = 0; j < recentOrders.length; j++) {
+    var ro = recentOrders[j];
+    if (!mergedMap[ro.order.id]) {
+      mergedMap[ro.order.id] = ro;
+    }
+  }
+
+  var merged = Object.values(mergedMap);
+  merged.sort(function(a, b) { return new Date(b.timestamp) - new Date(a.timestamp); });
+
+  recentOrders = merged.slice(0, MAX_ORDERS);
+
+  return merged;
+}
+
 // ============ DASHBOARD - GIFT CARDS ============
 
 app.get('/dashboard', async (req, res) => {
   try {
-    // Load recent orders from Shopify if memory is empty
-    if (recentOrders.length === 0) {
-      var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=50';
-      var response = await fetch(url, {
-        headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }
-      });
-      if (response.ok) {
-        var data = await response.json();
-        var orders = data.orders || [];
-        for (var i = 0; i < orders.length; i++) {
-          var od = extractOrderData(orders[i]);
-          recentOrders.push({ order: orders[i], data: od, timestamp: new Date(orders[i].created_at) });
-        }
-      }
-    }
-
-    var giftOrders = recentOrders.filter(function(o) { return o.data.giftMessage && o.data.giftMessage.trim(); });
+    var allOrders = await loadAllRecentOrders();
+    var giftOrders = allOrders.filter(function(o) { return o.data.giftMessage && o.data.giftMessage.trim(); });
 
     var orderCards = '';
     for (var j = 0; j < giftOrders.length; j++) {
@@ -238,7 +254,7 @@ app.get('/dashboard', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No gift card orders found. New orders with gift messages will appear here.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar input{width:100%;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}</style></head><body><div class="header"><h1>🎁 Gift Cards</h1><div class="nav-links"><a href="/dashboard/invoices" class="secondary">Invoices</a></div></div><div class="search-bar"><input type="text" id="search" placeholder="Search orders..." oninput="filterOrders()"></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}</style></head><body><div class="header"><h1>🎁 Gift Cards</h1><div class="nav-links"><a href="/dashboard/invoices" class="secondary">Invoices</a></div></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error loading dashboard: ' + error.message);
   }
@@ -248,31 +264,18 @@ app.get('/dashboard', async (req, res) => {
 
 app.get('/dashboard/invoices', async (req, res) => {
   try {
-    if (recentOrders.length === 0) {
-      var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=50';
-      var response = await fetch(url, {
-        headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }
-      });
-      if (response.ok) {
-        var data = await response.json();
-        var orders = data.orders || [];
-        for (var i = 0; i < orders.length; i++) {
-          var od = extractOrderData(orders[i]);
-          recentOrders.push({ order: orders[i], data: od, timestamp: new Date(orders[i].created_at) });
-        }
-      }
-    }
+    var allOrders = await loadAllRecentOrders();
 
     var orderCards = '';
-    for (var j = 0; j < recentOrders.length; j++) {
-      var o = recentOrders[j];
+    for (var j = 0; j < allOrders.length; j++) {
+      var o = allOrders[j];
       var hasGift = o.data.giftMessage && o.data.giftMessage.trim() ? '<span style="display:inline-block;background:#000;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px">🎁 GIFT</span>' : '';
       orderCards += '<div class="order-card"><div class="order-num">' + o.data.orderNumber + hasGift + '</div><div class="order-detail"><strong>' + o.data.deliveryType.toUpperCase() + '</strong> — ' + o.data.recipient.name + '</div><div class="order-detail">' + o.data.deliveryDate + '</div><div class="order-detail">' + o.data.items.length + ' item(s)</div><div class="order-actions"><a href="/dashboard/invoice-view/' + o.order.id + '" class="btn btn-view">View Invoice</a> <a href="/dashboard/reprint-invoice/' + o.order.id + '" class="btn btn-print">Reprint</a></div></div>';
     }
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No orders found. Orders will appear here as they come in.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Invoice Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar input{width:100%;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}</style></head><body><div class="header"><h1>📋 Invoices</h1><div class="nav-links"><a href="/dashboard" class="secondary">Gift Cards</a></div></div><div class="search-bar"><input type="text" id="search" placeholder="Search orders..." oninput="filterOrders()"></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Invoice Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}</style></head><body><div class="header"><h1>📋 Invoices</h1><div class="nav-links"><a href="/dashboard" class="secondary">Gift Cards</a></div></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
@@ -306,14 +309,13 @@ app.get('/dashboard/reprint-invoice/:orderId', async (req, res) => {
   }
 });
 
-// ============ GIFT CARD EDITOR & PRINT (FIXED: editor values actually work) ============
+// ============ GIFT CARD EDITOR & PRINT ============
 
 app.get('/dashboard/print-custom/:orderId', async (req, res) => {
   try {
     var order = await fetchOrderFromShopify(req.params.orderId);
     var orderData = extractOrderData(order);
 
-    // Truncate message to 300 chars
     var giftMsg = (orderData.giftMessage || '').substring(0, 300);
     var msgLen = giftMsg.length;
 
@@ -330,7 +332,6 @@ app.post('/dashboard/send-gift-card-print/:orderId', async (req, res) => {
     var order = await fetchOrderFromShopify(req.params.orderId);
     var orderData = extractOrderData(order);
 
-    // FIXED: Use editor values instead of defaults
     var customData = {
       giftReceiver: req.body.recipientName || orderData.giftReceiver,
       giftMessage: (req.body.giftMessage || orderData.giftMessage || '').substring(0, 300),
@@ -343,12 +344,10 @@ app.post('/dashboard/send-gift-card-print/:orderId', async (req, res) => {
         province: '',
         zip: ''
       },
-      // FIXED: Editor position values are passed through to the template
       topPosition: req.body.topPosition || '0.15in',
       messagePosition: req.body.messagePosition || '4.30in'
     };
 
-    // Parse address2 for city/state/zip
     var addr2 = req.body.address2 || '';
     var cityMatch = addr2.match(/^(.+),\s*(\w{2})\s+(\d{5}(-\d{4})?)$/);
     if (cityMatch) {
@@ -401,7 +400,6 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
     }
 
     var giftCardHTML = generateGiftCardHTML(customData);
-    // FIXED: No "Gift Card" header in print output
     res.send('<!DOCTYPE html><html><head><title> </title><style>@media print{.no-print{display:none!important}body{margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}</style></head><body><div class="no-print" style="position:fixed;top:20px;display:flex;gap:10px;left:50%;transform:translateX(-50%);z-index:1000"><a href="/dashboard" style="background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-family:sans-serif;font-size:14px;font-weight:600">← Back</a><button onclick="window.print()" style="background:#4CAF50;color:#fff;padding:10px 20px;border-radius:6px;font-family:sans-serif;font-size:14px;font-weight:600;border:none;cursor:pointer">🖨 Print</button></div>' + giftCardHTML + '</body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
@@ -413,40 +411,67 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
 app.get('/dashboard/search', async (req, res) => {
   try {
     var q = req.query.q || '';
-    if (!q) return res.redirect('/dashboard');
+    if (!q) return res.redirect('/dashboard/invoices');
 
-    // Search by order number in Shopify
-    var orders = [];
+    var allResults = [];
+
     if (q.match(/^#?\d+$/)) {
-      orders = await searchShopifyOrders(q.replace('#', ''));
-    }
-
-    // Also search in memory
-    var qLower = q.toLowerCase();
-    var memResults = recentOrders.filter(function(o) {
-      var d = o.data;
-      return (d.orderNumber && d.orderNumber.toLowerCase().indexOf(qLower) > -1) ||
-        (d.recipient.name && d.recipient.name.toLowerCase().indexOf(qLower) > -1) ||
-        (d.giftReceiver && d.giftReceiver.toLowerCase().indexOf(qLower) > -1) ||
-        (d.giftSender && d.giftSender.toLowerCase().indexOf(qLower) > -1) ||
-        (d.recipient.city && d.recipient.city.toLowerCase().indexOf(qLower) > -1);
-    });
-
-    var allResults = memResults.map(function(o) { return o; });
-    for (var i = 0; i < orders.length; i++) {
-      var exists = allResults.find(function(r) { return r.order.id === orders[i].id; });
-      if (!exists) {
+      var orders = await searchShopifyOrders(q.replace('#', ''));
+      for (var i = 0; i < orders.length; i++) {
         allResults.push({ order: orders[i], data: extractOrderData(orders[i]), timestamp: new Date(orders[i].created_at) });
+      }
+    } else {
+      var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=250';
+      var response = await fetch(url, {
+        headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }
+      });
+      if (response.ok) {
+        var data = await response.json();
+        var orders = data.orders || [];
+        var qLower = q.toLowerCase();
+        for (var i = 0; i < orders.length; i++) {
+          var od = extractOrderData(orders[i]);
+          var customerName = ((orders[i].customer || {}).first_name || '') + ' ' + ((orders[i].customer || {}).last_name || '');
+          var recipientName = od.recipient.name || '';
+          var giftReceiver = od.giftReceiver || '';
+          var giftSender = od.giftSender || '';
+          var orderNum = od.orderNumber || '';
+          if (customerName.toLowerCase().indexOf(qLower) > -1 ||
+              recipientName.toLowerCase().indexOf(qLower) > -1 ||
+              giftReceiver.toLowerCase().indexOf(qLower) > -1 ||
+              giftSender.toLowerCase().indexOf(qLower) > -1 ||
+              orderNum.toLowerCase().indexOf(qLower) > -1) {
+            allResults.push({ order: orders[i], data: od, timestamp: new Date(orders[i].created_at) });
+          }
+        }
       }
     }
 
-    var html = '<h2>Search: "' + q + '" (' + allResults.length + ' results)</h2>';
-    for (var j = 0; j < allResults.length; j++) {
-      var r = allResults[j];
-      html += '<div style="background:#fff;border:2px solid #eee;border-radius:8px;padding:12px;margin:8px 0"><strong>' + r.data.orderNumber + '</strong> — ' + r.data.recipient.name + ' — ' + r.data.deliveryType.toUpperCase() + (r.data.giftMessage ? ' <a href="/dashboard/print-custom/' + r.order.id + '">[Edit Gift Card]</a>' : '') + ' <a href="/dashboard/invoice-view/' + r.order.id + '">[View Invoice]</a></div>';
+    var qLower2 = q.toLowerCase();
+    for (var k = 0; k < recentOrders.length; k++) {
+      var ro = recentOrders[k];
+      var d = ro.data;
+      var alreadyFound = allResults.find(function(r) { return r.order.id === ro.order.id; });
+      if (!alreadyFound) {
+        if ((d.orderNumber && d.orderNumber.toLowerCase().indexOf(qLower2) > -1) ||
+          (d.recipient.name && d.recipient.name.toLowerCase().indexOf(qLower2) > -1) ||
+          (d.giftReceiver && d.giftReceiver.toLowerCase().indexOf(qLower2) > -1) ||
+          (d.giftSender && d.giftSender.toLowerCase().indexOf(qLower2) > -1)) {
+          allResults.push(ro);
+        }
+      }
     }
 
-    res.send('<!DOCTYPE html><html><head><title>Search</title><style>body{font-family:sans-serif;max-width:900px;margin:20px auto;padding:20px}a{color:#000}</style></head><body><a href="/dashboard">← Back to Dashboard</a><br><br>' + html + '</body></html>');
+    var orderCards = '';
+    for (var j = 0; j < allResults.length; j++) {
+      var r = allResults[j];
+      var hasGift = r.data.giftMessage && r.data.giftMessage.trim() ? '<span style="display:inline-block;background:#000;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px;margin-left:6px">🎁 GIFT</span>' : '';
+      orderCards += '<div class="order-card"><div class="order-num">' + r.data.orderNumber + hasGift + '</div><div class="order-detail"><strong>' + r.data.deliveryType.toUpperCase() + '</strong> — ' + r.data.recipient.name + '</div><div class="order-detail">' + r.data.deliveryDate + '</div><div class="order-detail">' + r.data.items.length + ' item(s)</div><div class="order-actions"><a href="/dashboard/invoice-view/' + r.order.id + '" class="btn btn-view">View Invoice</a> <a href="/dashboard/reprint-invoice/' + r.order.id + '" class="btn btn-print">Reprint</a>' + (r.data.giftMessage ? ' <a href="/dashboard/print-custom/' + r.order.id + '" class="btn btn-print" style="background:#4CAF50">Edit Gift Card</a>' : '') + '</div></div>';
+    }
+
+    if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No results found for "' + q + '". Try an order number or customer name.</p>';
+
+    res.send('<!DOCTYPE html><html><head><title>Search: ' + q + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}</style></head><body><div class="header"><h1>🔍 Search: "' + q + '" (' + allResults.length + ' results)</h1><div class="nav-links"><a href="/dashboard/invoices" class="secondary">← Back to Invoices</a><a href="/dashboard" class="secondary">Gift Cards</a></div></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" placeholder="Search orders..." value="' + q.replace(/"/g, '&quot;') + '"></form></div><div class="order-grid">' + orderCards + '</div></body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
