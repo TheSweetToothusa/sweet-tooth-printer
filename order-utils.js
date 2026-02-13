@@ -402,9 +402,7 @@ function generateInvoiceHTML(data) {
     giverCardHTML = '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
   }
 
-  var instructionsDisplay = specialInstructions ? specialInstructions.replace(/\n/g, '<br>') : '';
-  var instructionsClass = specialInstructions ? '' : 'no-notes';
-  var instructionsContent = specialInstructions ? instructionsDisplay : 'No special instructions';
+  // Special instructions display is handled inline in the alert box below
 
   // FIXED: Gift message section — show "NO GIFT MESSAGE" when empty
   var giftMessageHTML = '';
@@ -524,10 +522,11 @@ function generateInvoiceHTML(data) {
   // FIXED: Style for "NO GIFT MESSAGE" indicator
   html += '.no-gift-message-section { border: 2px dashed #999; padding: 10px; margin-bottom: 12px; text-align: center; }';
   html += '.no-gift-message { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #666; }';
-  html += '.special-notes { border: 2px dashed #000; padding: 10px; margin-bottom: 12px; }';
-  html += '.special-notes-header { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px; }';
-  html += '.special-notes-content { font-size: 11px; line-height: 1.5; font-weight: 500; }';
-  html += '.no-notes { font-style: italic; color: #666; }';
+  html += '.special-instructions-alert { border: 4px solid #000; margin-bottom: 14px; }';
+  html += '.special-instructions-alert .alert-header { background: #000; color: #fff; padding: 10px 16px; display: flex; align-items: center; justify-content: center; gap: 10px; }';
+  html += '.special-instructions-alert .alert-header-text { font-size: 20px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; }';
+  html += '.special-instructions-alert .warning-triangle { flex-shrink: 0; }';
+  html += '.special-instructions-alert .alert-body { padding: 14px 16px; font-size: 15px; font-weight: 700; line-height: 1.5; }';
   html += '.footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #000; display: flex; justify-content: space-between; align-items: center; }';
   html += '.logo-area { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }';
   html += '.print-timestamp { font-size: 9px; }';
@@ -541,10 +540,18 @@ function generateInvoiceHTML(data) {
   html += '<div class="info-card recipient-card"><div class="info-card-header">' + recipientLabel + '</div><div class="recipient-name">' + recipient.name + '</div>' + phoneHTML + addressHTML + '</div>';
   html += giverCardHTML;
   html += '</div>';
+  // Special Instructions — big alert box, only shows when instructions exist
+  if (specialInstructions && specialInstructions.trim()) {
+    var instructionsDisplay = specialInstructions.replace(/\n/g, '<br>');
+    html += '<div class="special-instructions-alert"><div class="alert-header">';
+    html += '<svg class="warning-triangle" width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 2L1 21h22L12 2z" fill="#fff" stroke="#fff" stroke-width="1"/><path d="M12 9v5" stroke="#000" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="#000"/></svg>';
+    html += '<span class="alert-header-text">SPECIAL INSTRUCTIONS</span>';
+    html += '<svg class="warning-triangle" width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 2L1 21h22L12 2z" fill="#fff" stroke="#fff" stroke-width="1"/><path d="M12 9v5" stroke="#000" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="#000"/></svg>';
+    html += '</div><div class="alert-body">' + instructionsDisplay + '</div></div>';
+  }
   html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table></div>';
   html += totalsHTML;
   html += giftMessageHTML;
-  html += '<div class="special-notes"><div class="special-notes-header">⚠ Special Instructions</div><div class="special-notes-content ' + instructionsClass + '">' + instructionsContent + '</div></div>';
   html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + '</div></div>';
   html += '</div></body></html>';
 
