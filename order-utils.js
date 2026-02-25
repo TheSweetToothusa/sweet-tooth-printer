@@ -370,13 +370,33 @@ function generateInvoiceHTML(data) {
   var addressLines = addressParts.join('<br>');
 
   var itemRows = '';
+  var hasAddons = false;
+  var addonRows = '';
+
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
+    var isAddon = item.sku && item.sku.toString().toUpperCase().indexOf('ADDON') === 0;
+    if (isAddon) { hasAddons = true; continue; }
     var variantHTML = '';
     if (item.variant) {
       variantHTML = '<span class="variant-tag">' + item.variant + '</span>';
     }
     itemRows += '<tr><td class="item-name">' + item.title + ' ' + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
+  }
+
+  if (hasAddons) {
+    addonRows += '<tr><td colspan="4" class="addon-section-header">Add-Ons</td></tr>';
+    for (var j = 0; j < items.length; j++) {
+      var addonItem = items[j];
+      var isAddonItem = addonItem.sku && addonItem.sku.toString().toUpperCase().indexOf('ADDON') === 0;
+      if (!isAddonItem) continue;
+      var addonVariantHTML = '';
+      if (addonItem.variant) {
+        addonVariantHTML = '<span class="variant-tag">' + addonItem.variant + '</span>';
+      }
+      addonRows += '<tr class="addon-row"><td class="item-name addon-item-name">' + addonItem.title + ' ' + addonVariantHTML + '</td><td>' + addonItem.sku + '</td><td>' + addonItem.quantity + '</td><td>$' + addonItem.price + '</td></tr>';
+    }
+    itemRows += addonRows;
   }
 
   var topRightHTML = '';
@@ -509,6 +529,9 @@ function generateInvoiceHTML(data) {
   html += '.items-table th:last-child { text-align: right; }';
   html += '.items-table td { padding: 6px 8px; border-bottom: 1px solid #ccc; font-size: 11px; }';
   html += '.items-table td.item-name { font-size: 15px; font-weight: 800; }';
+  html += '.addon-section-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #666; padding: 8px 8px 4px 8px !important; border-bottom: 1px dashed #999 !important; border-top: 2px solid #000 !important; }';
+  html += '.addon-row td { background: #fafafa; }';
+  html += '.addon-item-name { font-size: 11px !important; font-weight: 500 !important; font-style: italic !important; padding-left: 18px !important; color: #333; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
   html += '.variant-tag { display: inline-block; background: #000; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; margin-left: 6px; vertical-align: middle; text-transform: uppercase; }';
