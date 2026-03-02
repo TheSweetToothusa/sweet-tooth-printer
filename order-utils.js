@@ -528,8 +528,8 @@ function generateInvoiceHTML(data) {
   html += '.items-table th:last-child { text-align: right; }';
   html += '.items-table td { padding: 6px 8px; border-bottom: 1px solid #ccc; font-size: 11px; }';
   html += '.items-table td.item-name { font-size: 15px; font-weight: 800; }';
-  html += '.addon-section { margin-top: 8px; margin-bottom: 12px; }';
-  html += '.addon-section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #999; }';
+  html += '.addon-section { margin-top: 16px; margin-bottom: 12px; }';
+  html += '.addon-section-title { display: inline-block; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; padding: 4px 10px; background: #000; color: #fff; }';
   html += '.addon-line-item { padding: 4px 0; font-size: 12px; }';
   html += '.addon-item-name { font-weight: 800; }';
   html += '.addon-qty { font-weight: 600; margin-left: 6px; }';
