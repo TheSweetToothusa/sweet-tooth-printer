@@ -371,7 +371,6 @@ function generateInvoiceHTML(data) {
 
   var itemRows = '';
   var hasAddons = false;
-  var addonRows = '';
 
   for (var i = 0; i < items.length; i++) {
     var item = items[i];
@@ -384,19 +383,21 @@ function generateInvoiceHTML(data) {
     itemRows += '<tr><td class="item-name">' + item.title + ' ' + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
   }
 
+  // Build add-ons as a separate left-aligned section below the items table
+  var addonSectionHTML = '';
   if (hasAddons) {
-    addonRows += '<tr><td colspan="4" class="addon-section-header">Add-Ons</td></tr>';
+    addonSectionHTML += '<div class="addon-section"><div class="addon-section-title">Add-On\'s</div>';
     for (var j = 0; j < items.length; j++) {
       var addonItem = items[j];
       var isAddonItem = addonItem.sku && addonItem.sku.toString().toUpperCase().indexOf('ADDON') === 0;
       if (!isAddonItem) continue;
       var addonVariantHTML = '';
       if (addonItem.variant) {
-        addonVariantHTML = '<span class="variant-tag">' + addonItem.variant + '</span>';
+        addonVariantHTML = ' <span class="variant-tag">' + addonItem.variant + '</span>';
       }
-      addonRows += '<tr class="addon-row"><td class="item-name addon-item-name">' + addonItem.title + ' ' + addonVariantHTML + '</td><td>' + addonItem.sku + '</td><td>' + addonItem.quantity + '</td><td>$' + addonItem.price + '</td></tr>';
+      addonSectionHTML += '<div class="addon-line-item"><span class="addon-item-name">' + addonItem.title + addonVariantHTML + '</span> <span class="addon-qty">x' + addonItem.quantity + '</span></div>';
     }
-    itemRows += addonRows;
+    addonSectionHTML += '</div>';
   }
 
   var topRightHTML = '';
@@ -421,8 +422,6 @@ function generateInvoiceHTML(data) {
     var giverPhoneHTML = giver.phone ? '<div class="giver-detail">' + giver.phone + '</div>' : '';
     giverCardHTML = '<div class="info-card"><div class="info-card-header">Gift From</div><div class="giver-name">' + giver.name + '</div>' + giverEmailHTML + giverPhoneHTML + '</div>';
   }
-
-  // Special instructions display is handled inline in the alert box below
 
   // FIXED: Gift message section — show "NO GIFT MESSAGE" when empty
   var giftMessageHTML = '';
@@ -529,9 +528,11 @@ function generateInvoiceHTML(data) {
   html += '.items-table th:last-child { text-align: right; }';
   html += '.items-table td { padding: 6px 8px; border-bottom: 1px solid #ccc; font-size: 11px; }';
   html += '.items-table td.item-name { font-size: 15px; font-weight: 800; }';
-  html += '.addon-section-header { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #666; padding: 8px 8px 4px 8px !important; border-bottom: 1px dashed #999 !important; border-top: 2px solid #000 !important; }';
-  html += '.addon-row td { background: #fafafa; }';
-  html += '.addon-item-name { font-size: 11px !important; font-weight: 500 !important; font-style: italic !important; padding-left: 18px !important; color: #333; }';
+  html += '.addon-section { margin-top: 8px; margin-bottom: 12px; }';
+  html += '.addon-section-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed #999; }';
+  html += '.addon-line-item { padding: 4px 0; font-size: 12px; }';
+  html += '.addon-item-name { font-weight: 800; }';
+  html += '.addon-qty { font-weight: 600; margin-left: 6px; }';
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
   html += '.variant-tag { display: inline-block; background: #000; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; margin-left: 6px; vertical-align: middle; text-transform: uppercase; }';
@@ -572,7 +573,7 @@ function generateInvoiceHTML(data) {
     html += '<svg class="warning-triangle" width="30" height="30" viewBox="0 0 24 24" fill="none"><path d="M12 2L1 21h22L12 2z" fill="#fff" stroke="#fff" stroke-width="1"/><path d="M12 9v5" stroke="#000" stroke-width="2.5" stroke-linecap="round"/><circle cx="12" cy="17" r="1.2" fill="#000"/></svg>';
     html += '</div><div class="alert-body">' + instructionsDisplay + '</div></div>';
   }
-  html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table></div>';
+  html += '<div class="items-section"><div class="items-header">Order Items</div><table class="items-table"><thead><tr><th>Item</th><th>SKU</th><th>Qty</th><th>Price</th></tr></thead><tbody>' + itemRows + '</tbody></table>' + addonSectionHTML + '</div>';
   html += totalsHTML;
   html += giftMessageHTML;
   html += '<div class="footer"><div class="logo-area">The Sweet Tooth Chocolate Factory</div><div class="print-timestamp">Printed: ' + printTimestamp + '</div></div>';
