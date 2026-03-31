@@ -36,13 +36,16 @@ function generateGiftCardHTML(data) {
     messageLineHeight = '1.45';
   }
 
-  // Allow editor override of font size
+  // Allow editor override of font size, family, weight, style
   if (data.messageFontSize) {
     messageFontSize = data.messageFontSize;
   }
   if (data.messageLineHeight) {
     messageLineHeight = data.messageLineHeight;
   }
+  var messageFontFamily = data.messageFontFamily || 'Montserrat';
+  var messageFontWeight = data.messageFontWeight || '700';
+  var messageFontStyle  = data.messageFontStyle  || 'normal';
 
   // Convert px values to inches for print
   var topInches = topPosition;
@@ -58,7 +61,7 @@ function generateGiftCardHTML(data) {
   // Card width reduced to 4.15in with overflow:hidden on all text containers
   var html = '<!DOCTYPE html><html><head>';
   html += '<title> </title><meta charset="UTF-8">';
-  html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
+  html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Dancing+Script:wght@400;700&family=Lato:ital,wght@0,400;0,700;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400;1,700&family=Great+Vibes&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Raleway:ital,wght@0,400;0,700;1,400;1,700&family=Pacifico&family=EB+Garamond:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
   html += '<style>';
   html += '@page { size: 4.15in 8.5in; margin: 0; }';
   html += '* { margin: 0; padding: 0; box-sizing: border-box; }';
@@ -68,8 +71,8 @@ function generateGiftCardHTML(data) {
   html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: 11.9pt; font-weight: 400; margin-bottom: 12px; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: 9.35pt; font-weight: 400; line-height: 1.4; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
-  html += '.gift-message { font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
-  html += '.gift-sender { margin-top: 12px; font-family: Montserrat, sans-serif; font-size: ' + messageFontSize + '; font-weight: 700; font-style: normal; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
+  html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
@@ -85,3 +88,4 @@ function generateGiftCardHTML(data) {
   return html;
 }
 module.exports = { generateGiftCardHTML };
+
