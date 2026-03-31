@@ -254,7 +254,7 @@ app.get('/dashboard', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No gift card orders found. New orders with gift messages will appear here.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px;align-items:center}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}.btn-new{margin-left:auto;padding:10px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a><a href="/dashboard/gift-card-new" class="btn-new">✨ Create New Card</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error loading dashboard: ' + error.message);
   }
@@ -321,7 +321,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       '.field input,.field textarea{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit}.field textarea{height:80px;resize:vertical}' +
       '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
       '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
-      '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}' +
+      '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}' +
       '</style></head><body>' +
       '<div class="editor-panel no-print">' +
         '<h2>Edit Invoice</h2>' +
@@ -339,6 +339,8 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>Special Instructions</label><textarea id="specialInstructions" oninput="refreshPreview()">' + specialInstructions + '</textarea></div>' +
         '<div class="field"><label>Gift Message</label><textarea id="giftMessage" oninput="refreshPreview()">' + giftMessage + '</textarea></div>' +
         '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Send to Printer</button></div>' +
+        '<div class="btn-row"><button class="btn btn-blue" onclick="saveEdits()">💾 Save Changes</button></div>' +
+        '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
         '<div class="btn-row"><button class="btn btn-black" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard/invoices" class="btn btn-outline">← Back</a></div>' +
       '</div>' +
       '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +
@@ -360,6 +362,18 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           'var fd=getFormData();' +
           'var params=new URLSearchParams(fd);' +
           'document.getElementById("previewFrame").src="/dashboard/invoice-preview/' + order.id + '?"+params.toString();' +
+        '}' +
+        'function saveEdits(){' +
+          'var fd=getFormData();' +
+          'fetch("/dashboard/invoice-save/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)})' +
+          '.then(function(r){return r.json()})' +
+          '.then(function(d){' +
+            'var msg=document.getElementById("saveMsg");' +
+            'if(d.success){msg.textContent="✅ Changes saved!";msg.style.color="#22c55e"}' +
+            'else{msg.textContent="❌ Save failed: "+d.error;msg.style.color="#ef4444"}' +
+            'setTimeout(function(){msg.textContent=""},3000)' +
+          '})' +
+          '.catch(function(e){var msg=document.getElementById("saveMsg");msg.textContent="Error: "+e.message;msg.style.color="#ef4444"})' +
         '}' +
         'function printToPrinter(){' +
           'var fd=getFormData();' +
@@ -537,6 +551,157 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
     res.send('<!DOCTYPE html><html><head><title> </title><style>@media print{.no-print{display:none!important}body{margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}</style></head><body><div class="no-print" style="position:fixed;top:20px;display:flex;gap:10px;left:50%;transform:translateX(-50%);z-index:1000"><a href="/dashboard" style="background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-family:sans-serif;font-size:14px;font-weight:600">← Back</a><button onclick="window.print()" style="background:#4CAF50;color:#fff;padding:10px 20px;border-radius:6px;font-family:sans-serif;font-size:14px;font-weight:600;border:none;cursor:pointer">🖨 Print</button></div>' + giftCardHTML + '</body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
+  }
+});
+
+// ============ SAVE INVOICE EDITS TO SHOPIFY ============
+
+app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
+  try {
+    var body = req.body;
+    var noteLines = [];
+    if (body.specialInstructions) noteLines.push('Special Instructions: ' + body.specialInstructions);
+    if (body.giftMessage) noteLines.push('Gift Message: ' + body.giftMessage);
+    if (body.deliveryDate) noteLines.push('Delivery Date: ' + body.deliveryDate);
+
+    var updatePayload = { order: { id: parseInt(req.params.orderId) } };
+    if (body.recipientName || body.addr1 || body.city) {
+      updatePayload.order.shipping_address = {};
+      if (body.recipientName) updatePayload.order.shipping_address.name = body.recipientName;
+      if (body.addr1) updatePayload.order.shipping_address.address1 = body.addr1;
+      if (body.addr2) updatePayload.order.shipping_address.address2 = body.addr2;
+      if (body.city) updatePayload.order.shipping_address.city = body.city;
+      if (body.province) updatePayload.order.shipping_address.province = body.province;
+      if (body.zip) updatePayload.order.shipping_address.zip = body.zip;
+    }
+    if (noteLines.length > 0) updatePayload.order.note = noteLines.join('\n');
+
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + req.params.orderId + '.json';
+    var response = await fetch(url, {
+      method: 'PUT',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatePayload)
+    });
+    if (!response.ok) {
+      var errText = await response.text();
+      return res.json({ success: false, error: 'Shopify error ' + response.status + ': ' + errText });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
+});
+
+// ============ CREATE NEW GIFT CARD (no order needed) ============
+
+app.get('/dashboard/gift-card-new', async (req, res) => {
+  res.send('<!DOCTYPE html><html><head><title>Create Gift Card</title><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}.editor-panel{width:380px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}.editor-panel h2{font-size:20px;margin-bottom:4px}.editor-panel .sub{font-size:12px;color:#888;margin-bottom:16px}.field{margin-bottom:14px}.field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#333}.field input,.field textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}.field textarea{height:110px;resize:vertical}.char-count{font-size:11px;text-align:right;margin-top:2px}.char-count.warn{color:red;font-weight:700}.btn-row{display:flex;gap:10px;margin-top:16px}.btn{padding:12px 20px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-primary{background:#000;color:#fff}.btn-green{background:#22c55e;color:#fff}.btn-secondary{background:#fff;color:#000;border:2px solid #000}.card-preview{width:299px;height:612px;background:#fff;border:2px solid #000;position:relative;overflow:hidden;font-family:Montserrat,sans-serif}.top-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.hint{font-size:11px;color:#aaa;margin-top:4px}@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.editor-panel{display:none}.preview-panel{display:block;padding:0}.card-preview{border:none;width:4.15in;height:8.5in;margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}</style></head><body>' +
+    '<div class="editor-panel no-print">' +
+      '<h2>✨ Create Gift Card</h2>' +
+      '<div class="sub">No order needed — fill in and print</div>' +
+      '<div class="field"><label>Recipient Name</label><input type="text" id="recipientName" placeholder="e.g. Sarah Cohen" oninput="updatePreview()"></div>' +
+      '<div class="field"><label>Address Line 1 <span class="hint">(optional)</span></label><input type="text" id="address1" placeholder="123 Main St" oninput="updatePreview()"></div>' +
+      '<div class="field"><label>City, State ZIP <span class="hint">(optional)</span></label><input type="text" id="address2" placeholder="Miami, FL 33179" oninput="updatePreview()"></div>' +
+      '<div class="field"><label>Gift Message <span id="charCount" class="char-count">0/300</span></label><textarea id="giftMessage" maxlength="300" placeholder="Write the gift message here..." oninput="updatePreview()"></textarea></div>' +
+      '<div class="field"><label>Sender Name</label><input type="text" id="senderName" placeholder="e.g. The Smith Family" oninput="updatePreview()"></div>' +
+      '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Print to Printer</button></div>' +
+      '<div class="btn-row"><button class="btn btn-primary" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard" class="btn btn-secondary">← Back</a></div>' +
+    '</div>' +
+    '<div class="preview-panel">' +
+      '<p style="font-size:12px;color:#999;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Live Preview</p>' +
+      '<div class="card-preview" id="cardPreview">' +
+        '<div class="top-section-preview" id="topSection" style="top:0.15in">' +
+          '<div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px;color:#bbb;font-style:italic">Recipient name</div>' +
+          '<div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4;color:#ccc"></div>' +
+        '</div>' +
+        '<div class="msg-section-preview" id="msgSection" style="top:4.30in">' +
+          '<div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10.2pt;font-weight:700;line-height:1.5;color:#ccc;font-style:italic">Gift message will appear here...</div>' +
+          '<div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10.2pt;font-weight:700;color:#ccc"></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<script>' +
+    'function updatePreview(){' +
+      'var name=document.getElementById("recipientName").value;' +
+      'var a1=document.getElementById("address1").value;' +
+      'var a2=document.getElementById("address2").value;' +
+      'var msg=document.getElementById("giftMessage").value;' +
+      'var sender=document.getElementById("senderName").value;' +
+      'var len=msg.length;' +
+      'var cc=document.getElementById("charCount");' +
+      'cc.textContent=len+"/300";' +
+      'cc.className=len>280?"char-count warn":"char-count";' +
+      'var nameEl=document.getElementById("prevName");' +
+      'if(name){nameEl.textContent=name;nameEl.style.color="#000";nameEl.style.fontStyle="normal"}' +
+      'else{nameEl.textContent="Recipient name";nameEl.style.color="#bbb";nameEl.style.fontStyle="italic"}' +
+      'var addrEl=document.getElementById("prevAddr");' +
+      'addrEl.innerHTML=a1?(a1+(a2?"<br>"+a2:"")):(a2||"");' +
+      'addrEl.style.color=a1||a2?"#000":"#ccc";' +
+      'var msgEl=document.getElementById("prevMsg");' +
+      'var fs="10.2pt";var lh="1.5";' +
+      'if(len>250){fs="8pt";lh="1.3"}else if(len>200){fs="8.5pt";lh="1.35"}else if(len>150){fs="9pt";lh="1.4"}else if(len>100){fs="9.5pt";lh="1.45"}' +
+      'msgEl.style.fontSize=fs;msgEl.style.lineHeight=lh;' +
+      'if(msg){msgEl.innerHTML=msg.replace(/\\n/g,"<br>");msgEl.style.color="#000";msgEl.style.fontStyle="normal"}' +
+      'else{msgEl.textContent="Gift message will appear here...";msgEl.style.color="#ccc";msgEl.style.fontStyle="italic"}' +
+      'var senderEl=document.getElementById("prevSender");' +
+      'senderEl.textContent=sender;senderEl.style.color=sender?"#000":"#ccc";senderEl.style.fontSize=fs;' +
+    '}' +
+    'function printToPrinter(){' +
+      'var params=new URLSearchParams({' +
+        'recipientName:document.getElementById("recipientName").value,' +
+        'address1:document.getElementById("address1").value,' +
+        'address2:document.getElementById("address2").value,' +
+        'giftMessage:document.getElementById("giftMessage").value,' +
+        'senderName:document.getElementById("senderName").value,' +
+        'topPosition:"0.15in",' +
+        'messagePosition:"4.30in"' +
+      '});' +
+      'fetch("/dashboard/send-new-gift-card",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()})' +
+      '.then(function(r){return r.json()})' +
+      '.then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}})' +
+      '.catch(function(e){alert("Error: "+e.message)})' +
+    '}' +
+    '</script></body></html>');
+});
+
+// ============ PRINT NEW GIFT CARD (no order) VIA PRINTNODE ============
+
+app.post('/dashboard/send-new-gift-card', async (req, res) => {
+  try {
+    var customData = {
+      giftReceiver: req.body.recipientName || '',
+      giftMessage: (req.body.giftMessage || '').substring(0, 300),
+      giftSender: req.body.senderName || '',
+      recipient: {
+        name: req.body.recipientName || '',
+        address1: req.body.address1 || '',
+        address2: '',
+        city: '',
+        province: '',
+        zip: ''
+      },
+      topPosition: req.body.topPosition || '0.15in',
+      messagePosition: req.body.messagePosition || '4.30in'
+    };
+
+    var addr2 = req.body.address2 || '';
+    var cityMatch = addr2.match(/^(.+),\s*(\w{2})\s+(\d{5}(-\d{4})?)$/);
+    if (cityMatch) {
+      customData.recipient.city = cityMatch[1];
+      customData.recipient.province = cityMatch[2];
+      customData.recipient.zip = cityMatch[3];
+    } else {
+      customData.recipient.city = addr2;
+    }
+
+    var { generateGiftCardHTML } = require('./gift-card-template');
+    var giftCardHTML = generateGiftCardHTML(customData);
+    var pdfBase64 = await giftCardToPdfBase64(giftCardHTML);
+    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'Custom Gift Card - ' + (customData.giftReceiver || 'No Name'));
+    res.json({ success: true });
+  } catch (error) {
+    console.error('New gift card print error:', error);
+    res.json({ success: false, error: error.message });
   }
 });
 
