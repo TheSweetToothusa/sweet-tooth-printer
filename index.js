@@ -463,15 +463,97 @@ app.get('/dashboard/print-custom/:orderId', async (req, res) => {
   try {
     var order = await fetchOrderFromShopify(req.params.orderId);
     var orderData = extractOrderData(order);
-
     var giftMsg = (orderData.giftMessage || '').substring(0, 300);
     var msgLen = giftMsg.length;
+    var recipName = (orderData.giftReceiver || orderData.recipient.name || '').replace(/"/g,'&quot;');
+    var addr1Val = (orderData.recipient.address1 || '').replace(/"/g,'&quot;');
+    var addr2Val = (orderData.recipient.city ? orderData.recipient.city+', '+orderData.recipient.province+' '+orderData.recipient.zip : '').replace(/"/g,'&quot;');
+    var senderVal = (orderData.giftSender || '').replace(/"/g,'&quot;');
+    var prevName = (orderData.giftReceiver || orderData.recipient.name || '');
+    var prevAddr1 = (orderData.recipient.address1 || '');
+    var prevAddr2 = (orderData.recipient.city ? orderData.recipient.city+', '+orderData.recipient.province+' '+orderData.recipient.zip : '');
+    var prevMsg = giftMsg.replace(/</g,'&lt;');
+    var prevSender = (orderData.giftSender || '');
 
-    res.send('<!DOCTYPE html><html><head><title>Edit Gift Card ' + orderData.orderNumber + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}.editor-panel{width:380px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}.editor-panel h2{font-size:20px;margin-bottom:16px}.field{margin-bottom:14px}.field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#333}.field input,.field textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}.field textarea{height:100px;resize:vertical}.field input[type=range]{padding:0;border:none}.char-count{font-size:11px;text-align:right;margin-top:2px}.char-count.warn{color:red;font-weight:700}.slider-row{display:flex;align-items:center;gap:10px}.slider-row input[type=range]{flex:1}.slider-val{font-size:12px;font-weight:700;min-width:40px;text-align:right}.btn-row{display:flex;gap:10px;margin-top:16px}.btn{padding:12px 20px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1}.btn-primary{background:#000;color:#fff}.btn-secondary{background:#fff;color:#000;border:2px solid #000}.card-preview{width:299px;height:612px;background:#fff;border:2px solid #000;position:relative;overflow:hidden;font-family:Montserrat,sans-serif}.top-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.editor-panel{display:none}.preview-panel{display:block;padding:0}.card-preview{border:none;width:4.15in;height:8.5in;margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}</style></head><body><div class="editor-panel no-print"><h2>Edit Gift Card</h2><p style="font-size:12px;color:#666;margin-bottom:16px">' + orderData.orderNumber + '</p><div class="field"><label>Recipient Name</label><input type="text" id="recipientName" value="' + (orderData.giftReceiver || orderData.recipient.name).replace(/"/g, '&quot;') + '" oninput="updatePreview()"></div><div class="field"><label>Address Line 1</label><input type="text" id="address1" value="' + (orderData.recipient.address1 || '').replace(/"/g, '&quot;') + '" oninput="updatePreview()"></div><div class="field"><label>Address Line 2</label><input type="text" id="address2" value="' + (orderData.recipient.city ? orderData.recipient.city + ', ' + orderData.recipient.province + ' ' + orderData.recipient.zip : '').replace(/"/g, '&quot;') + '" oninput="updatePreview()"></div><div class="field"><label>Gift Message <span id="charCount" class="char-count">' + msgLen + '/300</span></label><textarea id="giftMessage" maxlength="300" oninput="updatePreview()">' + giftMsg.replace(/</g, '&lt;') + '</textarea></div><div class="field"><label>Sender Name</label><input type="text" id="senderName" value="' + (orderData.giftSender || '').replace(/"/g, '&quot;') + '" oninput="updatePreview()"></div><hr style="margin:16px 0;border:1px solid #eee"><div class="field"><label>Name/Address Position (from top)</label><div class="slider-row"><input type="range" id="topPos" min="0" max="150" value="11" oninput="updatePreview()"><span class="slider-val" id="topPosVal">0.15in</span></div></div><div class="field"><label>Message Position (from top)</label><div class="slider-row"><input type="range" id="msgPos" min="280" max="400" value="310" oninput="updatePreview()"><span class="slider-val" id="msgPosVal">4.30in</span></div></div><div class="btn-row"><button class="btn btn-primary" onclick="printCard()">🖨 Print to Printer</button></div><div class="btn-row"><button class="btn btn-secondary" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard" class="btn btn-secondary" style="display:flex;align-items:center;justify-content:center">← Back</a></div></div><div class="preview-panel"><div class="card-preview" id="cardPreview"><div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-size:11.9pt;font-weight:400;margin-bottom:12px">' + (orderData.giftReceiver || orderData.recipient.name) + '</div><div id="prevAddr" style="font-size:9.35pt;font-weight:400;line-height:1.4">' + (orderData.recipient.address1 || '') + (orderData.recipient.city ? '<br>' + orderData.recipient.city + ', ' + orderData.recipient.province + ' ' + orderData.recipient.zip : '') + '</div></div><div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-size:10.2pt;font-weight:700;line-height:1.5">' + giftMsg.replace(/\n/g, '<br>') + '</div><div id="prevSender" style="margin-top:12px;font-size:10.2pt;font-weight:700">' + (orderData.giftSender || '') + '</div></div></div></div><script>function updatePreview(){var name=document.getElementById("recipientName").value;var a1=document.getElementById("address1").value;var a2=document.getElementById("address2").value;var msg=document.getElementById("giftMessage").value;var sender=document.getElementById("senderName").value;var topPx=parseInt(document.getElementById("topPos").value);var msgPx=parseInt(document.getElementById("msgPos").value);var topIn=(topPx/72).toFixed(2);var msgIn=(msgPx/72).toFixed(2);document.getElementById("topPosVal").textContent=topIn+"in";document.getElementById("msgPosVal").textContent=msgIn+"in";document.getElementById("topSection").style.top=topIn+"in";document.getElementById("msgSection").style.top=msgIn+"in";document.getElementById("prevName").textContent=name;document.getElementById("prevAddr").innerHTML=a1+(a2?"<br>"+a2:"");var len=msg.length;var cc=document.getElementById("charCount");cc.textContent=len+"/300";cc.className=len>280?"char-count warn":"char-count";var fs="10.2pt";var lh="1.5";if(len>250){fs="8pt";lh="1.3"}else if(len>200){fs="8.5pt";lh="1.35"}else if(len>150){fs="9pt";lh="1.4"}else if(len>100){fs="9.5pt";lh="1.45"}document.getElementById("prevMsg").style.fontSize=fs;document.getElementById("prevMsg").style.lineHeight=lh;document.getElementById("prevMsg").innerHTML=msg.replace(/\\n/g,"<br>");document.getElementById("prevSender").textContent=sender;document.getElementById("prevSender").style.fontSize=fs}function printCard(){var fd=new FormData();fd.append("recipientName",document.getElementById("recipientName").value);fd.append("address1",document.getElementById("address1").value);fd.append("address2",document.getElementById("address2").value);fd.append("giftMessage",document.getElementById("giftMessage").value);fd.append("senderName",document.getElementById("senderName").value);fd.append("topPosition",(parseInt(document.getElementById("topPos").value)/72).toFixed(2)+"in");fd.append("messagePosition",(parseInt(document.getElementById("msgPos").value)/72).toFixed(2)+"in");var params=new URLSearchParams(fd);fetch("/dashboard/send-gift-card-print/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()}).then(function(r){return r.json()}).then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}}).catch(function(e){alert("Error: "+e.message)})}</script></body></html>');
+    var html = '<!DOCTYPE html><html><head>';
+    html += '<title>Edit Gift Card '+orderData.orderNumber+'</title><meta name="viewport" content="width=device-width,initial-scale=1">';
+    html += '<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Dancing+Script:wght@400;700&family=Lato:ital,wght@0,400;0,700;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400;1,700&family=Great+Vibes&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Raleway:ital,wght@0,400;0,700;1,400;1,700&family=Pacifico&family=EB+Garamond:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">';
+    html += '<style>';
+    html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}';
+    html += '.editor-panel{width:400px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}';
+    html += 'h2{font-size:20px;margin-bottom:4px}.sub{font-size:12px;color:#888;margin-bottom:16px}.field{margin-bottom:13px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#333}.field input,.field textarea{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit}.field textarea{height:90px;resize:vertical}.char-count{font-size:11px;text-align:right;margin-top:2px}.char-count.warn{color:red;font-weight:700}.slider-row{display:flex;align-items:center;gap:8px}.slider-row input[type=range]{flex:1}.slider-val{font-size:12px;font-weight:700;min-width:40px;text-align:right}.btn-row{display:flex;gap:8px;margin-top:12px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-primary{background:#000;color:#fff}.btn-secondary{background:#fff;color:#000;border:2px solid #000}.card-preview{width:299px;height:612px;background:#fff;border:2px solid #000;position:relative;overflow:hidden}.top-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}';
+    html += '.fmt-section{margin-bottom:14px}.fmt-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;color:#333}.fmt-row{display:flex;gap:8px;align-items:center}.fmt-select{width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;background:#fff;cursor:pointer}.fmt-select:focus{outline:none;border-color:#000}.fmt-size-row{display:flex;align-items:center;gap:8px}.fmt-size-row input[type=range]{flex:1}.fmt-size-val{font-size:13px;font-weight:700;min-width:36px;text-align:right;color:#000}.fmt-toggle-group{display:flex;gap:6px}.fmt-toggle{padding:7px 16px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#555;transition:all 0.15s;line-height:1}.fmt-toggle.active{background:#000;color:#fff;border-color:#000}.fmt-toggle:hover:not(.active){border-color:#999;color:#000}.fmt-divider{border:none;border-top:1px solid #eee;margin:14px 0}';
+    html += '@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.editor-panel{display:none}.preview-panel{display:block;padding:0}.card-preview{border:none;width:4.15in;height:8.5in;margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}';
+    html += '</style></head><body>';
+    html += '<div class="editor-panel no-print">';
+    html += '<h2>Edit Gift Card</h2><div class="sub">'+orderData.orderNumber+'</div>';
+    html += '<div class="fmt-section"><span class="fmt-label">Message Font</span><select id="fmtFont" class="fmt-select" onchange="updatePreview()"><option value="Montserrat" style="font-family:Montserrat">Montserrat</option><option value="Playfair Display" style="font-family:Playfair Display">Playfair Display</option><option value="Dancing Script" style="font-family:Dancing Script">Dancing Script</option><option value="Lato" style="font-family:Lato">Lato</option><option value="Cormorant Garamond" style="font-family:Cormorant Garamond">Cormorant Garamond</option><option value="Great Vibes" style="font-family:Great Vibes">Great Vibes</option><option value="Libre Baskerville" style="font-family:Libre Baskerville">Libre Baskerville</option><option value="Raleway" style="font-family:Raleway">Raleway</option><option value="Pacifico" style="font-family:Pacifico">Pacifico</option><option value="EB Garamond" style="font-family:EB Garamond">EB Garamond</option></select></div><div class="fmt-section"><span class="fmt-label">Font Size</span><div class="fmt-size-row"><input type="range" id="fmtSize" min="7" max="18" value="10" step="0.5" oninput="updatePreview()"><span class="fmt-size-val" id="fmtSizeVal">10pt</span></div></div><div class="fmt-section"><span class="fmt-label">Style</span><div class="fmt-toggle-group"><button class="fmt-toggle active" id="toggleBold" onclick="toggleFmt('bold')"><b>B</b></button><button class="fmt-toggle" id="toggleItalic" onclick="toggleFmt('italic')"><i>I</i></button></div></div><hr class="fmt-divider">';
+    html += '<div class="field"><label>Recipient Name</label><input type="text" id="recipientName" value="'+recipName+'" oninput="updatePreview()"></div>';
+    html += '<div class="field"><label>Address Line 1</label><input type="text" id="address1" value="'+addr1Val+'" oninput="updatePreview()"></div>';
+    html += '<div class="field"><label>City, State ZIP</label><input type="text" id="address2" value="'+addr2Val+'" oninput="updatePreview()"></div>';
+    html += '<div class="field"><label>Gift Message <span id="charCount" class="char-count">'+msgLen+'/300</span></label><textarea id="giftMessage" maxlength="300" oninput="updatePreview()">'+giftMsg.replace(/</g,'&lt;')+'</textarea></div>';
+    html += '<div class="field"><label>Sender Name</label><input type="text" id="senderName" value="'+senderVal+'" oninput="updatePreview()"></div>';
+    html += '<hr style="margin:12px 0;border:1px solid #eee">';
+    html += '<div class="field"><label>Name/Address Position</label><div class="slider-row"><input type="range" id="topPos" min="0" max="150" value="11" oninput="updatePreview()"><span class="slider-val" id="topPosVal">0.15in</span></div></div>';
+    html += '<div class="field"><label>Message Position</label><div class="slider-row"><input type="range" id="msgPos" min="280" max="400" value="310" oninput="updatePreview()"><span class="slider-val" id="msgPosVal">4.30in</span></div></div>';
+    html += '<div class="btn-row"><button class="btn btn-primary" onclick="printCard()">🖨 Print to Printer</button></div>';
+    html += '<div class="btn-row"><button class="btn btn-secondary" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard" class="btn btn-secondary">← Back</a></div>';
+    html += '</div>';
+    html += '<div class="preview-panel"><p style="font-size:12px;color:#999;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Live Preview</p>';
+    html += '<div class="card-preview" id="cardPreview">';
+    html += '<div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px">'+prevName+'</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4">'+prevAddr1+(prevAddr2?'<br>'+prevAddr2:'')+'</div></div>';
+    html += '<div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5">'+prevMsg.replace(/\n/g,'<br>')+'</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700">'+prevSender+'</div></div>';
+    html += '</div></div>';
+    html += '<script>';
+    html += 'var fmtBold=true,fmtItalic=false;';
+    html += 'function toggleFmt(t){if(t==="bold"){fmtBold=!fmtBold;document.getElementById("toggleBold").className="fmt-toggle"+(fmtBold?" active":"")}else{fmtItalic=!fmtItalic;document.getElementById("toggleItalic").className="fmt-toggle"+(fmtItalic?" active":"")}updatePreview()}';
+    html += 'function getFmtFont(){return document.getElementById("fmtFont").value}';
+    html += 'function getFmtSize(){var v=parseFloat(document.getElementById("fmtSize").value);document.getElementById("fmtSizeVal").textContent=v+"pt";return v+"pt"}';
+    html += 'function updatePreview(){';
+    html += 'var name=document.getElementById("recipientName").value;';
+    html += 'var a1=document.getElementById("address1").value;';
+    html += 'var a2=document.getElementById("address2").value;';
+    html += 'var msg=document.getElementById("giftMessage").value;';
+    html += 'var sender=document.getElementById("senderName").value;';
+    html += 'var topPx=parseInt(document.getElementById("topPos").value);';
+    html += 'var msgPx=parseInt(document.getElementById("msgPos").value);';
+    html += 'var topIn=(topPx/72).toFixed(2);var msgIn=(msgPx/72).toFixed(2);';
+    html += 'document.getElementById("topPosVal").textContent=topIn+"in";';
+    html += 'document.getElementById("msgPosVal").textContent=msgIn+"in";';
+    html += 'document.getElementById("topSection").style.top=topIn+"in";';
+    html += 'document.getElementById("msgSection").style.top=msgIn+"in";';
+    html += 'document.getElementById("prevName").textContent=name;';
+    html += 'document.getElementById("prevAddr").innerHTML=a1+(a2?"<br>"+a2:"");';
+    html += 'var len=msg.length;var cc=document.getElementById("charCount");cc.textContent=len+"/300";cc.className=len>280?"char-count warn":"char-count";';
+    html += 'var fs=getFmtSize();var font=getFmtFont();';
+    html += 'var msgEl=document.getElementById("prevMsg");msgEl.style.fontFamily=font+",sans-serif";msgEl.style.fontSize=fs;msgEl.style.fontWeight=fmtBold?"700":"400";msgEl.style.fontStyle=fmtItalic?"italic":"normal";msgEl.style.lineHeight="1.5";msgEl.innerHTML=msg.replace(/\\n/g,"<br>");';
+    html += 'var sEl=document.getElementById("prevSender");sEl.textContent=sender;sEl.style.fontFamily=font+",sans-serif";sEl.style.fontSize=fs;sEl.style.fontWeight=fmtBold?"700":"400";sEl.style.fontStyle=fmtItalic?"italic":"normal";';
+    html += '}';
+    html += 'function printCard(){';
+    html += 'var fs=getFmtSize();var font=getFmtFont();';
+    html += 'var fd=new FormData();';
+    html += 'fd.append("recipientName",document.getElementById("recipientName").value);';
+    html += 'fd.append("address1",document.getElementById("address1").value);';
+    html += 'fd.append("address2",document.getElementById("address2").value);';
+    html += 'fd.append("giftMessage",document.getElementById("giftMessage").value);';
+    html += 'fd.append("senderName",document.getElementById("senderName").value);';
+    html += 'fd.append("topPosition",(parseInt(document.getElementById("topPos").value)/72).toFixed(2)+"in");';
+    html += 'fd.append("messagePosition",(parseInt(document.getElementById("msgPos").value)/72).toFixed(2)+"in");';
+    html += 'fd.append("messageFontSize",fs);';
+    html += 'fd.append("messageFontFamily",font);';
+    html += 'fd.append("messageFontWeight",fmtBold?"700":"400");';
+    html += 'fd.append("messageFontStyle",fmtItalic?"italic":"normal");';
+    html += 'var params=new URLSearchParams(fd);';
+    html += 'fetch("/dashboard/send-gift-card-print/'+order.id+'",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()}).then(function(r){return r.json()}).then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}}).catch(function(e){alert("Error: "+e.message)})';
+    html += '}';
+    html += '</' + 'script>';
+    html += '</body></html>';
+    res.send(html);
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
 });
+
 
 // ============ SEND GIFT CARD TO PRINTNODE (from editor) ============
 
@@ -493,7 +575,11 @@ app.post('/dashboard/send-gift-card-print/:orderId', async (req, res) => {
         zip: ''
       },
       topPosition: req.body.topPosition || '0.15in',
-      messagePosition: req.body.messagePosition || '4.30in'
+      messagePosition: req.body.messagePosition || '4.30in',
+      messageFontSize: req.body.messageFontSize || null,
+      messageFontFamily: req.body.messageFontFamily || null,
+      messageFontWeight: req.body.messageFontWeight || null,
+      messageFontStyle: req.body.messageFontStyle || null
     };
 
     var addr2 = req.body.address2 || '';
@@ -534,7 +620,11 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
         zip: ''
       },
       topPosition: req.body.topPosition || '0.15in',
-      messagePosition: req.body.messagePosition || '4.30in'
+      messagePosition: req.body.messagePosition || '4.30in',
+      messageFontSize: req.body.messageFontSize || null,
+      messageFontFamily: req.body.messageFontFamily || null,
+      messageFontWeight: req.body.messageFontWeight || null,
+      messageFontStyle: req.body.messageFontStyle || null
     };
 
     var addr2 = req.body.address2 || '';
@@ -595,74 +685,69 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
 // ============ CREATE NEW GIFT CARD (no order needed) ============
 
 app.get('/dashboard/gift-card-new', async (req, res) => {
-  res.send('<!DOCTYPE html><html><head><title>Create Gift Card</title><meta name="viewport" content="width=device-width,initial-scale=1"><link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}.editor-panel{width:380px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}.editor-panel h2{font-size:20px;margin-bottom:4px}.editor-panel .sub{font-size:12px;color:#888;margin-bottom:16px}.field{margin-bottom:14px}.field label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#333}.field input,.field textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}.field textarea{height:110px;resize:vertical}.char-count{font-size:11px;text-align:right;margin-top:2px}.char-count.warn{color:red;font-weight:700}.btn-row{display:flex;gap:10px;margin-top:16px}.btn{padding:12px 20px;border-radius:8px;font-size:14px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-primary{background:#000;color:#fff}.btn-green{background:#22c55e;color:#fff}.btn-secondary{background:#fff;color:#000;border:2px solid #000}.card-preview{width:299px;height:612px;background:#fff;border:2px solid #000;position:relative;overflow:hidden;font-family:Montserrat,sans-serif}.top-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.hint{font-size:11px;color:#aaa;margin-top:4px}@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.editor-panel{display:none}.preview-panel{display:block;padding:0}.card-preview{border:none;width:4.15in;height:8.5in;margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}</style></head><body>' +
-    '<div class="editor-panel no-print">' +
-      '<h2>✨ Create Gift Card</h2>' +
-      '<div class="sub">No order needed — fill in and print</div>' +
-      '<div class="field"><label>Recipient Name</label><input type="text" id="recipientName" placeholder="e.g. Sarah Cohen" oninput="updatePreview()"></div>' +
-      '<div class="field"><label>Address Line 1 <span class="hint">(optional)</span></label><input type="text" id="address1" placeholder="123 Main St" oninput="updatePreview()"></div>' +
-      '<div class="field"><label>City, State ZIP <span class="hint">(optional)</span></label><input type="text" id="address2" placeholder="Miami, FL 33179" oninput="updatePreview()"></div>' +
-      '<div class="field"><label>Gift Message <span id="charCount" class="char-count">0/300</span></label><textarea id="giftMessage" maxlength="300" placeholder="Write the gift message here..." oninput="updatePreview()"></textarea></div>' +
-      '<div class="field"><label>Sender Name</label><input type="text" id="senderName" placeholder="e.g. The Smith Family" oninput="updatePreview()"></div>' +
-      '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Print to Printer</button></div>' +
-      '<div class="btn-row"><button class="btn btn-primary" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard" class="btn btn-secondary">← Back</a></div>' +
-    '</div>' +
-    '<div class="preview-panel">' +
-      '<p style="font-size:12px;color:#999;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Live Preview</p>' +
-      '<div class="card-preview" id="cardPreview">' +
-        '<div class="top-section-preview" id="topSection" style="top:0.15in">' +
-          '<div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px;color:#bbb;font-style:italic">Recipient name</div>' +
-          '<div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4;color:#ccc"></div>' +
-        '</div>' +
-        '<div class="msg-section-preview" id="msgSection" style="top:4.30in">' +
-          '<div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10.2pt;font-weight:700;line-height:1.5;color:#ccc;font-style:italic">Gift message will appear here...</div>' +
-          '<div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10.2pt;font-weight:700;color:#ccc"></div>' +
-        '</div>' +
-      '</div>' +
-    '</div>' +
-    '<script>' +
-    'function updatePreview(){' +
-      'var name=document.getElementById("recipientName").value;' +
-      'var a1=document.getElementById("address1").value;' +
-      'var a2=document.getElementById("address2").value;' +
-      'var msg=document.getElementById("giftMessage").value;' +
-      'var sender=document.getElementById("senderName").value;' +
-      'var len=msg.length;' +
-      'var cc=document.getElementById("charCount");' +
-      'cc.textContent=len+"/300";' +
-      'cc.className=len>280?"char-count warn":"char-count";' +
-      'var nameEl=document.getElementById("prevName");' +
-      'if(name){nameEl.textContent=name;nameEl.style.color="#000";nameEl.style.fontStyle="normal"}' +
-      'else{nameEl.textContent="Recipient name";nameEl.style.color="#bbb";nameEl.style.fontStyle="italic"}' +
-      'var addrEl=document.getElementById("prevAddr");' +
-      'addrEl.innerHTML=a1?(a1+(a2?"<br>"+a2:"")):(a2||"");' +
-      'addrEl.style.color=a1||a2?"#000":"#ccc";' +
-      'var msgEl=document.getElementById("prevMsg");' +
-      'var fs="10.2pt";var lh="1.5";' +
-      'if(len>250){fs="8pt";lh="1.3"}else if(len>200){fs="8.5pt";lh="1.35"}else if(len>150){fs="9pt";lh="1.4"}else if(len>100){fs="9.5pt";lh="1.45"}' +
-      'msgEl.style.fontSize=fs;msgEl.style.lineHeight=lh;' +
-      'if(msg){msgEl.innerHTML=msg.replace(/\\n/g,"<br>");msgEl.style.color="#000";msgEl.style.fontStyle="normal"}' +
-      'else{msgEl.textContent="Gift message will appear here...";msgEl.style.color="#ccc";msgEl.style.fontStyle="italic"}' +
-      'var senderEl=document.getElementById("prevSender");' +
-      'senderEl.textContent=sender;senderEl.style.color=sender?"#000":"#ccc";senderEl.style.fontSize=fs;' +
-    '}' +
-    'function printToPrinter(){' +
-      'var params=new URLSearchParams({' +
-        'recipientName:document.getElementById("recipientName").value,' +
-        'address1:document.getElementById("address1").value,' +
-        'address2:document.getElementById("address2").value,' +
-        'giftMessage:document.getElementById("giftMessage").value,' +
-        'senderName:document.getElementById("senderName").value,' +
-        'topPosition:"0.15in",' +
-        'messagePosition:"4.30in"' +
-      '});' +
-      'fetch("/dashboard/send-new-gift-card",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()})' +
-      '.then(function(r){return r.json()})' +
-      '.then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}})' +
-      '.catch(function(e){alert("Error: "+e.message)})' +
-    '}' +
-    '</script></body></html>');
+  var fontLink = 'https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;1,400;1,700&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&family=Dancing+Script:wght@400;700&family=Lato:ital,wght@0,400;0,700;1,400;1,700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400;1,700&family=Great+Vibes&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Raleway:ital,wght@0,400;0,700;1,400;1,700&family=Pacifico&family=EB+Garamond:ital,wght@0,400;0,700;1,400;1,700&display=swap';
+  var toolbarCSS = '.fmt-section{margin-bottom:14px}.fmt-label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;color:#333}.fmt-select{width:100%;padding:8px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;background:#fff;cursor:pointer}.fmt-select:focus{outline:none;border-color:#000}.fmt-size-row{display:flex;align-items:center;gap:8px}.fmt-size-row input[type=range]{flex:1}.fmt-size-val{font-size:13px;font-weight:700;min-width:36px;text-align:right;color:#000}.fmt-toggle-group{display:flex;gap:6px}.fmt-toggle{padding:7px 16px;border:2px solid #ddd;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#555;transition:all 0.15s;line-height:1}.fmt-toggle.active{background:#000;color:#fff;border-color:#000}.fmt-toggle:hover:not(.active){border-color:#999;color:#000}.fmt-divider{border:none;border-top:1px solid #eee;margin:14px 0}';
+  var toolbarHTML = '<div class=\"fmt-section\"><span class=\"fmt-label\">Message Font</span><select id=\"fmtFont\" class=\"fmt-select\" onchange=\"updatePreview()\"><option value=\"Montserrat\" style=\"font-family:Montserrat\">Montserrat</option><option value=\"Playfair Display\" style=\"font-family:Playfair Display\">Playfair Display</option><option value=\"Dancing Script\" style=\"font-family:Dancing Script\">Dancing Script</option><option value=\"Lato\" style=\"font-family:Lato\">Lato</option><option value=\"Cormorant Garamond\" style=\"font-family:Cormorant Garamond\">Cormorant Garamond</option><option value=\"Great Vibes\" style=\"font-family:Great Vibes\">Great Vibes</option><option value=\"Libre Baskerville\" style=\"font-family:Libre Baskerville\">Libre Baskerville</option><option value=\"Raleway\" style=\"font-family:Raleway\">Raleway</option><option value=\"Pacifico\" style=\"font-family:Pacifico\">Pacifico</option><option value=\"EB Garamond\" style=\"font-family:EB Garamond\">EB Garamond</option></select></div><div class=\"fmt-section\"><span class=\"fmt-label\">Font Size</span><div class=\"fmt-size-row\"><input type=\"range\" id=\"fmtSize\" min=\"7\" max=\"18\" value=\"10\" step=\"0.5\" oninput=\"updatePreview()\"><span class=\"fmt-size-val\" id=\"fmtSizeVal\">10pt</span></div></div><div class=\"fmt-section\"><span class=\"fmt-label\">Style</span><div class=\"fmt-toggle-group\"><button class=\"fmt-toggle active\" id=\"toggleBold\" onclick=\"toggleFmt('bold')\"><b>B</b></button><button class=\"fmt-toggle\" id=\"toggleItalic\" onclick=\"toggleFmt('italic')\"><i>I</i></button></div></div><hr class=\"fmt-divider\">';
+
+  var html = '<!DOCTYPE html><html><head>';
+  html += '<title>Create Gift Card</title><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<link href="' + fontLink + '" rel="stylesheet">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}';
+  html += '.editor-panel{width:400px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}';
+  html += 'h2{font-size:20px;margin-bottom:4px}.sub{font-size:12px;color:#888;margin-bottom:16px}.field{margin-bottom:13px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#333}.field input,.field textarea{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit}.field textarea{height:90px;resize:vertical}.char-count{font-size:11px;text-align:right;margin-top:2px}.char-count.warn{color:red;font-weight:700}.btn-row{display:flex;gap:8px;margin-top:12px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-primary{background:#000;color:#fff}.btn-green{background:#22c55e;color:#fff}.btn-secondary{background:#fff;color:#000;border:2px solid #000}.card-preview{width:299px;height:612px;background:#fff;border:2px solid #000;position:relative;overflow:hidden}.top-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.hint{font-size:11px;color:#aaa;margin-top:3px}';
+  html += toolbarCSS;
+  html += '@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.editor-panel{display:none}.preview-panel{display:block;padding:0}.card-preview{border:none;width:4.15in;height:8.5in;margin:0;padding:0}@page{size:4.15in 8.5in;margin:0}}';
+  html += '</style></head><body>';
+
+  html += '<div class="editor-panel no-print">';
+  html += '<h2>✨ Create Gift Card</h2><div class="sub">No order needed — fill in and print</div>';
+  html += toolbarHTML;
+  html += '<div class="field"><label>Recipient Name</label><input type="text" id="recipientName" placeholder="e.g. Sarah Cohen" oninput="updatePreview()"></div>';
+  html += '<div class="field"><label>Address Line 1 <span class="hint">(optional)</span></label><input type="text" id="address1" placeholder="123 Main St" oninput="updatePreview()"></div>';
+  html += '<div class="field"><label>City, State ZIP <span class="hint">(optional)</span></label><input type="text" id="address2" placeholder="Miami, FL 33179" oninput="updatePreview()"></div>';
+  html += '<div class="field"><label>Gift Message <span id="charCount" class="char-count">0/300</span></label><textarea id="giftMessage" maxlength="300" placeholder="Write the gift message here..." oninput="updatePreview()"></textarea></div>';
+  html += '<div class="field"><label>Sender Name</label><input type="text" id="senderName" placeholder="e.g. The Smith Family" oninput="updatePreview()"></div>';
+  html += '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Print to Printer</button></div>';
+  html += '<div class="btn-row"><button class="btn btn-primary" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard" class="btn btn-secondary">← Back</a></div>';
+  html += '</div>';
+
+  html += '<div class="preview-panel">';
+  html += '<p style="font-size:12px;color:#999;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px">Live Preview</p>';
+  html += '<div class="card-preview" id="cardPreview">';
+  html += '<div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px;color:#bbb;font-style:italic">Recipient name</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4;color:#ccc"></div></div>';
+  html += '<div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5;color:#ccc;font-style:italic">Gift message will appear here...</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;color:#ccc"></div></div>';
+  html += '</div></div>';
+
+  html += '<script>';
+  html += 'var fmtBold=true,fmtItalic=false;';
+  html += 'function toggleFmt(t){if(t==="bold"){fmtBold=!fmtBold;document.getElementById("toggleBold").className="fmt-toggle"+(fmtBold?" active":"")}else{fmtItalic=!fmtItalic;document.getElementById("toggleItalic").className="fmt-toggle"+(fmtItalic?" active":"")}updatePreview()}';
+  html += 'function getFmtFont(){return document.getElementById("fmtFont").value}';
+  html += 'function getFmtSize(){var v=parseFloat(document.getElementById("fmtSize").value);document.getElementById("fmtSizeVal").textContent=v+"pt";return v+"pt"}';
+  html += 'function updatePreview(){';
+  html += 'var name=document.getElementById("recipientName").value;';
+  html += 'var a1=document.getElementById("address1").value;';
+  html += 'var a2=document.getElementById("address2").value;';
+  html += 'var msg=document.getElementById("giftMessage").value;';
+  html += 'var sender=document.getElementById("senderName").value;';
+  html += 'var len=msg.length;var cc=document.getElementById("charCount");cc.textContent=len+"/300";cc.className=len>280?"char-count warn":"char-count";';
+  html += 'var fs=getFmtSize();var font=getFmtFont();';
+  html += 'var nameEl=document.getElementById("prevName");if(name){nameEl.textContent=name;nameEl.style.color="#000";nameEl.style.fontStyle="normal"}else{nameEl.textContent="Recipient name";nameEl.style.color="#bbb";nameEl.style.fontStyle="italic"}';
+  html += 'var addrEl=document.getElementById("prevAddr");addrEl.innerHTML=a1?(a1+(a2?"<br>"+a2:"")):(a2||"");addrEl.style.color=a1||a2?"#000":"#ccc";';
+  html += 'var msgEl=document.getElementById("prevMsg");msgEl.style.fontFamily=font+",sans-serif";msgEl.style.fontSize=fs;msgEl.style.fontWeight=fmtBold?"700":"400";msgEl.style.fontStyle=fmtItalic?"italic":"normal";msgEl.style.lineHeight="1.5";';
+  html += 'if(msg){msgEl.innerHTML=msg.replace(/\\n/g,"<br>");msgEl.style.color="#000"}else{msgEl.textContent="Gift message will appear here...";msgEl.style.color="#ccc"}';
+  html += 'var sEl=document.getElementById("prevSender");sEl.textContent=sender;sEl.style.fontFamily=font+",sans-serif";sEl.style.fontSize=fs;sEl.style.fontWeight=fmtBold?"700":"400";sEl.style.fontStyle=fmtItalic?"italic":"normal";sEl.style.color=sender?"#000":"#ccc";';
+  html += '}';
+  html += 'function printToPrinter(){';
+  html += 'var fs=getFmtSize();var font=getFmtFont();';
+  html += 'var params=new URLSearchParams({recipientName:document.getElementById("recipientName").value,address1:document.getElementById("address1").value,address2:document.getElementById("address2").value,giftMessage:document.getElementById("giftMessage").value,senderName:document.getElementById("senderName").value,topPosition:"0.15in",messagePosition:"4.30in",messageFontSize:fs,messageFontFamily:font,messageFontWeight:fmtBold?"700":"400",messageFontStyle:fmtItalic?"italic":"normal"});';
+  html += 'fetch("/dashboard/send-new-gift-card",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()}).then(function(r){return r.json()}).then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}}).catch(function(e){alert("Error: "+e.message)})';
+  html += '}';
+  html += '</' + 'script>';
+  html += '</body></html>';
+  res.send(html);
 });
+
 
 // ============ PRINT NEW GIFT CARD (no order) VIA PRINTNODE ============
 
