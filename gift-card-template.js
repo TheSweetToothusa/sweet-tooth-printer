@@ -3,6 +3,7 @@ function generateGiftCardHTML(data) {
   var giftMessage = data.giftMessage;
   var giftSender = data.giftSender;
   var recipient = data.recipient;
+  var orderNumber = data.orderNumber || '';
   // Default positions
   var topPosition = data.topPosition || '0.15in';
   var messagePosition = data.messagePosition || '4.30in';
@@ -73,6 +74,7 @@ function generateGiftCardHTML(data) {
   html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
   html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
   html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.order-code { position: absolute; bottom: 0.1in; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 6pt; color: #bbb; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
@@ -83,9 +85,11 @@ function generateGiftCardHTML(data) {
   html += '<div class="gift-message">' + formattedMessage + '</div>';
   html += senderDiv;
   html += '</div>';
+  if (orderNumber) {
+    html += '<div class="order-code">' + orderNumber + '</div>';
+  }
   html += '</div>';
   html += '</body></html>';
   return html;
 }
 module.exports = { generateGiftCardHTML };
-
