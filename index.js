@@ -503,6 +503,7 @@ app.get('/dashboard/print-custom/:orderId', async (req, res) => {
     html += '<div class="card-preview" id="cardPreview">';
     html += '<div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px">'+prevName+'</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4">'+prevAddr1+(prevAddr2?'<br>'+prevAddr2:'')+'</div></div>';
     html += '<div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5">'+prevMsg.replace(/\n/g,'<br>')+'</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700">'+prevSender+'</div></div>';
+    html += '<div style="position:absolute;bottom:7px;left:0;right:0;text-align:center;font-family:Arial,sans-serif;font-size:6pt;color:#bbb">'+orderData.orderNumber+'</div>';
     html += '</div></div>';
     html += '<script>';
     html += 'var fmtBold=true,fmtItalic=false;';
@@ -566,6 +567,7 @@ app.post('/dashboard/send-gift-card-print/:orderId', async (req, res) => {
       giftReceiver: req.body.recipientName || orderData.giftReceiver,
       giftMessage: (req.body.giftMessage || orderData.giftMessage || '').substring(0, 300),
       giftSender: req.body.senderName || orderData.giftSender,
+      orderNumber: orderData.orderNumber,
       recipient: {
         name: req.body.recipientName || orderData.recipient.name,
         address1: req.body.address1 || orderData.recipient.address1,
@@ -611,6 +613,7 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
       giftReceiver: req.body.recipientName || '',
       giftMessage: (req.body.giftMessage || '').substring(0, 300),
       giftSender: req.body.senderName || '',
+      orderNumber: req.body.orderNumber || '',
       recipient: {
         name: req.body.recipientName || '',
         address1: req.body.address1 || '',
@@ -703,6 +706,7 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += '<div class="editor-panel no-print">';
   html += '<h2>✨ Create Gift Card</h2><div class="sub">No order needed — fill in and print</div>';
   html += toolbarHTML;
+  html += '<div class="field"><label>Order # <span class="hint">(optional — for matching)</span></label><input type="text" id="orderNumber" placeholder="e.g. #12345" oninput="updatePreview()"></div>';
   html += '<div class="field"><label>Recipient Name</label><input type="text" id="recipientName" placeholder="e.g. Sarah Cohen" oninput="updatePreview()"></div>';
   html += '<div class="field"><label>Address Line 1 <span class="hint">(optional)</span></label><input type="text" id="address1" placeholder="123 Main St" oninput="updatePreview()"></div>';
   html += '<div class="field"><label>City, State ZIP <span class="hint">(optional)</span></label><input type="text" id="address2" placeholder="Miami, FL 33179" oninput="updatePreview()"></div>';
@@ -717,6 +721,7 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += '<div class="card-preview" id="cardPreview">';
   html += '<div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px;color:#bbb;font-style:italic">Recipient name</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4;color:#ccc"></div></div>';
   html += '<div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5;color:#ccc;font-style:italic">Gift message will appear here...</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;color:#ccc"></div></div>';
+  html += '<div id="prevOrderCode" style="position:absolute;bottom:7px;left:0;right:0;text-align:center;font-family:Arial,sans-serif;font-size:6pt;color:#bbb"></div>';
   html += '</div></div>';
 
   html += '<script>';
@@ -725,6 +730,7 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += 'function getFmtFont(){return document.getElementById("fmtFont").value}';
   html += 'function getFmtSize(){var v=parseFloat(document.getElementById("fmtSize").value);document.getElementById("fmtSizeVal").textContent=v+"pt";return v+"pt"}';
   html += 'function updatePreview(){';
+  html += 'var orderNum=document.getElementById("orderNumber").value;';
   html += 'var name=document.getElementById("recipientName").value;';
   html += 'var a1=document.getElementById("address1").value;';
   html += 'var a2=document.getElementById("address2").value;';
@@ -737,10 +743,11 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += 'var msgEl=document.getElementById("prevMsg");msgEl.style.fontFamily=font+",sans-serif";msgEl.style.fontSize=fs;msgEl.style.fontWeight=fmtBold?"700":"400";msgEl.style.fontStyle=fmtItalic?"italic":"normal";msgEl.style.lineHeight="1.5";';
   html += 'if(msg){msgEl.innerHTML=msg.replace(/\\n/g,"<br>");msgEl.style.color="#000"}else{msgEl.textContent="Gift message will appear here...";msgEl.style.color="#ccc"}';
   html += 'var sEl=document.getElementById("prevSender");sEl.textContent=sender;sEl.style.fontFamily=font+",sans-serif";sEl.style.fontSize=fs;sEl.style.fontWeight=fmtBold?"700":"400";sEl.style.fontStyle=fmtItalic?"italic":"normal";sEl.style.color=sender?"#000":"#ccc";';
+  html += 'document.getElementById("prevOrderCode").textContent=orderNum;';
   html += '}';
   html += 'function printToPrinter(){';
   html += 'var fs=getFmtSize();var font=getFmtFont();';
-  html += 'var params=new URLSearchParams({recipientName:document.getElementById("recipientName").value,address1:document.getElementById("address1").value,address2:document.getElementById("address2").value,giftMessage:document.getElementById("giftMessage").value,senderName:document.getElementById("senderName").value,topPosition:"0.15in",messagePosition:"4.30in",messageFontSize:fs,messageFontFamily:font,messageFontWeight:fmtBold?"700":"400",messageFontStyle:fmtItalic?"italic":"normal"});';
+  html += 'var params=new URLSearchParams({orderNumber:document.getElementById("orderNumber").value,recipientName:document.getElementById("recipientName").value,address1:document.getElementById("address1").value,address2:document.getElementById("address2").value,giftMessage:document.getElementById("giftMessage").value,senderName:document.getElementById("senderName").value,topPosition:"0.15in",messagePosition:"4.30in",messageFontSize:fs,messageFontFamily:font,messageFontWeight:fmtBold?"700":"400",messageFontStyle:fmtItalic?"italic":"normal"});';
   html += 'fetch("/dashboard/send-new-gift-card",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:params.toString()}).then(function(r){return r.json()}).then(function(d){if(d.success){alert("✅ Gift card sent to printer!")}else{alert("❌ Print failed: "+d.error)}}).catch(function(e){alert("Error: "+e.message)})';
   html += '}';
   html += '</' + 'script>';
@@ -757,6 +764,7 @@ app.post('/dashboard/send-new-gift-card', async (req, res) => {
       giftReceiver: req.body.recipientName || '',
       giftMessage: (req.body.giftMessage || '').substring(0, 300),
       giftSender: req.body.senderName || '',
+      orderNumber: req.body.orderNumber || '',
       recipient: {
         name: req.body.recipientName || '',
         address1: req.body.address1 || '',
