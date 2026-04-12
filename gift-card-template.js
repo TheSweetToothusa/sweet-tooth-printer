@@ -74,7 +74,8 @@ function generateGiftCardHTML(data) {
   html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
   html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
   html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
-  html += '.order-code { position: absolute; bottom: 0.1in; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 6pt; color: #bbb; }';
+  // Order number at bottom of the card - 6pt light gray, barely visible
+  html += '.order-code { position: absolute; bottom: 0.15in; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 6pt; color: #ccc; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
@@ -85,6 +86,7 @@ function generateGiftCardHTML(data) {
   html += '<div class="gift-message">' + formattedMessage + '</div>';
   html += senderDiv;
   html += '</div>';
+  // Always show order number if present
   if (orderNumber) {
     html += '<div class="order-code">' + orderNumber + '</div>';
   }
