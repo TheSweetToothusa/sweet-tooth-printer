@@ -6,6 +6,7 @@ const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { extractOrderData, generateInvoiceHTML } = require('./order-utils');
 const { generateGiftCardHTML } = require('./gift-card-template');
+const { buyLabelForOrder } = require('./shipping-label');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,7 +20,8 @@ const CONFIG = {
   printNode: {
     apiKey: process.env.PRINTNODE_API_KEY,
     invoicePrinterId: process.env.PRINTNODE_INVOICE_PRINTER_ID,
-    giftCardPrinterId: process.env.PRINTNODE_GIFTCARD_PRINTER_ID
+    giftCardPrinterId: process.env.PRINTNODE_GIFTCARD_PRINTER_ID,
+    labelPrinterId: process.env.PRINTNODE_LABEL_PRINTER_ID
   }
 };
 
@@ -200,6 +202,34 @@ async function searchShopifyOrders(query) {
   var data = await response.json();
   return data.orders || [];
 }
+
+// ============ SHIPPING LABEL (separate flow — Shippo -> PrintNode 4x6) ============
+// Buys the label for the service the customer chose and prints it on the label printer.
+// Completely separate from invoice/gift-card printing.
+async function printShippingLabel(order) {
+  var orderName = order.name || ('#' + order.order_number);
+  if (!CONFIG.printNode.labelPrinterId) throw new Error('Label printer not configured (PRINTNODE_LABEL_PRINTER_ID)');
+  var label = await buyLabelForOrder(order);
+  if (label.skipped) {
+    console.log('⊘ No label for', orderName, '-', label.reason);
+    return label;
+  }
+  await sendToPrintNode(label.labelBase64, CONFIG.printNode.labelPrinterId, 'Label ' + orderName);
+  console.log('✓ Label printed for', orderName, '-', label.carrier, label.service, '$' + label.amount, 'track', label.tracking);
+  return label;
+}
+
+// Manual trigger: open in browser to buy+print a label for one order.
+app.get('/dashboard/print-label/:orderId', async (req, res) => {
+  try {
+    var order = await fetchOrderFromShopify(req.params.orderId);
+    var label = await printShippingLabel(order);
+    res.send('<p style="font:16px sans-serif">✓ Label printing: ' + label.carrier + ' ' +
+      (label.service || '') + ' — $' + label.amount + '<br>Tracking: ' + label.tracking + '</p>');
+  } catch (e) {
+    res.status(500).send('<p style="font:16px sans-serif;color:#b00">Label error: ' + e.message + '</p>');
+  }
+});
 
 // ============ HELPER: Always load orders from Shopify + merge with webhook memory ============
 
