@@ -33,8 +33,11 @@ const DEFAULT_BOX = { length: '10', width: '8', height: '6', distance_unit: 'in'
 // Falls back to null (we then just buy the cheapest rate from the same carrier).
 function mapServiceToken(title) {
   var t = (title || '').toLowerCase();
-  if (t.indexOf('next day') > -1 || t.indexOf('priority mail express') > -1) {
-    return t.indexOf('usps') > -1 || t.indexOf('priority') > -1 ? 'usps_priority_express' : 'ups_next_day_air';
+  if (t.indexOf('priority mail express') > -1) return 'usps_priority_express';
+  if (t.indexOf('next day') > -1) {
+    if (t.indexOf('saver') > -1) return 'ups_next_day_air_saver';
+    if (t.indexOf('early') > -1) return 'ups_next_day_air_early_am';
+    return 'ups_next_day_air';
   }
   if (t.indexOf('2nd day') > -1 || t.indexOf('second day') > -1) return 'ups_second_day_air';
   if (t.indexOf('ground advantage') > -1) return 'usps_ground_advantage';
@@ -88,17 +91,16 @@ async function shippo(path, body) {
   return json;
 }
 
-// Pick the rate that matches the customer's chosen service; else cheapest from the right carrier.
-function pickRate(rates, chosenTitle) {
-  if (!rates || !rates.length) throw new Error('No Shippo rates returned');
+// Match ONLY the exact service the customer chose. Never substitute a slower/other
+// service (that could melt). Returns the matching rate, or null if not found.
+function matchRate(rates, chosenTitle) {
+  if (!rates || !rates.length) return null;
   var token = mapServiceToken(chosenTitle);
-  var carrier = carrierHint(chosenTitle);
-  var match = token && rates.filter(function (r) { return r.servicelevel && r.servicelevel.token === token; });
-  if (match && match.length) return match[0];
-  var pool = carrier ? rates.filter(function (r) { return (r.provider || '').toLowerCase().indexOf(carrier) > -1; }) : rates;
-  if (!pool.length) pool = rates;
-  pool.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
-  return pool[0];
+  if (!token) return null;
+  var match = rates.filter(function (r) { return r.servicelevel && r.servicelevel.token === token; });
+  if (!match.length) return null;
+  match.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
+  return match[0];
 }
 
 async function urlToBase64(url) {
@@ -113,7 +115,7 @@ async function buyLabelForOrder(order) {
   if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
   var chosenTitle = (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) || '';
   if (isNonShipping(chosenTitle)) {
-    return { skipped: true, reason: 'Local delivery / pickup — no label', chosenTitle: chosenTitle };
+    return { skipped: true, needsManual: false, reason: 'Local delivery / pickup — no label', chosenTitle: chosenTitle };
   }
 
   var shipment = await shippo('/shipments/', {
@@ -127,7 +129,29 @@ async function buyLabelForOrder(order) {
     async: false
   });
 
-  var rate = pickRate(shipment.rates, chosenTitle);
+  var rate = matchRate(shipment.rates, chosenTitle);
+  if (!rate) {
+    return {
+      skipped: true, needsManual: true,
+      reason: 'Couldn\'t match "' + chosenTitle + '" in Shippo — buy this label manually',
+      chosenTitle: chosenTitle
+    };
+  }
+
+  // Safety cap: don't auto-buy if Shippo's label is more than $CAP over what the customer paid.
+  // (Free-shipping orders, where the customer paid $0, are intentionally absorbed — no cap.)
+  var CAP = parseFloat(process.env.LABEL_PRICE_CAP || '5');
+  var customerPaid = parseFloat((order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].price) || 0);
+  if (customerPaid > 0 && parseFloat(rate.amount) > customerPaid + CAP) {
+    return {
+      skipped: true, needsManual: true,
+      reason: 'Shippo $' + rate.amount + ' is over the $' + CAP + ' cap (customer paid $' + customerPaid.toFixed(2) + ')',
+      amount: rate.amount, customerPaid: customerPaid.toFixed(2),
+      carrier: rate.provider, service: rate.servicelevel && rate.servicelevel.name,
+      chosenTitle: chosenTitle
+    };
+  }
+
   var txn = await shippo('/transactions/', {
     rate: rate.object_id,
     label_file_type: 'PDF_4x6',

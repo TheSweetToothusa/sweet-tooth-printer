@@ -234,6 +234,20 @@ async function printShippingLabel(order) {
   var label = await buyLabelForOrder(order);
   if (label.skipped) {
     console.log('⊘ No label for', orderName, '-', label.reason);
+    if (label.needsManual) {
+      try {
+        var alertHtml = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
+          '<div style="font-size:34px;font-weight:800">&#9888; BUY LABEL MANUALLY</div>' +
+          '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
+          '<div style="font-size:20px;margin-top:18px;line-height:1.5">' + label.reason + '<br>' +
+          'Service: ' + (label.chosenTitle || '') + '<br>' +
+          'Ship to: ' + ((order.shipping_address && (order.shipping_address.city + ', ' + order.shipping_address.province_code)) || '') +
+          '</div></div>';
+        var alertPdf = await htmlToPdfBase64(alertHtml);
+        await sendToPrintNode(alertPdf, CONFIG.printNode.invoicePrinterId, 'MANUAL LABEL ' + orderName);
+        console.log('  ↳ printed manual-label alert to invoice printer');
+      } catch (e) { console.error('  ↳ alert slip failed:', e.message); }
+    }
     return label;
   }
   await sendToPrintNode(label.labelBase64, CONFIG.printNode.labelPrinterId, 'Label ' + orderName);
