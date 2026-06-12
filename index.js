@@ -22,8 +22,21 @@ const CONFIG = {
     invoicePrinterId: process.env.PRINTNODE_INVOICE_PRINTER_ID,
     giftCardPrinterId: process.env.PRINTNODE_GIFTCARD_PRINTER_ID,
     labelPrinterId: process.env.PRINTNODE_LABEL_PRINTER_ID
-  }
+  },
+  labelAutoPrint: (process.env.LABEL_AUTO_PRINT || '').toLowerCase() === 'on'
 };
+
+// Only auto-print a label for real outbound shipments (not in-store, pickup, or local delivery).
+var labeledOrderIds = {};
+function shouldAutoLabel(order) {
+  if (!CONFIG.labelAutoPrint) return false;
+  if (isInStoreOrder(order)) return false;
+  var sl = order.shipping_lines && order.shipping_lines[0];
+  if (!sl || !sl.title) return false;
+  var t = sl.title.toLowerCase();
+  if (t.indexOf('local delivery') > -1 || t.indexOf('pick up') > -1 || t.indexOf('pickup') > -1) return false;
+  return true;
+}
 
 console.log('=== Sweet Tooth Printer Starting ===');
 console.log('Invoice Printer ID:', CONFIG.printNode.invoicePrinterId || 'NOT SET');
@@ -174,6 +187,15 @@ app.post('/webhook/orders/paid', async (req, res) => {
       await printOrder(order);
     } else {
       console.log('Order already processed, skipping');
+    }
+    // Auto shipping label (separate from invoice/gift card) — ship-only, once per order.
+    if (shouldAutoLabel(order) && !labeledOrderIds[order.id]) {
+      labeledOrderIds[order.id] = true;
+      try {
+        await printShippingLabel(order);
+      } catch (labelErr) {
+        console.error('Auto-label error for', order.name, '-', labelErr.message);
+      }
     }
   } catch (error) {
     console.error('Webhook error:', error.message);
