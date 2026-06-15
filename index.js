@@ -30,12 +30,33 @@ const CONFIG = {
 var labeledOrderIds = {};
 function shouldAutoLabel(order) {
   if (!CONFIG.labelAutoPrint) return false;
+  if ((order.financial_status || '') !== 'paid') return false;
   if (isInStoreOrder(order)) return false;
   var sl = order.shipping_lines && order.shipping_lines[0];
   if (!sl || !sl.title) return false;
   var t = sl.title.toLowerCase();
   if (t.indexOf('local delivery') > -1 || t.indexOf('pick up') > -1 || t.indexOf('pickup') > -1) return false;
   return true;
+}
+
+// Fire the shipping label once per order (from whichever webhook is active: create OR paid).
+async function maybeAutoLabel(order) {
+  if (!shouldAutoLabel(order) || labeledOrderIds[order.id]) return;
+  labeledOrderIds[order.id] = true;
+  try {
+    await printShippingLabel(order);
+  } catch (labelErr) {
+    console.error('Auto-label error for', order.name, '-', labelErr.message);
+    try {
+      var orderName = order.name || ('#' + order.order_number);
+      var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
+        '<div style="font-size:34px;font-weight:800">&#9888; LABEL FAILED &mdash; BUY MANUALLY</div>' +
+        '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
+        '<div style="font-size:20px;margin-top:18px">' + labelErr.message + '</div></div>';
+      var pdf = await htmlToPdfBase64(html);
+      await sendToPrintNode(pdf, CONFIG.printNode.invoicePrinterId, 'LABEL FAILED ' + orderName);
+    } catch (e2) { console.error('  failure-alert print failed:', e2.message); }
+  }
 }
 
 console.log('=== Sweet Tooth Printer Starting ===');
@@ -168,6 +189,7 @@ app.post('/webhook/orders/create', async (req, res) => {
     console.log('Webhook received: orders/create for', order.name);
     res.status(200).send('OK');
     await printOrder(order);
+    await maybeAutoLabel(order);
   } catch (error) {
     console.error('Webhook error:', error.message);
     res.status(200).send('OK');
@@ -188,15 +210,7 @@ app.post('/webhook/orders/paid', async (req, res) => {
     } else {
       console.log('Order already processed, skipping');
     }
-    // Auto shipping label (separate from invoice/gift card) — ship-only, once per order.
-    if (shouldAutoLabel(order) && !labeledOrderIds[order.id]) {
-      labeledOrderIds[order.id] = true;
-      try {
-        await printShippingLabel(order);
-      } catch (labelErr) {
-        console.error('Auto-label error for', order.name, '-', labelErr.message);
-      }
-    }
+    await maybeAutoLabel(order);
   } catch (error) {
     console.error('Webhook error:', error.message);
     res.status(200).send('OK');
@@ -254,6 +268,20 @@ async function printShippingLabel(order) {
   console.log('✓ Label printed for', orderName, '-', label.carrier, label.service, '$' + label.amount, 'track', label.tracking);
   return label;
 }
+
+// Diagnostic: confirms config + that the app is receiving orders. No secrets exposed.
+app.get('/dashboard/label-status', function (req, res) {
+  var tok = process.env.SHIPPO_API_TOKEN || '';
+  res.json({
+    labelAutoPrint: CONFIG.labelAutoPrint,
+    labelPrinterIdSet: !!CONFIG.printNode.labelPrinterId,
+    shippoTokenSet: !!tok,
+    shippoMode: tok.indexOf('shippo_live_') === 0 ? 'LIVE' : (tok.indexOf('shippo_test_') === 0 ? 'TEST' : 'unknown'),
+    ordersSeenInMemory: recentOrders.length,
+    recentOrderNames: recentOrders.slice(0, 8).map(function (o) { return o.order.name; }),
+    labelsAttempted: Object.keys(labeledOrderIds).length
+  });
+});
 
 // Manual trigger: open in browser to buy+print a label for one order.
 app.get('/dashboard/print-label/:orderId', async (req, res) => {
