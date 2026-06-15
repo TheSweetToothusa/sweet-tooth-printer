@@ -23,7 +23,7 @@ const CONFIG = {
     giftCardPrinterId: process.env.PRINTNODE_GIFTCARD_PRINTER_ID,
     labelPrinterId: process.env.PRINTNODE_LABEL_PRINTER_ID
   },
-  labelAutoPrint: (process.env.LABEL_AUTO_PRINT || '').toLowerCase() === 'on'
+  labelAutoPrint: ['on', 'true', 'yes', '1'].indexOf((process.env.LABEL_AUTO_PRINT || '').trim().toLowerCase()) > -1
 };
 
 // Only auto-print a label for real outbound shipments (not in-store, pickup, or local delivery).
