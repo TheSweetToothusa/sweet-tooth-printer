@@ -266,17 +266,62 @@ async function printShippingLabel(order) {
   }
   await sendToPrintNode(label.labelBase64, CONFIG.printNode.labelPrinterId, 'Label ' + orderName);
   console.log('✓ Label printed for', orderName, '-', label.carrier, label.service, '$' + label.amount, 'track', label.tracking);
+  // Write the tracking back to Shopify so the order shows it + the customer is notified once.
+  try {
+    await writeTrackingToShopify(order, label);
+  } catch (twErr) {
+    console.error('  tracking write failed for', orderName, '-', twErr.message);
+    try {
+      var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
+        '<div style="font-size:32px;font-weight:800">&#9888; ADD TRACKING IN SHOPIFY</div>' +
+        '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
+        '<div style="font-size:22px;margin-top:16px">Tracking: ' + label.tracking + ' (' + label.carrier + ')<br>' +
+        'Label printed OK — but Shopify wasn\'t updated. Mark fulfilled with this tracking.</div></div>';
+      var pdf = await htmlToPdfBase64(html);
+      await sendToPrintNode(pdf, CONFIG.printNode.invoicePrinterId, 'ADD TRACKING ' + orderName);
+    } catch (e3) { console.error('  tracking-alert print failed:', e3.message); }
+  }
   return label;
 }
 
+// Push the carrier tracking onto the Shopify order (fulfills + notifies the customer once).
+async function writeTrackingToShopify(order, label) {
+  var foRes = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders/' + order.id + '/fulfillment_orders.json',
+    { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+  var fos = (await foRes.json()).fulfillment_orders || [];
+  var open = fos.filter(function (f) { return f.status === 'open'; }).map(function (f) { return { fulfillment_order_id: f.id }; });
+  if (!open.length) { console.log('  no open fulfillment order for', order.name, '- tracking not written'); return; }
+  var body = { fulfillment: {
+    notify_customer: true,
+    tracking_info: { number: label.tracking, company: label.carrier, url: label.trackingUrl || undefined },
+    line_items_by_fulfillment_order: open
+  } };
+  var res = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/fulfillments.json',
+    { method: 'POST', headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  var j = await res.json();
+  if (!res.ok || j.errors) throw new Error(JSON.stringify(j.errors || j));
+  console.log('  tracking written to Shopify + customer notified:', label.tracking);
+}
+
 // Diagnostic: confirms config + that the app is receiving orders. No secrets exposed.
-app.get('/dashboard/label-status', function (req, res) {
+app.get('/dashboard/label-status', async function (req, res) {
   var tok = process.env.SHIPPO_API_TOKEN || '';
+  var canFulfill = null, fulfillScopes = null;
+  try {
+    var sr = await fetch('https://' + CONFIG.shopify.store + '/admin/oauth/access_scopes.json',
+      { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    var handles = ((await sr.json()).access_scopes || []).map(function (s) { return s.handle; });
+    fulfillScopes = handles.filter(function (h) { return h.indexOf('fulfillment') > -1; });
+    canFulfill = fulfillScopes.indexOf('write_merchant_managed_fulfillment_orders') > -1
+      || fulfillScopes.indexOf('write_assigned_fulfillment_orders') > -1;
+  } catch (e) { canFulfill = 'error: ' + e.message; }
   res.json({
     labelAutoPrint: CONFIG.labelAutoPrint,
     labelPrinterIdSet: !!CONFIG.printNode.labelPrinterId,
     shippoTokenSet: !!tok,
     shippoMode: tok.indexOf('shippo_live_') === 0 ? 'LIVE' : (tok.indexOf('shippo_test_') === 0 ? 'TEST' : 'unknown'),
+    canWriteTrackingToShopify: canFulfill,
+    fulfillmentScopes: fulfillScopes,
     ordersSeenInMemory: recentOrders.length,
     recentOrderNames: recentOrders.slice(0, 8).map(function (o) { return o.order.name; }),
     labelsAttempted: Object.keys(labeledOrderIds).length

@@ -164,6 +164,7 @@ async function buyLabelForOrder(order) {
   return {
     labelBase64: await urlToBase64(txn.label_url),
     tracking: txn.tracking_number,
+    trackingUrl: txn.tracking_url_provider || null,
     carrier: rate.provider,
     service: rate.servicelevel && rate.servicelevel.name,
     amount: rate.amount,
