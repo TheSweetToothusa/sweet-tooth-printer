@@ -25,9 +25,47 @@ function isNonShipping(title) {
   return t.indexOf('local delivery') > -1 || t.indexOf('pick up') > -1 || t.indexOf('pickup') > -1;
 }
 
-// Default box if we ever need one — weight is real (from the order), dims are a safe default
-// because Shopify doesn't store per-product box dimensions.
-const DEFAULT_BOX = { length: '10', width: '8', height: '6', distance_unit: 'in' };
+// Default box for small/unmatched items (chocolates etc.) — they rarely get DIM surcharges.
+const DEFAULT_BOX = [10, 8, 6];
+
+// Real shipping box (in) + packed weight (lb) for the big/heavy items that actually get
+// surcharged. Matched by keyword in the line-item title, most specific first. Measured 2026-06.
+const PARCEL_TABLE = [
+  { match: ['candy apple'], weightLb: 15, box: [12, 8, 5] },   // 6-pack: 6x (4x4x4) in a brown box
+  { match: ['supreme'], weightLb: 22, box: [30, 30, 10] },
+  { match: ['penultimate'], weightLb: 18, box: [26, 26, 8] },
+  { match: ['jumbo'], weightLb: 12, box: [27, 17, 9] },
+  { match: ['grand oval'], weightLb: 10, box: [27, 17, 9] },
+  { match: ['extra large'], weightLb: 7, box: [18, 18, 7] },
+  { match: ['large oval'], weightLb: 5, box: [21.5, 14.5, 8.5] },
+  { match: ['medium round'], weightLb: 5, box: [14.5, 14.5, 8.5] },
+  { match: ['small round'], weightLb: 5, box: [14.5, 14.5, 8.5] }
+];
+
+function lookupParcel(title) {
+  var t = (title || '').toLowerCase();
+  for (var i = 0; i < PARCEL_TABLE.length; i++) {
+    if (PARCEL_TABLE[i].match.every(function (m) { return t.indexOf(m) > -1; })) return PARCEL_TABLE[i];
+  }
+  return null;
+}
+
+// Choose the parcel: real box + packed weight for matched big items, else grams + default box.
+function buildParcel(order) {
+  var items = order.line_items || [];
+  var best = null, bestVol = -1, weightLb = 0, matched = false;
+  items.forEach(function (li) {
+    var p = lookupParcel(li.title || li.name);
+    if (p) {
+      matched = true;
+      weightLb += p.weightLb * (li.quantity || 1);
+      var vol = p.box[0] * p.box[1] * p.box[2];
+      if (vol > bestVol) { bestVol = vol; best = p; }
+    }
+  });
+  if (matched && best) return { box: best.box, weightOz: Math.max(1, Math.round(weightLb * 16)) };
+  return { box: DEFAULT_BOX, weightOz: orderWeightOz(order) };
+}
 
 // Map the Shopify shipping-line title -> Shippo servicelevel_token.
 // Falls back to null (we then just buy the cheapest rate from the same carrier).
@@ -118,13 +156,14 @@ async function buyLabelForOrder(order) {
     return { skipped: true, needsManual: false, reason: 'Local delivery / pickup — no label', chosenTitle: chosenTitle };
   }
 
+  var parcel = buildParcel(order);
   var shipment = await shippo('/shipments/', {
     address_from: STORE_ADDRESS,
     address_to: shippoAddressFromOrder(order),
     parcels: [{
-      length: DEFAULT_BOX.length, width: DEFAULT_BOX.width, height: DEFAULT_BOX.height,
-      distance_unit: DEFAULT_BOX.distance_unit,
-      weight: String(orderWeightOz(order)), mass_unit: 'oz'
+      length: String(parcel.box[0]), width: String(parcel.box[1]), height: String(parcel.box[2]),
+      distance_unit: 'in',
+      weight: String(parcel.weightOz), mass_unit: 'oz'
     }],
     async: false
   });
