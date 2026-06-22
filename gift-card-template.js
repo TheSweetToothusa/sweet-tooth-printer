@@ -80,7 +80,7 @@ function generateGiftCardHTML(data) {
   html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
   html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   // Order number at bottom of the card - 6pt light gray, barely visible
-  html += '.order-code { position: absolute; bottom: 0.15in; left: 0; right: 0; text-align: center; font-family: Arial, sans-serif; font-size: 6pt; color: #ccc; }';
+  html += '.order-code { position: absolute; bottom: 0.4in; right: 0.3in; font-family: Arial, sans-serif; font-size: 6pt; color: #aaa; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
