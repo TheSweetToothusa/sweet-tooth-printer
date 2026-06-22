@@ -48,6 +48,11 @@ function generateGiftCardHTML(data) {
   var messageFontWeight = data.messageFontWeight || '700';
   var messageFontStyle  = data.messageFontStyle  || 'normal';
 
+  // Allow editor override of name/address size and message alignment
+  var nameFontSize = data.nameFontSize || '11.9pt';
+  var addressFontSize = data.addressFontSize || '9.35pt';
+  var messageAlign = data.messageAlign || 'center';
+
   // Convert px values to inches for print
   var topInches = topPosition;
   var msgInches = messagePosition;
@@ -69,9 +74,9 @@ function generateGiftCardHTML(data) {
   html += 'body { margin: 0; padding: 0; font-family: Montserrat, Arial, sans-serif; background: white; }';
   html += '.card { width: 4.15in; height: 8.5in; position: relative; background: white; overflow: hidden; }';
   html += '.top-section { position: absolute; top: ' + topInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
-  html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: 11.9pt; font-weight: 400; margin-bottom: 12px; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
-  html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: 9.35pt; font-weight: 400; line-height: 1.4; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
-  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: center; overflow: hidden; }';
+  html += '.recipient-name { font-family: Montserrat, sans-serif; font-size: ' + nameFontSize + '; font-weight: 400; margin-bottom: 12px; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.recipient-address { font-family: Montserrat, sans-serif; font-size: ' + addressFontSize + '; font-weight: 400; line-height: 1.4; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
+  html += '.message-section { position: absolute; top: ' + msgInches + '; left: 0.55in; right: 0.55in; text-align: ' + messageAlign + '; overflow: hidden; }';
   html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
   html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   // Order number at bottom of the card - 6pt light gray, barely visible
