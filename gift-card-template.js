@@ -63,6 +63,13 @@ function generateGiftCardHTML(data) {
     msgInches = (parseFloat(messagePosition) / 72) + 'in';
   }
 
+  // The printer scales the card up to its printable area, which shifts the message
+  // about an inch below the fold. Nudge it up so it prints just below the center fold.
+  // If the printer is recalibrated, adjust PRINT_DROP_IN (smaller = message sits lower).
+  var PRINT_DROP_IN = 0.85;
+  var msgNum = parseFloat(msgInches);
+  if (!isNaN(msgNum)) { msgInches = Math.max(2.5, msgNum - PRINT_DROP_IN) + 'in'; }
+
   // FIX: Wider margins (0.55in each side) and hard overflow constraints
   // Card width reduced to 4.15in with overflow:hidden on all text containers
   var html = '<!DOCTYPE html><html><head>';

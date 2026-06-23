@@ -160,7 +160,7 @@ async function printOrder(order) {
         console.log('Printing gift card...');
         var giftCardHTML = generateGiftCardHTML(orderData);
         var giftCardPdf = await giftCardToPdfBase64(giftCardHTML);
-        await sendToPrintNode(giftCardPdf, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderName, { fit_to_page: false });
+        await sendToPrintNode(giftCardPdf, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderName);
         console.log('✓ Gift card sent to printer');
       } else {
         console.log('✗ Gift card printer not configured!');
@@ -737,7 +737,7 @@ app.post('/dashboard/send-gift-card-print/:orderId', async (req, res) => {
 
     var giftCardHTML = generateGiftCardHTML(customData);
     var pdfBase64 = await giftCardToPdfBase64(giftCardHTML);
-    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderData.orderNumber, { fit_to_page: false });
+    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'Gift Card ' + orderData.orderNumber);
 
     res.json({ success: true });
   } catch (error) {
@@ -970,7 +970,7 @@ app.post('/dashboard/send-new-gift-card', async (req, res) => {
     var { generateGiftCardHTML } = require('./gift-card-template');
     var giftCardHTML = generateGiftCardHTML(customData);
     var pdfBase64 = await giftCardToPdfBase64(giftCardHTML);
-    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'Custom Gift Card - ' + (customData.giftReceiver || 'No Name'), { fit_to_page: false });
+    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'Custom Gift Card - ' + (customData.giftReceiver || 'No Name'));
     res.json({ success: true });
   } catch (error) {
     console.error('New gift card print error:', error);
