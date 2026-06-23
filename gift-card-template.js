@@ -21,19 +21,19 @@ function generateGiftCardHTML(data) {
 
   // Dynamic font sizing based on message length so it always fits
   var msgLen = truncatedMessage.length;
-  var messageFontSize = '10.2pt';
+  var messageFontSize = '12pt';
   var messageLineHeight = '1.5';
   if (msgLen > 250) {
-    messageFontSize = '8pt';
+    messageFontSize = '8.5pt';
     messageLineHeight = '1.3';
   } else if (msgLen > 200) {
-    messageFontSize = '8.5pt';
+    messageFontSize = '9.5pt';
     messageLineHeight = '1.35';
   } else if (msgLen > 150) {
-    messageFontSize = '9pt';
+    messageFontSize = '10.5pt';
     messageLineHeight = '1.4';
   } else if (msgLen > 100) {
-    messageFontSize = '9.5pt';
+    messageFontSize = '11pt';
     messageLineHeight = '1.45';
   }
 
