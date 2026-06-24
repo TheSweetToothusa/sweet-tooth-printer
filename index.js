@@ -395,7 +395,7 @@ app.get('/dashboard', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No gift card orders found. New orders with gift messages will appear here.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px;align-items:center}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}.btn-new{margin-left:auto;padding:10px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a><a href="/dashboard/gift-card-new" class="btn-new">✨ Create New Card</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px;align-items:center}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}.btn-new{margin-left:auto;padding:10px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a><a href="/dashboard/gift-card-new" class="btn-new">✨ Create New Card</a><a href="/dashboard/test-card" class="btn-new" style="background:#6366f1;margin-left:8px">🧪 Test Card</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error loading dashboard: ' + error.message);
   }
@@ -974,6 +974,58 @@ app.post('/dashboard/send-new-gift-card', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('New gift card print error:', error);
+    res.json({ success: false, error: error.message });
+  }
+});
+
+// ============ TEST CARD (prints a sample through the REAL auto-print path) ============
+
+app.get('/dashboard/test-card', function (req, res) {
+  var html = '<!DOCTYPE html><html><head><title>Test Card</title><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f0f1f3;padding:40px;max-width:560px;margin:0 auto;color:#111}';
+  html += 'h2{font-size:21px;margin-bottom:4px}.sub{font-size:13px;color:#888;margin-bottom:22px;line-height:1.5}';
+  html += 'label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 5px;color:#374151}';
+  html += 'input,textarea{width:100%;padding:10px 11px;border:1.5px solid #e2e5ea;border-radius:8px;font-size:14px;font-family:inherit}textarea{height:80px;resize:vertical}';
+  html += '.btn{display:inline-block;margin-top:18px;padding:13px 20px;border-radius:9px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:#22c55e;color:#fff}';
+  html += '.btn.secondary{background:#fff;color:#111;border:1.5px solid #d1d5db;margin-left:8px}a{color:#111}</style></head><body>';
+  html += '<h2>🧪 Print a Test Card</h2>';
+  html += '<div class="sub">This prints a sample gift card through the <strong>exact same path a real order uses</strong> — same automatic font sizing, message position, and top-left order code. Use it to check the layout without waiting for an order.</div>';
+  html += '<label>Recipient Name</label><input id="name" value="Jessica Sample">';
+  html += '<label>Address</label><input id="addr" value="747 NE 193rd St, Miami, FL 33179">';
+  html += '<label>Gift Message</label><textarea id="msg">Thank you for an amazing trip!</textarea>';
+  html += '<label>Sender</label><input id="sender" value="Errol and Claudia Feldman">';
+  html += '<label>Order # (for the top-left code)</label><input id="order" value="#35993">';
+  html += '<div><button class="btn" onclick="go()">🖨 Print Test Card</button><a class="btn secondary" href="/dashboard">← Back</a></div>';
+  html += '<script>function go(){var p=new URLSearchParams({name:document.getElementById("name").value,addr:document.getElementById("addr").value,msg:document.getElementById("msg").value,sender:document.getElementById("sender").value,order:document.getElementById("order").value});fetch("/dashboard/test-card",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:p.toString()}).then(function(r){return r.json()}).then(function(d){alert(d.success?"✅ Test card sent to the gift card printer!":"❌ "+d.error)}).catch(function(e){alert("Error: "+e.message)})}</' + 'script></body></html>';
+  res.send(html);
+});
+
+app.post('/dashboard/test-card', async (req, res) => {
+  try {
+    var addr = (req.body.addr || '').trim();
+    var cityMatch = addr.match(/^(.+?),\s*(.+),\s*(\w{2})\s+(\d{5}(-\d{4})?)$/);
+    var recipient = { name: req.body.name || '', address1: addr, address2: '', city: '', province: '', zip: '' };
+    if (cityMatch) {
+      recipient.address1 = cityMatch[1];
+      recipient.city = cityMatch[2];
+      recipient.province = cityMatch[3];
+      recipient.zip = cityMatch[4];
+    }
+    // Build the data exactly like a real order would (no font/position overrides),
+    // so the template's automatic sizing and default position are used.
+    var sample = {
+      giftReceiver: req.body.name || 'Test Recipient',
+      giftMessage: (req.body.msg || '').substring(0, 300),
+      giftSender: req.body.sender || '',
+      orderNumber: req.body.order || '#TEST',
+      recipient: recipient
+    };
+    var giftCardHTML = generateGiftCardHTML(sample);
+    var pdfBase64 = await giftCardToPdfBase64(giftCardHTML);
+    await sendToPrintNode(pdfBase64, CONFIG.printNode.giftCardPrinterId, 'TEST Gift Card');
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Test card print error:', error);
     res.json({ success: false, error: error.message });
   }
 });
