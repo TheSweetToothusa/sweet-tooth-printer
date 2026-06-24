@@ -644,7 +644,7 @@ app.get('/dashboard/print-custom/:orderId', async (req, res) => {
     html += '<div class="card-preview" id="cardPreview">';
     html += '<div class="top-section-preview" id="topSection" style="top:0.15in"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px">'+prevName+'</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4">'+prevAddr1+(prevAddr2?'<br>'+prevAddr2:'')+'</div></div>';
     html += '<div class="msg-section-preview" id="msgSection" style="top:4.30in"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5">'+prevMsg.replace(/\n/g,'<br>')+'</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700">'+prevSender+'</div></div>';
-    html += '<div style="position:absolute;top:4.7%;left:7%;font-family:Arial,sans-serif;font-size:6pt;color:#bbb">'+orderData.orderNumber+'</div>';
+    html += '<div style="position:absolute;top:4.7%;left:14%;font-family:Arial,sans-serif;font-size:5pt;color:#888">'+orderData.orderNumber+'</div>';
     html += '</div></div>';
     html += '<script>';
     html += 'var fmtBold=true,fmtItalic=false;';
@@ -885,7 +885,7 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += '<div class="fold-line"></div><span class="fold-tag">fold</span>';
   html += '<div class="top-section-preview" id="topSection" style="top:1.76%"><div id="prevName" style="font-family:Montserrat,sans-serif;font-size:11.9pt;font-weight:400;margin-bottom:12px;color:#bbb;font-style:italic">Recipient name</div><div id="prevAddr" style="font-family:Montserrat,sans-serif;font-size:9.35pt;font-weight:400;line-height:1.4;color:#ccc"></div></div>';
   html += '<div class="msg-section-preview" id="msgSection" style="top:50.59%"><div id="prevMsg" style="font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;line-height:1.5;color:#ccc;font-style:italic">Gift message will appear here...</div><div id="prevSender" style="margin-top:12px;font-family:Montserrat,sans-serif;font-size:10pt;font-weight:700;color:#ccc"></div></div>';
-  html += '<div id="prevOrderCode" style="position:absolute;top:4.7%;left:7%;font-family:Arial,sans-serif;font-size:6pt;color:#bbb"></div>';
+  html += '<div id="prevOrderCode" style="position:absolute;top:4.7%;left:14%;font-family:Arial,sans-serif;font-size:5pt;color:#888"></div>';
   html += '</div></div>';
 
   html += '<script>';

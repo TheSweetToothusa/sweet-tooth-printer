@@ -63,10 +63,10 @@ function generateGiftCardHTML(data) {
     msgInches = (parseFloat(messagePosition) / 72) + 'in';
   }
 
-  // The printer scales the card up to its printable area, which shifts the message
-  // about an inch below the fold. Nudge it up so it prints just below the center fold.
-  // If the printer is recalibrated, adjust PRINT_DROP_IN (smaller = message sits lower).
-  var PRINT_DROP_IN = 0.85;
+  // The printer adds its own downward shift, which lands the message about an inch
+  // below the fold — which is where we want it. PRINT_DROP_IN nudges it UP from there
+  // (bigger = higher / closer to the fold). 0 = leave it ~1in below the fold.
+  var PRINT_DROP_IN = 0;
   var msgNum = parseFloat(msgInches);
   if (!isNaN(msgNum)) { msgInches = Math.max(2.5, msgNum - PRINT_DROP_IN) + 'in'; }
 
@@ -87,7 +87,7 @@ function generateGiftCardHTML(data) {
   html += '.gift-message { font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; line-height: ' + messageLineHeight + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }';
   html += '.gift-sender { margin-top: 12px; font-family: ' + messageFontFamily + ', sans-serif; font-size: ' + messageFontSize + '; font-weight: ' + messageFontWeight + '; font-style: ' + messageFontStyle + '; color: #000; word-wrap: break-word; overflow-wrap: break-word; }';
   // Order number at bottom of the card - 6pt light gray, barely visible
-  html += '.order-code { position: absolute; top: 0.4in; left: 0.3in; font-family: Arial, sans-serif; font-size: 7pt; color: #555; }';
+  html += '.order-code { position: absolute; top: 0.4in; left: 0.6in; font-family: Arial, sans-serif; font-size: 5pt; color: #555; }';
   html += '</style></head><body>';
   html += '<div class="card">';
   html += '<div class="top-section">';
