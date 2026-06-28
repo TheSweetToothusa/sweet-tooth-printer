@@ -141,6 +141,17 @@ function matchRate(rates, chosenTitle) {
   return match[0];
 }
 
+// For free-shipping / generic orders (no carrier service chosen): pick the CHEAPEST rate that
+// still arrives in <= 2 business days (melt-safe), using Shippo's delivery estimate.
+function pickCheapest2Day(rates) {
+  var ok = (rates || []).filter(function (r) {
+    return r.estimated_days != null && r.estimated_days <= 2;
+  });
+  if (!ok.length) return null;
+  ok.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
+  return ok[0];
+}
+
 async function urlToBase64(url) {
   var res = await fetch(url);
   if (!res.ok) throw new Error('Label download failed: ' + res.status);
@@ -168,11 +179,16 @@ async function buyLabelForOrder(order) {
     async: false
   });
 
-  var rate = matchRate(shipment.rates, chosenTitle);
+  // If the customer picked a real carrier service, match it exactly. Otherwise (free shipping /
+  // generic), auto-pick the cheapest <= 2-day option — same melt-safe rule, just chosen for them.
+  var hasService = !!mapServiceToken(chosenTitle);
+  var rate = hasService ? matchRate(shipment.rates, chosenTitle) : pickCheapest2Day(shipment.rates);
   if (!rate) {
     return {
       skipped: true, needsManual: true,
-      reason: 'Couldn\'t match "' + chosenTitle + '" in Shippo — buy this label manually',
+      reason: hasService
+        ? 'Couldn\'t match "' + chosenTitle + '" in Shippo — buy this label manually'
+        : 'No <=2-day rate found for "' + chosenTitle + '" — buy this label manually',
       chosenTitle: chosenTitle
     };
   }
