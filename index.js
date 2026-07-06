@@ -1147,11 +1147,29 @@ app.get('/api/status', (req, res) => {
 
 // ============ EMPLOYEE DASHBOARD (HOME) ============
 
+// Feather-style line icons (24x24 viewBox, stroke follows CSS color).
+var DASH_ICONS = {
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  filePlus: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/>',
+  printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  penTool: '<path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/>',
+  box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+  mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
+  cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>'
+};
+
 function dashTile(label, href, opts) {
   opts = opts || {};
   var html = '<a class="tile" href="' + (href || '#') + '"';
   if (opts.newTab) html += ' target="_blank" rel="noopener"';
-  html += '><span class="label">' + label + '</span></a>';
+  html += '>';
+  if (opts.icon && DASH_ICONS[opts.icon]) {
+    html += '<span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + DASH_ICONS[opts.icon] + '</svg></span>';
+  }
+  html += '<span class="label">' + label + '</span></a>';
   return html;
 }
 
@@ -1160,14 +1178,19 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f1f3;color:#111;padding:28px 20px}';
-  html += '.wrap{max-width:880px;margin:0 auto}';
-  html += '.back{display:inline-block;font-size:14px;font-weight:700;color:#6b7280;text-decoration:none;margin-bottom:16px}.back:hover{color:#111}';
-  html += 'h1{font-size:27px;letter-spacing:-.4px}.subtitle{color:#6b7280;font-size:14.5px;margin:5px 0 26px}';
-  html += '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}';
-  html += '.tile{display:flex;align-items:center;justify-content:center;min-height:110px;background:#fff;border:1.5px solid #e2e5ea;border-radius:14px;padding:20px 22px;text-decoration:none;color:#111;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:transform .1s,box-shadow .1s}';
-  html += '.tile:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.10);border-color:#c7ccd4}';
-  html += '.tile .label{font-weight:800;font-size:18px;letter-spacing:-.2px}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 28px}';
+  html += '.wrap{width:100%;max-width:1080px;margin:0 auto}';
+  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#3D3D3D}';
+  html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
+  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:24px;margin-top:44px;justify-content:center}';
+  html += '.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;background:#fff;border:1px solid #F3E4EB;border-radius:20px;padding:28px 24px;text-decoration:none;color:#3D3D3D;text-align:center;box-shadow:0 2px 12px rgba(247,181,205,.14);transition:transform .12s,box-shadow .12s,border-color .12s}';
+  html += '.tile:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(247,181,205,.32);border-color:#F7B5CD}';
+  html += '.icon-badge{width:58px;height:58px;border-radius:50%;background:#FDEBF2;color:#D96795;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
+  html += '.icon-badge svg{width:27px;height:27px}';
+  html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
+  html += '@media (max-width:760px){body{padding:36px 18px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body><div class="wrap">';
   if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back</a>';
   html += '<h1>' + title + '</h1>';
@@ -1179,21 +1202,21 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
 
 app.get('/', (req, res) => {
   var tiles = '';
-  tiles += dashTile('Order Lookup', null);
-  tiles += dashTile('Create a Draft Order', null);
-  tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices');
-  tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard');
-  tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new');
-  tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true });
-  tiles += dashTile('Supplies', '/supplies');
-  tiles += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true });
+  tiles += dashTile('Order Lookup', null, { icon: 'search' });
+  tiles += dashTile('Create a Draft Order', null, { icon: 'filePlus' });
+  tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer' });
+  tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit' });
+  tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift' });
+  tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
+  tiles += dashTile('Supplies', '/supplies', { icon: 'box' });
+  tiles += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true, icon: 'mail' });
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, tiles));
 });
 
 app.get('/supplies', (req, res) => {
   var tiles = '';
-  tiles += dashTile('Buy Supplies', '/supplies/buy');
-  tiles += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true });
+  tiles += dashTile('Buy Supplies', '/supplies/buy', { icon: 'cart' });
+  tiles += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true, icon: 'hand' });
   res.send(dashPage('Supplies', null, tiles, '/'));
 });
 
