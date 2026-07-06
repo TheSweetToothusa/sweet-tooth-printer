@@ -1218,8 +1218,6 @@ app.get('/contact', (req, res) => {
 app.get('/supplies', (req, res) => {
   var tiles = '';
   tiles += dashTile('🙋', 'Request Supplies', 'Fill out the supply request form (new tab)', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true });
-  tiles += dashTile('🛒', 'Order Supplies', 'Waiting on the link from Mike', null, { soon: true, tag: 'NEED LINK' });
-  tiles += dashTile('🔎', 'Vendor Search', 'Type an item, see which vendor we buy it from', null, { soon: true, tag: 'NEED VENDOR LIST' });
   tiles += '<div class="sec">Buy Supplies — each opens in a new tab</div>';
   tiles += dashTile('🅰️', 'Amazon', null, 'https://www.amazon.com', { newTab: true });
   tiles += dashTile('🏬', 'Restaurant Depot', null, 'https://www.restaurantdepot.com', { newTab: true });
