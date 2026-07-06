@@ -1147,15 +1147,11 @@ app.get('/api/status', (req, res) => {
 
 // ============ EMPLOYEE DASHBOARD (HOME) ============
 
-function dashTile(icon, label, hint, href, opts) {
+function dashTile(label, href, opts) {
   opts = opts || {};
-  var html = '<a class="tile' + (opts.soon ? ' soon' : '') + '" href="' + (href || '#') + '"';
+  var html = '<a class="tile" href="' + (href || '#') + '"';
   if (opts.newTab) html += ' target="_blank" rel="noopener"';
-  html += '>';
-  html += '<span class="icon">' + icon + '</span>';
-  html += '<span class="label">' + label + (opts.soon ? ' <span class="soon-tag">' + (opts.tag || 'COMING SOON') + '</span>' : '') + '</span>';
-  if (hint) html += '<span class="hint">' + hint + '</span>';
-  html += '</a>';
+  html += '><span class="label">' + label + '</span></a>';
   return html;
 }
 
@@ -1169,14 +1165,11 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '.back{display:inline-block;font-size:14px;font-weight:700;color:#6b7280;text-decoration:none;margin-bottom:16px}.back:hover{color:#111}';
   html += 'h1{font-size:27px;letter-spacing:-.4px}.subtitle{color:#6b7280;font-size:14.5px;margin:5px 0 26px}';
   html += '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}';
-  html += '.tile{display:flex;flex-direction:column;justify-content:center;gap:7px;min-height:126px;background:#fff;border:1.5px solid #e2e5ea;border-radius:14px;padding:20px 22px;text-decoration:none;color:#111;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:transform .1s,box-shadow .1s}';
+  html += '.tile{display:flex;align-items:center;justify-content:center;min-height:110px;background:#fff;border:1.5px solid #e2e5ea;border-radius:14px;padding:20px 22px;text-decoration:none;color:#111;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:transform .1s,box-shadow .1s}';
   html += '.tile:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.10);border-color:#c7ccd4}';
-  html += '.tile .icon{font-size:31px;line-height:1}.tile .label{font-weight:800;font-size:17.5px;letter-spacing:-.2px}.tile .hint{font-size:12.5px;font-weight:500;color:#9ca3af;line-height:1.4}';
-  html += '.tile.soon{opacity:.5;pointer-events:none}';
-  html += '.soon-tag{font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#b45309;background:#fef3c7;border-radius:20px;padding:2px 8px;vertical-align:2px;white-space:nowrap}';
-  html += '.sec{grid-column:1/-1;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#6b7280;margin:12px 0 0}';
+  html += '.tile .label{font-weight:800;font-size:18px;letter-spacing:-.2px}';
   html += '</style></head><body><div class="wrap">';
-  if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back to Home</a>';
+  if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back</a>';
   html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
   html += '<div class="grid">' + tilesHtml + '</div>';
@@ -1186,48 +1179,35 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
 
 app.get('/', (req, res) => {
   var tiles = '';
-  tiles += dashTile('🔍', 'Order Lookup', 'Find an order fast', null, { soon: true });
-  tiles += dashTile('📝', 'Create a Draft Order', 'New draft order in Shopify', null, { soon: true });
-  tiles += dashTile('🚚', 'Delivery Status', 'Was it delivered?', null, { soon: true });
-  tiles += dashTile('🧾', 'Invoices &amp; Gift Cards', 'Reprint, edit, or create new', '/invoices-gift-cards');
-  tiles += dashTile('💲', 'Price Quote', 'Shipping &amp; local delivery', null, { soon: true });
-  tiles += dashTile('📦', 'Supplies', 'Request, order &amp; buy supplies', '/supplies');
-  tiles += dashTile('📞', 'Contact', 'Email, UPS &amp; phone numbers', '/contact');
-  tiles += dashTile('🏷️', 'Create Discount Code', 'Needs Mike or Denis approval', null, { soon: true });
-  res.send(dashPage('The Sweet Tooth — Employee Dashboard', 'Pick what you need. Big buttons, no hunting.', tiles));
-});
-
-app.get('/invoices-gift-cards', (req, res) => {
-  var tiles = '';
-  tiles += dashTile('🧾', 'Edit or Reprint Invoice', 'Recent orders — view, edit &amp; print', '/dashboard/invoices');
-  tiles += dashTile('💌', 'Edit or Reprint Gift Card Message', 'Orders with gift messages', '/dashboard');
-  tiles += dashTile('✨', 'Create New Gift Card Message', 'No order needed — type &amp; print', '/dashboard/gift-card-new');
-  tiles += dashTile('🎨', 'Sugar Paper Designer', 'Opens the layout studio in a new tab', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true });
-  res.send(dashPage('Invoices &amp; Gift Cards', 'Everything for printing invoices and gift cards.', tiles, '/'));
-});
-
-app.get('/contact', (req, res) => {
-  var tiles = '';
-  tiles += dashTile('📧', 'Email', 'Opens the orders inbox in a new tab', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true });
-  tiles += dashTile('📍', 'UPS Tracking', 'Opens the UPS tracking page in a new tab', 'https://www.ups.com/track?loc=en_US&amp;requester=ST/', { newTab: true });
-  tiles += dashTile('☎️', 'Call UPS', '1-800-742-5877', 'tel:18007425877');
-  tiles += dashTile('🚛', 'Call Bernard (our UPS driver)', '(954) 594-2577', 'tel:9545942577');
-  res.send(dashPage('Contact', 'Email, UPS, and phone numbers.', tiles, '/'));
+  tiles += dashTile('Order Lookup', null);
+  tiles += dashTile('Create a Draft Order', null);
+  tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices');
+  tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard');
+  tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new');
+  tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true });
+  tiles += dashTile('Supplies', '/supplies');
+  tiles += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true });
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, tiles));
 });
 
 app.get('/supplies', (req, res) => {
   var tiles = '';
-  tiles += dashTile('🙋', 'Request Supplies', 'Fill out the supply request form (new tab)', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true });
-  tiles += '<div class="sec">Buy Supplies — each opens in a new tab</div>';
-  tiles += dashTile('🅰️', 'Amazon', null, 'https://www.amazon.com', { newTab: true });
-  tiles += dashTile('🏬', 'Restaurant Depot', null, 'https://www.restaurantdepot.com', { newTab: true });
-  tiles += dashTile('🥕', 'Instacart (Costco)', null, 'https://www.instacart.com/store/costco/storefront', { newTab: true });
-  tiles += dashTile('🏪', 'Sam&#39;s Club', null, 'https://www.samsclub.com', { newTab: true });
-  tiles += dashTile('🍫', 'Linnea&#39;s', 'Candy &amp; chocolate supplies', 'https://linneasinc.com', { newTab: true });
-  tiles += dashTile('📦', 'Uline', null, 'https://www.uline.com', { newTab: true });
-  tiles += dashTile('🌴', 'Hialeah Products', null, 'https://www.newurbanfarms.com/', { newTab: true });
-  tiles += dashTile('🍽️', 'WebstaurantStore', null, 'https://www.webstaurantstore.com', { newTab: true });
-  res.send(dashPage('Supplies', 'Request, order, and buy supplies.', tiles, '/'));
+  tiles += dashTile('Buy Supplies', '/supplies/buy');
+  tiles += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true });
+  res.send(dashPage('Supplies', null, tiles, '/'));
+});
+
+app.get('/supplies/buy', (req, res) => {
+  var tiles = '';
+  tiles += dashTile('Amazon', 'https://www.amazon.com', { newTab: true });
+  tiles += dashTile('Restaurant Depot', 'https://www.restaurantdepot.com', { newTab: true });
+  tiles += dashTile('Instacart (Costco)', 'https://www.instacart.com/store/costco/storefront', { newTab: true });
+  tiles += dashTile('Sam&#39;s Club', 'https://www.samsclub.com', { newTab: true });
+  tiles += dashTile('Linnea&#39;s', 'https://linneasinc.com', { newTab: true });
+  tiles += dashTile('Uline', 'https://www.uline.com', { newTab: true });
+  tiles += dashTile('Hialeah Products', 'https://www.newurbanfarms.com/', { newTab: true });
+  tiles += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com', { newTab: true });
+  res.send(dashPage('Buy Supplies', null, tiles, '/supplies'));
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
