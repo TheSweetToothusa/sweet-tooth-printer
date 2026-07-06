@@ -1191,7 +1191,7 @@ app.get('/', (req, res) => {
   tiles += dashTile('🧾', 'Invoices &amp; Gift Cards', 'Reprint, edit, or create new', '/invoices-gift-cards');
   tiles += dashTile('💲', 'Price Quote', 'Shipping &amp; local delivery', null, { soon: true });
   tiles += dashTile('📦', 'Supplies', 'Request, order &amp; buy supplies', null, { soon: true });
-  tiles += dashTile('📞', 'Contact', 'Email, UPS &amp; phone numbers', null, { soon: true });
+  tiles += dashTile('📞', 'Contact', 'Email, UPS &amp; phone numbers', '/contact');
   tiles += dashTile('🏷️', 'Create Discount Code', 'Needs Mike or Denis approval', null, { soon: true });
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', 'Pick what you need. Big buttons, no hunting.', tiles));
 });
@@ -1203,6 +1203,15 @@ app.get('/invoices-gift-cards', (req, res) => {
   tiles += dashTile('✨', 'Create New Gift Card Message', 'No order needed — type &amp; print', '/dashboard/gift-card-new');
   tiles += dashTile('🎨', 'Sugar Paper Designer', 'Opens the layout studio in a new tab', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true });
   res.send(dashPage('Invoices &amp; Gift Cards', 'Everything for printing invoices and gift cards.', tiles, '/'));
+});
+
+app.get('/contact', (req, res) => {
+  var tiles = '';
+  tiles += dashTile('📧', 'Email', 'Opens the orders inbox in a new tab', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true });
+  tiles += dashTile('📍', 'UPS Tracking', 'Opens the UPS tracking page in a new tab', 'https://www.ups.com/track?loc=en_US&amp;requester=ST/', { newTab: true });
+  tiles += dashTile('☎️', 'Call UPS', '1-800-742-5877', 'tel:18007425877');
+  tiles += dashTile('🚛', 'Call Bernard (our UPS driver)', '(954) 594-2577', 'tel:9545942577');
+  res.send(dashPage('Contact', 'Email, UPS, and phone numbers.', tiles, '/'));
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
