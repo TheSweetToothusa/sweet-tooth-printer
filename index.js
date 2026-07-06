@@ -1153,7 +1153,7 @@ function dashTile(icon, label, hint, href, opts) {
   if (opts.newTab) html += ' target="_blank" rel="noopener"';
   html += '>';
   html += '<span class="icon">' + icon + '</span>';
-  html += '<span class="label">' + label + (opts.soon ? ' <span class="soon-tag">COMING SOON</span>' : '') + '</span>';
+  html += '<span class="label">' + label + (opts.soon ? ' <span class="soon-tag">' + (opts.tag || 'COMING SOON') + '</span>' : '') + '</span>';
   if (hint) html += '<span class="hint">' + hint + '</span>';
   html += '</a>';
   return html;
@@ -1174,6 +1174,7 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '.tile .icon{font-size:31px;line-height:1}.tile .label{font-weight:800;font-size:17.5px;letter-spacing:-.2px}.tile .hint{font-size:12.5px;font-weight:500;color:#9ca3af;line-height:1.4}';
   html += '.tile.soon{opacity:.5;pointer-events:none}';
   html += '.soon-tag{font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#b45309;background:#fef3c7;border-radius:20px;padding:2px 8px;vertical-align:2px;white-space:nowrap}';
+  html += '.sec{grid-column:1/-1;font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#6b7280;margin:12px 0 0}';
   html += '</style></head><body><div class="wrap">';
   if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back to Home</a>';
   html += '<h1>' + title + '</h1>';
@@ -1190,7 +1191,7 @@ app.get('/', (req, res) => {
   tiles += dashTile('🚚', 'Delivery Status', 'Was it delivered?', null, { soon: true });
   tiles += dashTile('🧾', 'Invoices &amp; Gift Cards', 'Reprint, edit, or create new', '/invoices-gift-cards');
   tiles += dashTile('💲', 'Price Quote', 'Shipping &amp; local delivery', null, { soon: true });
-  tiles += dashTile('📦', 'Supplies', 'Request, order &amp; buy supplies', null, { soon: true });
+  tiles += dashTile('📦', 'Supplies', 'Request, order &amp; buy supplies', '/supplies');
   tiles += dashTile('📞', 'Contact', 'Email, UPS &amp; phone numbers', '/contact');
   tiles += dashTile('🏷️', 'Create Discount Code', 'Needs Mike or Denis approval', null, { soon: true });
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', 'Pick what you need. Big buttons, no hunting.', tiles));
@@ -1212,6 +1213,23 @@ app.get('/contact', (req, res) => {
   tiles += dashTile('☎️', 'Call UPS', '1-800-742-5877', 'tel:18007425877');
   tiles += dashTile('🚛', 'Call Bernard (our UPS driver)', '(954) 594-2577', 'tel:9545942577');
   res.send(dashPage('Contact', 'Email, UPS, and phone numbers.', tiles, '/'));
+});
+
+app.get('/supplies', (req, res) => {
+  var tiles = '';
+  tiles += dashTile('🙋', 'Request Supplies', 'Fill out the supply request form (new tab)', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true });
+  tiles += dashTile('🛒', 'Order Supplies', 'Waiting on the link from Mike', null, { soon: true, tag: 'NEED LINK' });
+  tiles += dashTile('🔎', 'Vendor Search', 'Type an item, see which vendor we buy it from', null, { soon: true, tag: 'NEED VENDOR LIST' });
+  tiles += '<div class="sec">Buy Supplies — each opens in a new tab</div>';
+  tiles += dashTile('🅰️', 'Amazon', null, 'https://www.amazon.com', { newTab: true });
+  tiles += dashTile('🏬', 'Restaurant Depot', null, 'https://www.restaurantdepot.com', { newTab: true });
+  tiles += dashTile('🥕', 'Instacart (Costco)', null, 'https://www.instacart.com/store/costco/storefront', { newTab: true });
+  tiles += dashTile('🏪', 'Sam&#39;s Club', null, 'https://www.samsclub.com', { newTab: true });
+  tiles += dashTile('🍫', 'Linnea&#39;s', 'Candy &amp; chocolate supplies', 'https://linneasinc.com', { newTab: true });
+  tiles += dashTile('📦', 'Uline', null, 'https://www.uline.com', { newTab: true });
+  tiles += dashTile('🌴', 'Hialeah Products', 'Waiting on the right website from Mike', null, { soon: true, tag: 'NEED LINK' });
+  tiles += dashTile('🍽️', 'WebstaurantStore', null, 'https://www.webstaurantstore.com', { newTab: true });
+  res.send(dashPage('Supplies', 'Request, order, and buy supplies.', tiles, '/'));
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
