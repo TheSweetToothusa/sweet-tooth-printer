@@ -1145,10 +1145,64 @@ app.get('/api/status', (req, res) => {
   });
 });
 
-// ============ HOME ============
+// ============ EMPLOYEE DASHBOARD (HOME) ============
+
+function dashTile(icon, label, hint, href, opts) {
+  opts = opts || {};
+  var html = '<a class="tile' + (opts.soon ? ' soon' : '') + '" href="' + (href || '#') + '"';
+  if (opts.newTab) html += ' target="_blank" rel="noopener"';
+  html += '>';
+  html += '<span class="icon">' + icon + '</span>';
+  html += '<span class="label">' + label + (opts.soon ? ' <span class="soon-tag">COMING SOON</span>' : '') + '</span>';
+  if (hint) html += '<span class="hint">' + hint + '</span>';
+  html += '</a>';
+  return html;
+}
+
+function dashPage(title, subtitle, tilesHtml, backHref) {
+  var html = '<!DOCTYPE html><html><head><title>' + title + ' — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f1f3;color:#111;padding:28px 20px}';
+  html += '.wrap{max-width:880px;margin:0 auto}';
+  html += '.back{display:inline-block;font-size:14px;font-weight:700;color:#6b7280;text-decoration:none;margin-bottom:16px}.back:hover{color:#111}';
+  html += 'h1{font-size:27px;letter-spacing:-.4px}.subtitle{color:#6b7280;font-size:14.5px;margin:5px 0 26px}';
+  html += '.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}';
+  html += '.tile{display:flex;flex-direction:column;justify-content:center;gap:7px;min-height:126px;background:#fff;border:1.5px solid #e2e5ea;border-radius:14px;padding:20px 22px;text-decoration:none;color:#111;box-shadow:0 1px 3px rgba(0,0,0,.05);transition:transform .1s,box-shadow .1s}';
+  html += '.tile:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.10);border-color:#c7ccd4}';
+  html += '.tile .icon{font-size:31px;line-height:1}.tile .label{font-weight:800;font-size:17.5px;letter-spacing:-.2px}.tile .hint{font-size:12.5px;font-weight:500;color:#9ca3af;line-height:1.4}';
+  html += '.tile.soon{opacity:.5;pointer-events:none}';
+  html += '.soon-tag{font-size:9.5px;font-weight:800;letter-spacing:.6px;color:#b45309;background:#fef3c7;border-radius:20px;padding:2px 8px;vertical-align:2px;white-space:nowrap}';
+  html += '</style></head><body><div class="wrap">';
+  if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back to Home</a>';
+  html += '<h1>' + title + '</h1>';
+  if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
+  html += '<div class="grid">' + tilesHtml + '</div>';
+  html += '</div></body></html>';
+  return html;
+}
 
 app.get('/', (req, res) => {
-  res.send('<!DOCTYPE html><html><head><title>Sweet Tooth Order Printer</title><style>body{font-family:sans-serif;max-width:600px;margin:50px auto;padding:20px}h1{margin-bottom:10px}.subtitle{color:#666;margin-bottom:30px}.btn{display:inline-block;padding:12px 24px;background:#000;color:white;text-decoration:none;border-radius:6px;font-weight:600;margin-right:10px}</style></head><body><h1>Sweet Tooth Order Printer</h1><p class="subtitle">Automatic invoice and gift card printing</p><a href="/dashboard" class="btn">Gift Cards</a><a href="/dashboard/invoices" class="btn">Invoices</a></body></html>');
+  var tiles = '';
+  tiles += dashTile('🔍', 'Order Lookup', 'Find an order fast', null, { soon: true });
+  tiles += dashTile('📝', 'Create a Draft Order', 'New draft order in Shopify', null, { soon: true });
+  tiles += dashTile('🚚', 'Delivery Status', 'Was it delivered?', null, { soon: true });
+  tiles += dashTile('🧾', 'Invoices &amp; Gift Cards', 'Reprint, edit, or create new', '/invoices-gift-cards');
+  tiles += dashTile('💲', 'Price Quote', 'Shipping &amp; local delivery', null, { soon: true });
+  tiles += dashTile('📦', 'Supplies', 'Request, order &amp; buy supplies', null, { soon: true });
+  tiles += dashTile('📞', 'Contact', 'Email, UPS &amp; phone numbers', null, { soon: true });
+  tiles += dashTile('🏷️', 'Create Discount Code', 'Needs Mike or Denis approval', null, { soon: true });
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', 'Pick what you need. Big buttons, no hunting.', tiles));
+});
+
+app.get('/invoices-gift-cards', (req, res) => {
+  var tiles = '';
+  tiles += dashTile('🧾', 'Edit or Reprint Invoice', 'Recent orders — view, edit &amp; print', '/dashboard/invoices');
+  tiles += dashTile('💌', 'Edit or Reprint Gift Card Message', 'Orders with gift messages', '/dashboard');
+  tiles += dashTile('✨', 'Create New Gift Card Message', 'No order needed — type &amp; print', '/dashboard/gift-card-new');
+  tiles += dashTile('🎨', 'Sugar Paper Designer', 'Opens the layout studio in a new tab', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true });
+  res.send(dashPage('Invoices &amp; Gift Cards', 'Everything for printing invoices and gift cards.', tiles, '/'));
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
