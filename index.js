@@ -1225,7 +1225,7 @@ app.get('/supplies', (req, res) => {
   tiles += dashTile('🏪', 'Sam&#39;s Club', null, 'https://www.samsclub.com', { newTab: true });
   tiles += dashTile('🍫', 'Linnea&#39;s', 'Candy &amp; chocolate supplies', 'https://linneasinc.com', { newTab: true });
   tiles += dashTile('📦', 'Uline', null, 'https://www.uline.com', { newTab: true });
-  tiles += dashTile('🌴', 'Hialeah Products', 'Waiting on the right website from Mike', null, { soon: true, tag: 'NEED LINK' });
+  tiles += dashTile('🌴', 'Hialeah Products', null, 'https://www.newurbanfarms.com/', { newTab: true });
   tiles += dashTile('🍽️', 'WebstaurantStore', null, 'https://www.webstaurantstore.com', { newTab: true });
   res.send(dashPage('Supplies', 'Request, order, and buy supplies.', tiles, '/'));
 });
