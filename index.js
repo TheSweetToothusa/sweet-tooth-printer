@@ -1185,10 +1185,12 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
   html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:24px;margin-top:44px;justify-content:center}';
-  html += '.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;background:#fff;border:1px solid #F3E4EB;border-radius:20px;padding:28px 24px;text-decoration:none;color:#3D3D3D;text-align:center;box-shadow:0 2px 12px rgba(247,181,205,.14);transition:transform .12s,box-shadow .12s,border-color .12s}';
-  html += '.tile:hover{transform:translateY(-4px);box-shadow:0 12px 28px rgba(247,181,205,.32);border-color:#F7B5CD}';
-  html += '.icon-badge{width:58px;height:58px;border-radius:50%;background:#FDEBF2;color:#D96795;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
-  html += '.icon-badge svg{width:27px;height:27px}';
+  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:28px 24px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
+  html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
+  html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
+  html += '.tile:hover:before{opacity:1}';
+  html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
+  html += '.icon-badge svg{width:34px;height:34px}';
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
   html += '@media (max-width:760px){body{padding:36px 18px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body><div class="wrap">';
@@ -1202,7 +1204,7 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
 
 app.get('/', (req, res) => {
   var tiles = '';
-  tiles += dashTile('Order Lookup', null, { icon: 'search' });
+  tiles += dashTile('Order Lookup', '/order-lookup', { icon: 'search' });
   tiles += dashTile('Create a Draft Order', null, { icon: 'filePlus' });
   tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer' });
   tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit' });
@@ -1231,6 +1233,173 @@ app.get('/supplies/buy', (req, res) => {
   tiles += dashTile('Hialeah Products', 'https://www.newurbanfarms.com/', { newTab: true });
   tiles += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com', { newTab: true });
   res.send(dashPage('Buy Supplies', null, tiles, '/supplies'));
+});
+
+// ============ ORDER LOOKUP ============
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Parse the driver app's st_* stamps off the order tags.
+function parseDeliveryTags(order) {
+  var out = {};
+  (order.tags || '').split(',').forEach(function (raw) {
+    var t = raw.trim();
+    if (t.indexOf('st_status:') === 0) out.status = t.slice(10);
+    if (t.indexOf('st_drivername:') === 0) out.driver = t.slice(14);
+    if (t.indexOf('st_deliverydate:') === 0) out.deliveryDate = t.slice(16);
+    if (t.indexOf('st_completed:') === 0) out.completed = t.slice(13);
+  });
+  return out;
+}
+
+// st_completed timestamps store the time with dashes (2026-07-03T20-43-55.073Z) -> real ISO.
+function formatStCompleted(raw) {
+  try {
+    var parts = raw.split('T');
+    var iso = parts[0] + 'T' + parts[1].replace(/^(\d{2})-(\d{2})-/, '$1:$2:');
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return raw;
+    return d.toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  } catch (e) { return raw; }
+}
+
+function lookupShell(inner, q) {
+  var html = '<!DOCTYPE html><html><head><title>Order Lookup — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:44px 24px}';
+  html += '.wrap{max-width:760px;margin:0 auto}';
+  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#2A2A2A}';
+  html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += '.searchbar{display:flex;gap:10px;margin:30px 0}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
+  html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15.5px}.row .k{color:#9B8A92;flex-shrink:0}.row .v{font-weight:600;text-align:right}';
+  html += '.status-banner{border-radius:20px;padding:20px 24px;margin-bottom:18px;font-size:19px;font-weight:800;text-align:center;background:#fff;border:1px solid #EFEBED;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.status-banner .sub{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:6px}';
+  html += '.status-banner.delivered{border-top:5px solid #F7B5CD}';
+  html += '.item{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.item:last-child{border-bottom:none}.item .qty{font-weight:800}';
+  html += '.trackbtn{display:inline-block;margin-top:10px;padding:13px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
+  html += '.muted{color:#9B8A92;font-size:15px}';
+  html += '.err{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:26px;text-align:center;font-size:16.5px;font-weight:600}';
+  html += '</style></head><body><div class="wrap">';
+  html += '<a class="back" href="/">&larr; Back</a>';
+  html += '<h1>Order Lookup</h1>';
+  html += '<form class="searchbar" action="/order-lookup" method="get">';
+  html += '<input type="text" name="q" placeholder="Type an order number, like 36051" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<button type="submit">Look Up</button></form>';
+  html += inner;
+  html += '</div></body></html>';
+  return html;
+}
+
+app.get('/order-lookup', async (req, res) => {
+  var q = (req.query.q || '').trim();
+  if (!q) return res.send(lookupShell('', ''));
+
+  try {
+    var clean = q.replace(/[^0-9]/g, '');
+    if (!clean) return res.send(lookupShell('<div class="err">Please type an order number, like 36051.</div>', q));
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = orders.filter(function (o) { return String(o.order_number) === clean || o.name === '#' + clean; })[0] || orders[0];
+    if (!order) return res.send(lookupShell('<div class="err">No order found for &quot;' + escapeHtml(q) + '&quot;. Double-check the number.</div>', q));
+
+    var st = parseDeliveryTags(order);
+    var method = (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) || '';
+    var mLow = method.toLowerCase();
+    var isLocal = mLow.indexOf('local delivery') > -1;
+    var isPickup = mLow.indexOf('pick') > -1;
+    var trackings = (order.fulfillments || []).filter(function (f) { return f.tracking_number; });
+
+    var inner = '';
+
+    // --- Status banner ---
+    var banner = '', sub = '', delivered = false;
+    if (st.status === 'DELIVERED') {
+      delivered = true;
+      banner = '&#10004; DELIVERED';
+      sub = (st.completed ? formatStCompleted(st.completed) : '') + (st.driver ? ' &middot; by ' + escapeHtml(st.driver) : '');
+    } else if (isLocal) {
+      banner = 'NOT DELIVERED YET';
+      sub = st.deliveryDate ? 'Local delivery scheduled for ' + escapeHtml(st.deliveryDate) : 'Local delivery — no date set yet';
+      if (st.status) sub += ' &middot; status: ' + escapeHtml(st.status);
+    } else if (isPickup) {
+      banner = 'PICK UP ORDER';
+      sub = order.fulfillment_status === 'fulfilled' ? 'Marked fulfilled' : 'Waiting for customer pickup';
+    } else if (trackings.length) {
+      banner = 'SHIPPED';
+      sub = 'Tracking below' + (order.fulfillment_status ? ' &middot; Shopify: ' + escapeHtml(order.fulfillment_status) : '');
+    } else {
+      banner = 'NOT SHIPPED / NOT DELIVERED YET';
+      sub = method ? escapeHtml(method) : 'No shipping method on this order';
+    }
+    inner += '<div class="status-banner' + (delivered ? ' delivered' : '') + '">' + banner + '<span class="sub">' + sub + '</span></div>';
+
+    // --- Order details ---
+    var c = order.customer || {};
+    var custName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || (order.shipping_address && order.shipping_address.name) || '—';
+    inner += '<div class="card"><h2>Order ' + escapeHtml(order.name) + '</h2>';
+    inner += '<div class="row"><span class="k">Placed</span><span class="v">' + new Date(order.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + '</span></div>';
+    inner += '<div class="row"><span class="k">Customer</span><span class="v">' + escapeHtml(custName) + '</span></div>';
+    if (order.email) inner += '<div class="row"><span class="k">Email</span><span class="v">' + escapeHtml(order.email) + '</span></div>';
+    if (order.phone || c.phone) inner += '<div class="row"><span class="k">Phone</span><span class="v">' + escapeHtml(order.phone || c.phone) + '</span></div>';
+    inner += '<div class="row"><span class="k">Payment</span><span class="v">' + escapeHtml((order.financial_status || '—').toUpperCase()) + ' &middot; $' + escapeHtml(order.total_price) + '</span></div>';
+    if (method) inner += '<div class="row"><span class="k">Method</span><span class="v">' + escapeHtml(method) + '</span></div>';
+    inner += '</div>';
+
+    // --- Items (tips never shown — same rule as invoices) ---
+    inner += '<div class="card"><h2>Items</h2>';
+    (order.line_items || []).forEach(function (li) {
+      if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
+      inner += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
+    });
+    inner += '</div>';
+
+    // --- Address ---
+    var a = order.shipping_address;
+    if (a) {
+      inner += '<div class="card"><h2>' + (isLocal ? 'Deliver To' : (isPickup ? 'Customer' : 'Ship To')) + '</h2>';
+      inner += '<div style="font-size:15.5px;line-height:1.65">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
+      if (a.address2) inner += ', ' + escapeHtml(a.address2);
+      inner += '<br>' + escapeHtml(a.city || '') + ', ' + escapeHtml(a.province_code || '') + ' ' + escapeHtml(a.zip || '');
+      if (a.phone) inner += '<br>&#9742; ' + escapeHtml(a.phone);
+      inner += '</div></div>';
+    }
+
+    // --- UPS tracking ---
+    if (trackings.length) {
+      inner += '<div class="card"><h2>UPS Tracking</h2>';
+      trackings.forEach(function (f) {
+        var num = f.tracking_number;
+        var url = (f.tracking_urls && f.tracking_urls[0]) || f.tracking_url || ('https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(num));
+        inner += '<div class="row"><span class="k">' + escapeHtml(f.tracking_company || 'Carrier') + '</span><span class="v">' + escapeHtml(num) + '</span></div>';
+        inner += '<a class="trackbtn" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Track on UPS</a>';
+      });
+      inner += '</div>';
+    } else if (!isLocal && !isPickup) {
+      inner += '<div class="card"><h2>UPS Tracking</h2><div class="muted">No tracking number on this order yet.</div></div>';
+    }
+
+    // --- Local delivery info ---
+    if (isLocal) {
+      inner += '<div class="card"><h2>Local Delivery</h2>';
+      inner += '<div class="row"><span class="k">Delivery date</span><span class="v">' + (st.deliveryDate ? escapeHtml(st.deliveryDate) : '—') + '</span></div>';
+      inner += '<div class="row"><span class="k">Driver</span><span class="v">' + (st.driver ? escapeHtml(st.driver) : '—') + '</span></div>';
+      inner += '<div class="row"><span class="k">Delivered at</span><span class="v">' + (st.completed ? formatStCompleted(st.completed) : 'Not delivered yet') + '</span></div>';
+      inner += '</div>';
+    }
+
+    res.send(lookupShell(inner, q));
+  } catch (err) {
+    console.error('order-lookup error:', err.message);
+    res.send(lookupShell('<div class="err">Something went wrong looking that up: ' + escapeHtml(err.message) + '</div>', q));
+  }
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
