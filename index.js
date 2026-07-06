@@ -1358,7 +1358,7 @@ function lookupShell(inner, q) {
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Order Lookup</h1>';
   html += '<form class="searchbar" action="/order-lookup" method="get">';
-  html += '<input type="text" name="q" placeholder="Type an order number, like 36051" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<input type="text" name="q" placeholder="Order number, customer name, email, or phone" value="' + escapeHtml(q || '') + '" autofocus>';
   html += '<button type="submit">Look Up</button></form>';
   html += inner;
 
@@ -1393,10 +1393,49 @@ app.get('/order-lookup', async (req, res) => {
 
   try {
     var clean = q.replace(/[^0-9]/g, '');
-    if (!clean) return res.send(lookupShell('<div class="err">Please type an order number, like 36051.</div>', q));
-    var orders = await searchShopifyOrders('#' + clean);
-    var order = orders.filter(function (o) { return String(o.order_number) === clean || o.name === '#' + clean; })[0] || orders[0];
-    if (!order) return res.send(lookupShell('<div class="err">No order found for &quot;' + escapeHtml(q) + '&quot;. Double-check the number.</div>', q));
+    var hasLetters = /[a-zA-Z@]/.test(q);
+    var order = null;
+
+    if (!hasLetters && clean.length >= 4 && clean.length <= 6) {
+      // Looks like an order number.
+      var orders = await searchShopifyOrders('#' + clean);
+      order = orders.filter(function (o) { return String(o.order_number) === clean || o.name === '#' + clean; })[0] || orders[0];
+      if (!order) return res.send(lookupShell('<div class="err">No order found for &quot;' + escapeHtml(q) + '&quot;. Double-check the number.</div>', q));
+    } else {
+      // Customer search: name, email, or phone across recent orders.
+      var needle = q.toLowerCase();
+      var phoneNeedle = clean.length >= 7 ? clean : null;
+      if (!hasLetters && !phoneNeedle) return res.send(lookupShell('<div class="err">Type an order number (like 36051), a customer name, an email, or a phone number.</div>', q));
+      var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=250&fields=name,order_number,created_at,total_price,email,phone,customer,shipping_address';
+      var r = await fetch(url, { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+      if (!r.ok) throw new Error('Shopify API error: ' + r.status);
+      var digits = function (s) { return String(s || '').replace(/\D/g, ''); };
+      var matches = ((await r.json()).orders || []).filter(function (o) {
+        var c = o.customer || {};
+        var sa = o.shipping_address || {};
+        var names = (((c.first_name || '') + ' ' + (c.last_name || '')) + '|' + (sa.name || '')).toLowerCase();
+        if (hasLetters && (names.indexOf(needle) > -1 || String(o.email || '').toLowerCase().indexOf(needle) > -1)) return true;
+        if (phoneNeedle && (digits(o.phone).indexOf(phoneNeedle) > -1 || digits(c.phone).indexOf(phoneNeedle) > -1 || digits(sa.phone).indexOf(phoneNeedle) > -1)) return true;
+        return false;
+      });
+      if (!matches.length) return res.send(lookupShell('<div class="err">No orders found for &quot;' + escapeHtml(q) + '&quot; in the last 250 orders. Try another spelling, or the order number.</div>', q));
+      if (matches.length > 1) {
+        var list = '<div class="card"><h2>' + matches.length + ' orders match &quot;' + escapeHtml(q) + '&quot; — pick one</h2>';
+        matches.slice(0, 20).forEach(function (o) {
+          var c2 = o.customer || {};
+          var who = ((c2.first_name || '') + ' ' + (c2.last_name || '')).trim() || (o.shipping_address && o.shipping_address.name) || '';
+          var when = new Date(o.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' });
+          list += '<div class="phone-row"><span>' + escapeHtml(o.name) + ' &middot; ' + escapeHtml(who) + ' <span class="muted">' + when + ' &middot; $' + escapeHtml(o.total_price) + '</span></span><a href="/order-lookup?q=' + o.order_number + '">Open &rarr;</a></div>';
+        });
+        if (matches.length > 20) list += '<div class="muted" style="margin-top:10px">Showing the newest 20.</div>';
+        list += '</div>';
+        return res.send(lookupShell(list, q));
+      }
+      // Exactly one match — refetch with full details.
+      var full = await searchShopifyOrders('#' + matches[0].order_number);
+      order = full.filter(function (o) { return o.order_number === matches[0].order_number; })[0];
+      if (!order) return res.send(lookupShell('<div class="err">Found ' + escapeHtml(matches[0].name) + ' but could not load it. Try the number directly.</div>', q));
+    }
 
     var st = parseDeliveryTags(order);
     var method = (order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].title) || '';
@@ -1532,11 +1571,35 @@ app.post('/draft-order/create', async (req, res) => {
     var lineItems = items.map(function (it) {
       var qty = Math.max(1, parseInt(it.qty, 10) || 1);
       if (it.variantId) return { variant_id: it.variantId, quantity: qty };
-      return { title: String(it.title || 'Custom item'), price: String(parseFloat(it.price) || 0), quantity: qty };
+      // requires_shipping keeps Shopify from dropping a custom shipping/delivery line.
+      return { title: String(it.title || 'Custom item'), price: String(parseFloat(it.price) || 0), quantity: qty, requires_shipping: true };
     });
     var draft = { line_items: lineItems, tags: 'st_dashboard' };
     if (req.body.email) draft.email = String(req.body.email).trim();
     if (req.body.note) draft.note = String(req.body.note).trim();
+
+    var ship = req.body.shipping || {};
+    var shipPrice = parseFloat(ship.price);
+    if (!isNaN(shipPrice) && shipPrice >= 0 && (ship.price !== '' && ship.price != null)) {
+      draft.shipping_line = { title: String(ship.title || 'Shipping / Delivery'), price: shipPrice.toFixed(2), custom: true };
+    }
+
+    var disc = req.body.discount || {};
+    var discVal = parseFloat(disc.value);
+    if (!isNaN(discVal) && discVal > 0) {
+      var subtotal = items.reduce(function (s, it) {
+        return s + (parseFloat(it.price) || 0) * Math.max(1, parseInt(it.qty, 10) || 1);
+      }, 0);
+      var isPct = disc.type === 'percent';
+      var amount = isPct ? subtotal * discVal / 100 : discVal;
+      draft.applied_discount = {
+        title: String(disc.reason || 'Discount'),
+        description: String(disc.reason || 'Discount'),
+        value_type: isPct ? 'percentage' : 'fixed_amount',
+        value: String(discVal),
+        amount: amount.toFixed(2)
+      };
+    }
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders.json', {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
@@ -1547,13 +1610,34 @@ app.post('/draft-order/create', async (req, res) => {
     var d = j.draft_order;
     res.json({
       ok: true,
+      id: d.id,
       name: d.name,
       total: d.total_price,
+      hasEmail: !!d.email,
       adminUrl: 'https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/draft_orders/' + d.id,
       invoiceUrl: d.invoice_url || null
     });
   } catch (e) {
     console.error('draft-order create error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Email the Shopify invoice (pay link) to the customer on the draft.
+app.post('/draft-order/send-invoice', async (req, res) => {
+  try {
+    var id = String(req.body.id || '').replace(/\D/g, '');
+    if (!id) return res.status(400).json({ error: 'Missing draft order id.' });
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + id + '/send_invoice.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_order_invoice: {} })
+    });
+    var j = await r.json();
+    if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+    res.json({ ok: true, to: (j.draft_order_invoice && j.draft_order_invoice.to) || null });
+  } catch (e) {
+    console.error('send-invoice error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });
@@ -1602,8 +1686,15 @@ app.get('/draft-order', (req, res) => {
 
   html += '<div class="card"><h2>Order Items</h2><div id="cart"><div class="muted">Nothing added yet.</div></div><div class="total-row" id="totalrow" style="display:none"><span>Total</span><span id="total"></span></div></div>';
 
+  html += '<div class="card"><h2>Shipping or Delivery (optional)</h2>';
+  html += '<div class="inline"><input type="text" id="shiptitle" placeholder="Name it, like &quot;Local Delivery&quot; or &quot;UPS 2nd Day&quot;"><input class="price" type="number" id="shipprice" min="0" step="0.01" placeholder="$ price"></div>';
+  html += '<div class="muted" style="margin-top:10px">Tip: get the local price from the ZIP box on Order Lookup.</div></div>';
+
+  html += '<div class="card"><h2>Discount (optional)</h2>';
+  html += '<div class="inline" style="flex-wrap:wrap"><input class="price" type="number" id="discval" min="0" step="0.01" placeholder="Amount"><select id="disctype" style="width:120px;flex-shrink:0;padding:13px 10px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:15px;background:#fff"><option value="fixed">$ off</option><option value="percent">% off</option></select><input type="text" id="discreason" style="min-width:220px;flex:1" placeholder="Reason, like &quot;Manager comp&quot;"></div></div>';
+
   html += '<div class="card"><h2>Customer (optional)</h2>';
-  html += '<div class="inline"><input type="email" id="cemail" placeholder="Customer email"></div>';
+  html += '<div class="inline"><input type="email" id="cemail" placeholder="Customer email (needed to email the invoice)"></div>';
   html += '<div style="margin-top:10px"><input type="text" id="cnote" placeholder="Note on the order"></div></div>';
 
   html += '<button class="btn btn-big" id="createbtn" onclick="createDraft()">Create Draft Order in Shopify</button>';
@@ -1633,11 +1724,18 @@ app.get('/draft-order', (req, res) => {
   html += 'function addVariant(json){var v=JSON.parse(json);showErr("");cart.push({title:v.label,qty:1,price:parseFloat(v.price)||0,variantId:v.id});renderCart()}';
   html += 'document.getElementById("psearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchProducts()}});';
   html += 'async function createDraft(){if(!cart.length){showErr("Add at least one item first.");return}showErr("");var btn=document.getElementById("createbtn");btn.disabled=true;btn.textContent="Creating\\u2026";';
-  html += 'try{var r=await fetch("/draft-order/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart,email:document.getElementById("cemail").value.trim(),note:document.getElementById("cnote").value.trim()})});';
+  html += 'try{var payload={items:cart,email:document.getElementById("cemail").value.trim(),note:document.getElementById("cnote").value.trim(),';
+  html += 'shipping:{title:document.getElementById("shiptitle").value.trim(),price:document.getElementById("shipprice").value},';
+  html += 'discount:{value:document.getElementById("discval").value,type:document.getElementById("disctype").value,reason:document.getElementById("discreason").value.trim()}};';
+  html += 'var r=await fetch("/draft-order/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});';
   html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server error");';
   html += 'document.getElementById("form-area").style.display="none";';
-  html += 'var d=document.getElementById("done");d.innerHTML=\'<div class="card success"><div class="big">&#10004; Draft \'+esc(j.name)+\' created</div><div class="muted">Total $\'+esc(j.total)+\' &middot; sitting in Shopify as a draft</div><a href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">Open in Shopify</a>\'+(j.invoiceUrl?\'<a href="\'+esc(j.invoiceUrl)+\'" target="_blank" rel="noopener">Customer Pay Link</a>\':"")+\'<br><a href="/draft-order" style="background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5">Start Another</a></div>\';}';
+  html += 'var d=document.getElementById("done");d.innerHTML=\'<div class="card success"><div class="big">&#10004; Draft \'+esc(j.name)+\' created</div><div class="muted">Total $\'+esc(j.total)+\' &middot; sitting in Shopify as a draft</div><a href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">Open in Shopify</a>\'+(j.invoiceUrl?\'<a href="\'+esc(j.invoiceUrl)+\'" target="_blank" rel="noopener">Customer Pay Link</a>\':"")+(j.hasEmail?\'<a href="#" id="sendinv" onclick="sendInvoice(\'+j.id+\');return false">Email Invoice to Customer</a>\':\'<div class="muted" style="margin-top:12px">No email on this draft &mdash; add one next time to email the invoice from here.</div>\')+\'<br><a href="/draft-order" style="background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5">Start Another</a></div>\';}';
   html += 'catch(e){showErr("Could not create the draft order: "+e.message);btn.disabled=false;btn.textContent="Create Draft Order in Shopify"}}';
+  html += 'async function sendInvoice(id){var b=document.getElementById("sendinv");b.textContent="Sending\\u2026";';
+  html += 'try{var r=await fetch("/draft-order/send-invoice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})});var j=await r.json();';
+  html += 'if(!r.ok||j.error)throw new Error(j.error||"Server error");b.textContent="\\u2714 Invoice emailed"+(j.to?" to "+j.to:"");b.onclick=function(){return false}}';
+  html += 'catch(e){b.textContent="Email Invoice to Customer";showErr("Could not email the invoice: "+e.message)}}';
   html += '</script>';
   html += '</div></body></html>';
   res.send(html);
