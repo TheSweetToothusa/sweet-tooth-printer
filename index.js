@@ -1161,6 +1161,11 @@ var DASH_ICONS = {
   hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>'
 };
 
+// Sticky top bar shown on every dashboard page — wordmark always goes home.
+var TOPBAR_HTML = '<header class="topbar"><a href="/">The Sweet Tooth</a></header>';
+var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
+  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;border-bottom:2.5px solid #F7B5CD;padding-bottom:1px}';
+
 function dashTile(label, href, opts) {
   opts = opts || {};
   var html = '<a class="tile" href="' + (href || '#') + '"';
@@ -1178,9 +1183,9 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:48px 28px}';
-  html += '.wrap{width:100%;max-width:1080px;margin:0 auto}';
-  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#3D3D3D}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;padding:100px 28px 48px}';
+  html += '.wrap{width:100%;max-width:1080px;margin:auto}';
+  html += TOPBAR_CSS;
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
@@ -1192,9 +1197,8 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
   html += '.icon-badge svg{width:34px;height:34px}';
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
-  html += '@media (max-width:760px){body{padding:36px 18px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
-  html += '</style></head><body><div class="wrap">';
-  if (backHref) html += '<a class="back" href="' + backHref + '">&larr; Back</a>';
+  html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
   html += '<div class="grid">' + tilesHtml + '</div>';
@@ -1231,11 +1235,70 @@ app.get('/supplies/buy', (req, res) => {
   tiles += dashTile('Linnea&#39;s', 'https://linneasinc.com', { newTab: true });
   tiles += dashTile('Uline', 'https://www.uline.com', { newTab: true });
   tiles += dashTile('Hialeah Products', 'https://www.newurbanfarms.com/', { newTab: true });
-  tiles += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com', { newTab: true });
+  tiles += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com/myaccount/orders', { newTab: true });
   res.send(dashPage('Buy Supplies', null, tiles, '/supplies'));
 });
 
 // ============ ORDER LOOKUP ============
+
+// Local delivery fees by ZIP — copied verbatim from the driver app's src/constants.ts
+// (DELIVERY_FEES). If prices change there, update here too.
+var DELIVERY_FEES = {
+  "33004": 25, "33131": 25, "33196": 65,
+  "33008": 20, "33132": 25, "33301": 25,
+  "33009": 20, "33133": 25, "33302": 30,
+  "33010": 25, "33134": 25, "33304": 25,
+  "33011": 25, "33135": 25, "33305": 30,
+  "33012": 25, "33136": 25, "33306": 30,
+  "33013": 25, "33137": 20, "33307": 30,
+  "33014": 25, "33138": 20, "33308": 30,
+  "33015": 25, "33139": 25, "33309": 30,
+  "33016": 25, "33140": 20, "33311": 30,
+  "33018": 25, "33141": 20, "33312": 25,
+  "33019": 20, "33142": 25, "33313": 30,
+  "33020": 20, "33143": 30, "33314": 25,
+  "33021": 20, "33144": 30, "33315": 25,
+  "33022": 20, "33145": 25, "33316": 25,
+  "33023": 20, "33146": 25, "33317": 30,
+  "33024": 20, "33147": 20, "33319": 35,
+  "33025": 20, "33149": 30, "33320": 35,
+  "33026": 25, "33150": 20, "33321": 30,
+  "33027": 25, "33154": 20, "33322": 30,
+  "33028": 25, "33155": 30, "33323": 25,
+  "33029": 30, "33156": 35, "33324": 30,
+  "33030": 65, "33157": 50, "33325": 30,
+  "33031": 65, "33158": 40, "33326": 30,
+  "33032": 65, "33159": 30, "33327": 25,
+  "33033": 65, "33160": 15, "33328": 25,
+  "33034": 65, "33161": 20, "33330": 30,
+  "33035": 65, "33162": 15, "33331": 30,
+  "33039": 65, "33165": 35, "33332": 30,
+  "33054": 20, "33166": 30, "33334": 30,
+  "33055": 20, "33167": 20, "33351": 25,
+  "33056": 20, "33168": 20, "33394": 65,
+  "33060": 30, "33169": 20, "33426": 50,
+  "33062": 30, "33170": 65, "33428": 50,
+  "33063": 35, "33172": 30, "33431": 50,
+  "33064": 35, "33173": 35, "33432": 50,
+  "33065": 40, "33175": 35, "33433": 50,
+  "33066": 35, "33176": 35, "33434": 65,
+  "33067": 40, "33177": 65, "33435": 65,
+  "33068": 35, "33178": 30, "33436": 65,
+  "33069": 30, "33179": 15, "33437": 40,
+  "33071": 35, "33180": 15, "33441": 40,
+  "33073": 40, "33181": 20, "33442": 55,
+  "33076": 40, "33182": 35, "33444": 55,
+  "33101": 25, "33183": 40, "33445": 65,
+  "33109": 40, "33184": 35, "33446": 65,
+  "33122": 30, "33185": 40, "33472": 65,
+  "33124": 25, "33186": 40, "33473": 55,
+  "33125": 25, "33187": 65, "33484": 50,
+  "33126": 30, "33189": 65, "33486": 55,
+  "33127": 20, "33190": 65, "33487": 55,
+  "33128": 25, "33192": 40, "33496": 55,
+  "33129": 25, "33193": 40, "33498": 30,
+  "33130": 25, "33194": 40
+};
 
 function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -1270,9 +1333,9 @@ function lookupShell(inner, q) {
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:44px 24px}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:96px 24px 44px}';
   html += '.wrap{max-width:760px;margin:0 auto}';
-  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#2A2A2A}';
+  html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.searchbar{display:flex;gap:10px;margin:30px 0}';
@@ -1288,13 +1351,38 @@ function lookupShell(inner, q) {
   html += '.trackbtn{display:inline-block;margin-top:10px;padding:13px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
   html += '.muted{color:#9B8A92;font-size:15px}';
   html += '.err{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:26px;text-align:center;font-size:16.5px;font-weight:600}';
-  html += '</style></head><body><div class="wrap">';
-  html += '<a class="back" href="/">&larr; Back</a>';
+  html += '.toolout{margin-top:12px;font-size:22px;font-weight:800;text-align:center}';
+  html += '.toolout .miss{font-size:15px;font-weight:600;color:#9B8A92}';
+  html += '.phone-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.phone-row:last-child{border-bottom:none}';
+  html += '.phone-row a{font-weight:800;color:#2A2A2A;text-decoration:none}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Order Lookup</h1>';
   html += '<form class="searchbar" action="/order-lookup" method="get">';
   html += '<input type="text" name="q" placeholder="Type an order number, like 36051" value="' + escapeHtml(q || '') + '" autofocus>';
   html += '<button type="submit">Look Up</button></form>';
   html += inner;
+
+  // --- Quick tools: zip fee, UPS tracking, phones ---
+  html += '<div class="card"><h2>Local Delivery Price by ZIP</h2>';
+  html += '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div>';
+  html += '<div class="toolout" id="zipout"></div></div>';
+
+  html += '<div class="card"><h2>UPS Tracking</h2>';
+  html += '<div class="searchbar" style="margin:0"><input type="text" id="upsin" placeholder="Paste a UPS tracking number"><button type="button" onclick="upsTrack()">Track on UPS</button></div></div>';
+
+  html += '<div class="card"><h2>Phone Numbers</h2>';
+  html += '<div class="phone-row"><span>UPS</span><a href="tel:18007425877">1-800-742-5877</a></div>';
+  html += '<div class="phone-row"><span>Bernard (our UPS driver)</span><a href="tel:9545942577">(954) 594-2577</a></div></div>';
+
+  html += '<script>';
+  html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
+  html += 'function zipFee(){var z=(document.getElementById("zipin").value||"").replace(/\\D/g,"").slice(0,5);var o=document.getElementById("zipout");';
+  html += 'if(z.length<5){o.innerHTML=\'<span class="miss">Type a 5-digit ZIP code.</span>\';return}';
+  html += 'if(FEES[z]!=null){o.textContent="$"+FEES[z]}else{o.innerHTML=\'<span class="miss">\'+z+\' is not in our local delivery table.</span>\'}}';
+  html += 'document.getElementById("zipin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();zipFee()}});';
+  html += 'function upsTrack(){var n=(document.getElementById("upsin").value||"").trim();if(!n)return;window.open("https://www.ups.com/track?loc=en_US&tracknum="+encodeURIComponent(n),"_blank")}';
+  html += 'document.getElementById("upsin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();upsTrack()}});';
+  html += '</script>';
   html += '</div></body></html>';
   return html;
 }
@@ -1475,9 +1563,9 @@ app.get('/draft-order', (req, res) => {
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:44px 24px}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:96px 24px 44px}';
   html += '.wrap{max-width:760px;margin:0 auto}';
-  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#2A2A2A}';
+  html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 30px}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
@@ -1499,8 +1587,7 @@ app.get('/draft-order', (req, res) => {
   html += '.success .big{font-size:22px;font-weight:800;margin-bottom:6px}';
   html += '.success a{display:inline-block;margin:14px 6px 0;padding:14px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
   html += '.errbox{background:#fff;border:1.5px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:18px;font-weight:600;display:none}';
-  html += '</style></head><body><div class="wrap">';
-  html += '<a class="back" href="/">&larr; Back</a>';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Create a Draft Order</h1>';
   html += '<div id="errbox" class="errbox"></div>';
   html += '<div id="form-area">';
