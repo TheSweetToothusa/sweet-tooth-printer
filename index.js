@@ -1205,7 +1205,7 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
 app.get('/', (req, res) => {
   var tiles = '';
   tiles += dashTile('Order Lookup', '/order-lookup', { icon: 'search' });
-  tiles += dashTile('Create a Draft Order', null, { icon: 'filePlus' });
+  tiles += dashTile('Create a Draft Order', '/draft-order', { icon: 'filePlus' });
   tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer', newTab: true });
   tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit', newTab: true });
   tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift', newTab: true });
@@ -1400,6 +1400,160 @@ app.get('/order-lookup', async (req, res) => {
     console.error('order-lookup error:', err.message);
     res.send(lookupShell('<div class="err">Something went wrong looking that up: ' + escapeHtml(err.message) + '</div>', q));
   }
+});
+
+// ============ CREATE A DRAFT ORDER ============
+
+// Diagnostic: does this app's token have draft-order permission?
+app.get('/draft-order/scope-check', async (req, res) => {
+  try {
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/oauth/access_scopes.json',
+      { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    var handles = ((await r.json()).access_scopes || []).map(function (s) { return s.handle; });
+    res.json({ canCreateDraftOrders: handles.indexOf('write_draft_orders') > -1, draftScopes: handles.filter(function (h) { return h.indexOf('draft') > -1; }) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Product search for the picker (server-side substring filter on active products).
+app.get('/draft-order/products', async (req, res) => {
+  try {
+    var q = (req.query.q || '').trim().toLowerCase();
+    if (q.length < 2) return res.json({ products: [] });
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/products.json?status=active&limit=250&fields=id,title,variants';
+    var r = await fetch(url, { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    if (!r.ok) throw new Error('Shopify API error: ' + r.status);
+    var products = ((await r.json()).products || []).filter(function (p) {
+      return (p.title || '').toLowerCase().indexOf(q) > -1;
+    }).slice(0, 12).map(function (p) {
+      return {
+        title: p.title,
+        variants: (p.variants || []).map(function (v) {
+          return { id: v.id, title: v.title === 'Default Title' ? '' : v.title, price: v.price };
+        })
+      };
+    });
+    res.json({ products: products });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// Create the draft order in Shopify.
+app.post('/draft-order/create', async (req, res) => {
+  try {
+    var items = req.body.items || [];
+    if (!items.length) return res.status(400).json({ error: 'No items on the order.' });
+    var lineItems = items.map(function (it) {
+      var qty = Math.max(1, parseInt(it.qty, 10) || 1);
+      if (it.variantId) return { variant_id: it.variantId, quantity: qty };
+      return { title: String(it.title || 'Custom item'), price: String(parseFloat(it.price) || 0), quantity: qty };
+    });
+    var draft = { line_items: lineItems, tags: 'st_dashboard' };
+    if (req.body.email) draft.email = String(req.body.email).trim();
+    if (req.body.note) draft.note = String(req.body.note).trim();
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_order: draft })
+    });
+    var j = await r.json();
+    if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+    var d = j.draft_order;
+    res.json({
+      ok: true,
+      name: d.name,
+      total: d.total_price,
+      adminUrl: 'https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/draft_orders/' + d.id,
+      invoiceUrl: d.invoice_url || null
+    });
+  } catch (e) {
+    console.error('draft-order create error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/draft-order', (req, res) => {
+  var html = '<!DOCTYPE html><html><head><title>Create a Draft Order — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:44px 24px}';
+  html += '.wrap{max-width:760px;margin:0 auto}';
+  html += '.back{display:inline-block;font-size:15px;font-weight:700;color:#9B8A92;text-decoration:none;margin-bottom:20px}.back:hover{color:#2A2A2A}';
+  html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 30px}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:14px}';
+  html += 'input{padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:16px;background:#fff;width:100%}input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.inline{display:flex;gap:10px}.inline input.qty{width:86px;flex-shrink:0}.inline input.price{width:120px;flex-shrink:0}';
+  html += '.btn{padding:13px 22px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;flex-shrink:0}';
+  html += '.btn:disabled{opacity:.4;cursor:default}';
+  html += '.btn-big{width:100%;padding:18px;font-size:18px;border-radius:14px;margin-top:4px}';
+  html += '.result{margin-top:10px}';
+  html += '.hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid #F5F1F3;font-size:15px}.hit:last-child{border-bottom:none}';
+  html += '.hit .add{padding:8px 16px;font-size:13.5px;border-radius:9px}';
+  html += '.cart-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.cart-row:last-child{border-bottom:none}';
+  html += '.cart-row .t{flex:1;font-weight:600}.cart-row input.q{width:70px;padding:8px;text-align:center}.cart-row .p{width:90px;text-align:right;font-weight:700}';
+  html += '.cart-row .x{background:none;border:none;color:#C94F7C;font-size:20px;font-weight:800;cursor:pointer;padding:4px 8px}';
+  html += '.total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:800;padding-top:14px}';
+  html += '.muted{color:#9B8A92;font-size:14.5px}';
+  html += '.success{border-top:5px solid #F7B5CD;text-align:center;padding:30px 24px}';
+  html += '.success .big{font-size:22px;font-weight:800;margin-bottom:6px}';
+  html += '.success a{display:inline-block;margin:14px 6px 0;padding:14px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
+  html += '.errbox{background:#fff;border:1.5px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:18px;font-weight:600;display:none}';
+  html += '</style></head><body><div class="wrap">';
+  html += '<a class="back" href="/">&larr; Back</a>';
+  html += '<h1>Create a Draft Order</h1>';
+  html += '<div id="errbox" class="errbox"></div>';
+  html += '<div id="form-area">';
+
+  html += '<div class="card"><h2>Add From the Store</h2>';
+  html += '<div class="inline"><input type="text" id="psearch" placeholder="Search products, like &quot;pretzel&quot;"><button class="btn" onclick="searchProducts()">Search</button></div>';
+  html += '<div class="result" id="presults"></div></div>';
+
+  html += '<div class="card"><h2>Quick Add — Manual Item</h2>';
+  html += '<div class="inline"><input type="text" id="mtitle" placeholder="Item name, like &quot;Menu item&quot;"><input class="qty" type="number" id="mqty" min="1" value="1" placeholder="Qty"><input class="price" type="number" id="mprice" min="0" step="0.01" placeholder="$ each"><button class="btn" onclick="addManual()">Add</button></div>';
+  html += '<div class="muted" style="margin-top:10px">Example: 30 &times; $8 &rarr; type the name, qty 30, price 8.</div></div>';
+
+  html += '<div class="card"><h2>Order Items</h2><div id="cart"><div class="muted">Nothing added yet.</div></div><div class="total-row" id="totalrow" style="display:none"><span>Total</span><span id="total"></span></div></div>';
+
+  html += '<div class="card"><h2>Customer (optional)</h2>';
+  html += '<div class="inline"><input type="email" id="cemail" placeholder="Customer email"></div>';
+  html += '<div style="margin-top:10px"><input type="text" id="cnote" placeholder="Note on the order"></div></div>';
+
+  html += '<button class="btn btn-big" id="createbtn" onclick="createDraft()">Create Draft Order in Shopify</button>';
+  html += '<div class="muted" style="text-align:center;margin:12px 0 40px">This makes a DRAFT — nothing is charged and no invoice prints.</div>';
+  html += '</div>';
+  html += '<div id="done"></div>';
+
+  html += '<script>';
+  html += 'var cart = [];';
+  html += 'function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}';
+  html += 'function showErr(m){var b=document.getElementById("errbox");b.textContent=m;b.style.display=m?"block":"none";if(m)window.scrollTo(0,0)}';
+  html += 'function renderCart(){var el=document.getElementById("cart");if(!cart.length){el.innerHTML=\'<div class="muted">Nothing added yet.</div>\';document.getElementById("totalrow").style.display="none";return}';
+  html += 'var h="";cart.forEach(function(it,i){h+=\'<div class="cart-row"><span class="t">\'+esc(it.title)+\'</span><input class="q" type="number" min="1" value="\'+it.qty+\'" onchange="setQty(\'+i+\',this.value)"><span class="p">$\'+(it.price*it.qty).toFixed(2)+\'</span><button class="x" onclick="removeItem(\'+i+\')" title="Remove">&times;</button></div>\'});';
+  html += 'el.innerHTML=h;var tot=cart.reduce(function(s,it){return s+it.price*it.qty},0);document.getElementById("total").textContent="$"+tot.toFixed(2);document.getElementById("totalrow").style.display="flex"}';
+  html += 'function setQty(i,v){cart[i].qty=Math.max(1,parseInt(v,10)||1);renderCart()}';
+  html += 'function removeItem(i){cart.splice(i,1);renderCart()}';
+  html += 'function addManual(){var t=document.getElementById("mtitle").value.trim();var q=Math.max(1,parseInt(document.getElementById("mqty").value,10)||1);var p=parseFloat(document.getElementById("mprice").value);';
+  html += 'if(!t){showErr("Type a name for the manual item.");return}if(isNaN(p)||p<0){showErr("Type a price for the manual item.");return}showErr("");';
+  html += 'cart.push({title:t,qty:q,price:p});document.getElementById("mtitle").value="";document.getElementById("mqty").value=1;document.getElementById("mprice").value="";renderCart()}';
+  html += 'async function searchProducts(){var q=document.getElementById("psearch").value.trim();var out=document.getElementById("presults");if(q.length<2){out.innerHTML=\'<div class="muted" style="padding-top:8px">Type at least 2 letters.</div>\';return}';
+  html += 'out.innerHTML=\'<div class="muted" style="padding-top:8px">Searching&hellip;</div>\';';
+  html += 'try{var r=await fetch("/draft-order/products?q="+encodeURIComponent(q));var j=await r.json();if(j.error)throw new Error(j.error);';
+  html += 'if(!j.products.length){out.innerHTML=\'<div class="muted" style="padding-top:8px">No products found.</div>\';return}';
+  html += 'var h="";j.products.forEach(function(p){p.variants.forEach(function(v){var label=p.title+(v.title?" — "+v.title:"");';
+  html += 'h+=\'<div class="hit"><span>\'+esc(label)+\' <span class="muted">$\'+esc(v.price)+\'</span></span><button class="btn add" onclick=\\\'addVariant(\'+JSON.stringify(JSON.stringify({id:v.id,label:label,price:v.price}))+\')\\\'>Add</button></div>\'})});';
+  html += 'out.innerHTML=h}catch(e){out.innerHTML="";showErr("Product search failed: "+e.message)}}';
+  html += 'function addVariant(json){var v=JSON.parse(json);showErr("");cart.push({title:v.label,qty:1,price:parseFloat(v.price)||0,variantId:v.id});renderCart()}';
+  html += 'document.getElementById("psearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchProducts()}});';
+  html += 'async function createDraft(){if(!cart.length){showErr("Add at least one item first.");return}showErr("");var btn=document.getElementById("createbtn");btn.disabled=true;btn.textContent="Creating\\u2026";';
+  html += 'try{var r=await fetch("/draft-order/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({items:cart,email:document.getElementById("cemail").value.trim(),note:document.getElementById("cnote").value.trim()})});';
+  html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server error");';
+  html += 'document.getElementById("form-area").style.display="none";';
+  html += 'var d=document.getElementById("done");d.innerHTML=\'<div class="card success"><div class="big">&#10004; Draft \'+esc(j.name)+\' created</div><div class="muted">Total $\'+esc(j.total)+\' &middot; sitting in Shopify as a draft</div><a href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">Open in Shopify</a>\'+(j.invoiceUrl?\'<a href="\'+esc(j.invoiceUrl)+\'" target="_blank" rel="noopener">Customer Pay Link</a>\':"")+\'<br><a href="/draft-order" style="background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5">Start Another</a></div>\';}';
+  html += 'catch(e){showErr("Could not create the draft order: "+e.message);btn.disabled=false;btn.textContent="Create Draft Order in Shopify"}}';
+  html += '</script>';
+  html += '</div></body></html>';
+  res.send(html);
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
