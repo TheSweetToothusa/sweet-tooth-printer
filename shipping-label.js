@@ -195,7 +195,7 @@ async function buyLabelForOrder(order) {
 
   // Safety cap: don't auto-buy if Shippo's label is more than $CAP over what the customer paid.
   // (Free-shipping orders, where the customer paid $0, are intentionally absorbed — no cap.)
-  var CAP = parseFloat(process.env.LABEL_PRICE_CAP || '5');
+  var CAP = parseFloat(process.env.LABEL_PRICE_CAP || '15');
   var customerPaid = parseFloat((order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].price) || 0);
   if (customerPaid > 0 && parseFloat(rate.amount) > customerPaid + CAP) {
     return {
