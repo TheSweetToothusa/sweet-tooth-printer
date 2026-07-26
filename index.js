@@ -1220,7 +1220,8 @@ var DASH_ICONS = {
   box: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
   mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
   cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
-  hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>'
+  hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
+  truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
@@ -1273,6 +1274,7 @@ app.get('/', (req, res) => {
   tiles += dashTile('Order Lookup', '/order-lookup', { icon: 'search' });
   tiles += dashTile('Create a Draft Order', '/draft-order', { icon: 'filePlus' });
   tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer', newTab: true });
+  tiles += dashTile('Reprint Shipping Label', '/reprint-label', { icon: 'truck' });
   tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit', newTab: true });
   tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift', newTab: true });
   tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
@@ -1801,6 +1803,76 @@ app.get('/draft-order', (req, res) => {
   html += '</script>';
   html += '</div></body></html>';
   res.send(html);
+});
+
+// ============ REPRINT SHIPPING LABEL (one-click employee page) ============
+// Re-sends a label that was ALREADY bought in Shippo. It never buys, so it can't double-charge.
+function reprintShell(inner, q, pstate) {
+  var online = pstate === 'online';
+  var html = '<!DOCTYPE html><html><head><title>Reprint Shipping Label — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:96px 24px 44px}';
+  html += '.wrap{max-width:640px;margin:0 auto}';
+  html += TOPBAR_CSS;
+  html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += '.pill{display:flex;align-items:center;justify-content:center;gap:9px;font-size:14.5px;font-weight:700;background:#fff;border:1px solid #EFEBED;border-radius:14px;padding:12px 16px;margin:28px 0 0}';
+  html += '.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}.dot.ok{background:#2E9E5B}.dot.bad{background:#C4423A}';
+  html += '.searchbar{display:flex;gap:10px;margin:16px 0 18px}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
+  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>Reprint Shipping Label</h1>';
+  html += '<div class="pill"><span class="dot ' + (online ? 'ok' : 'bad') + '"></span>' +
+    (online ? 'Label printer is online' : 'Label printer is ' + escapeHtml(pstate) + ' &mdash; it will print when it reconnects') + '</div>';
+  html += '<form class="searchbar" action="/reprint-label" method="get">';
+  html += '<input type="text" name="order" inputmode="numeric" placeholder="Order number, like 36226" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<button type="submit">Reprint Label</button></form>';
+  html += inner;
+  html += '<div class="hint">This reprints the label that was already bought for the order.<br>It never buys a new one, so it can&#39;t charge you twice.</div>';
+  html += '</div></body></html>';
+  return html;
+}
+
+app.get('/reprint-label', async (req, res) => {
+  var q = (req.query.order || '').trim();
+  var pstate = await printerState(CONFIG.printNode.labelPrinterId);
+  if (!q) return res.send(reprintShell('', '', pstate));
+  try {
+    var clean = q.replace(/[^0-9]/g, '');
+    if (!clean) return res.send(reprintShell('<div class="note">Type an order number, like 36226.</div>', q, pstate));
+
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = (orders || []).filter(function (o) { return String(o.order_number) === clean || o.name === '#' + clean; })[0];
+    if (!order) return res.send(reprintShell('<div class="note"><div class="big">Order not found</div>Nothing matches &quot;' + escapeHtml(q) + '&quot;. Double-check the number.</div>', q, pstate));
+
+    var trk = null;
+    (order.fulfillments || []).forEach(function (f) { if (f.tracking_number) trk = f.tracking_number; });
+    if (!trk) {
+      return res.send(reprintShell('<div class="note"><div class="big">No label to reprint</div>' + escapeHtml(order.name) +
+        ' doesn&#39;t have a shipping label yet.<div class="muted">Nothing was printed and nothing was charged. Buy the label the usual way first.</div></div>', q, pstate));
+    }
+
+    var lab = await reprintLabelByTracking(trk);
+    await sendToPrintNode(lab.labelBase64, CONFIG.printNode.labelPrinterId, 'REPRINT ' + order.name);
+    delete queuedWhileOffline[order.name];
+
+    res.send(reprintShell('<div class="note good"><div class="big">&#10004; Label sent to the printer</div>' +
+      escapeHtml(order.name) + ' &middot; ' + escapeHtml(trk) +
+      '<div class="muted">No charge &mdash; this is the label that was already bought.' +
+      (pstate === 'online' ? '' : '<br>The printer is ' + escapeHtml(pstate) + ' right now, so it will come out once it reconnects.') +
+      '</div></div>', q, pstate));
+  } catch (e) {
+    res.send(reprintShell('<div class="note"><div class="big">Couldn&#39;t reprint</div>' + escapeHtml(e.message) +
+      '<div class="muted">Nothing was charged.</div></div>', q, pstate));
+  }
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
