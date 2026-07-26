@@ -6,7 +6,7 @@ const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { extractOrderData, generateInvoiceHTML } = require('./order-utils');
 const { generateGiftCardHTML } = require('./gift-card-template');
-const { buyLabelForOrder } = require('./shipping-label');
+const { buyLabelForOrder, reprintLabelByTracking } = require('./shipping-label');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -125,6 +125,22 @@ async function sendToPrintNode(pdfBase64, printerId, title, jobOptions) {
   console.log('PrintNode SUCCESS - Job ID:', result);
   return result;
 }
+
+// PrintNode reports a printer's live state ("online" when the PC + printer are connected & ready).
+async function printerState(printerId) {
+  try {
+    var r = await fetch('https://api.printnode.com/printers/' + printerId, {
+      headers: { 'Authorization': 'Basic ' + Buffer.from(CONFIG.printNode.apiKey + ':').toString('base64') }
+    });
+    if (!r.ok) return 'unknown';
+    var arr = await r.json();
+    var p = Array.isArray(arr) ? arr[0] : arr;
+    return (p && p.state) ? p.state : 'unknown';
+  } catch (e) { return 'error'; }
+}
+
+// Orders whose label was sent while the printer was NOT online (so it may not have come out).
+var queuedWhileOffline = {};
 
 function isInStoreOrder(order) {
   var sourceName = (order.source_name || '').toLowerCase();
@@ -266,8 +282,13 @@ async function printShippingLabel(order) {
     }
     return label;
   }
+  var pstate = await printerState(CONFIG.printNode.labelPrinterId);
   await sendToPrintNode(label.labelBase64, CONFIG.printNode.labelPrinterId, 'Label ' + orderName);
-  console.log('✓ Label printed for', orderName, '-', label.carrier, label.service, '$' + label.amount, 'track', label.tracking);
+  if (pstate !== 'online') {
+    queuedWhileOffline[orderName] = { tracking: label.tracking, printerState: pstate };
+    console.log('  ⚠ label sent but printer was', pstate, '- may NOT have printed. Order', orderName, 'tracking', label.tracking);
+  }
+  console.log('✓ Label printed for', orderName, '-', label.carrier, label.service, '$' + label.amount, 'track', label.tracking, '(printer:', pstate + ')');
   // Write the tracking back to Shopify so the order shows it + the customer is notified once.
   try {
     await writeTrackingToShopify(order, label);
@@ -324,10 +345,31 @@ app.get('/dashboard/label-status', async function (req, res) {
     shippoMode: tok.indexOf('shippo_live_') === 0 ? 'LIVE' : (tok.indexOf('shippo_test_') === 0 ? 'TEST' : 'unknown'),
     canWriteTrackingToShopify: canFulfill,
     fulfillmentScopes: fulfillScopes,
+    labelPrinterState: await printerState(CONFIG.printNode.labelPrinterId),
+    queuedWhilePrinterOffline: Object.keys(queuedWhileOffline).length ? queuedWhileOffline : 'none',
     ordersSeenInMemory: recentOrders.length,
     recentOrderNames: recentOrders.slice(0, 8).map(function (o) { return o.order.name; }),
     labelsAttempted: Object.keys(labeledOrderIds).length
   });
+});
+
+// Reprint an ALREADY-BOUGHT label to the label printer (no re-charge). Use this instead of
+// print-label when a label was bought but didn't physically print. Pass the order number, e.g. /dashboard/reprint/36226
+app.get('/dashboard/reprint/:name', async (req, res) => {
+  try {
+    var orders = await searchShopifyOrders(req.params.name);
+    var order = orders && orders[0];
+    if (!order) return res.status(404).send('Order ' + req.params.name + ' not found');
+    var trk = null;
+    (order.fulfillments || []).forEach(function (f) { if (f.tracking_number) trk = f.tracking_number; });
+    if (!trk) return res.status(400).send('No tracking on ' + order.name + ' — no bought label to reprint. Use /dashboard/print-label to buy one.');
+    var lab = await reprintLabelByTracking(trk);
+    var pstate = await printerState(CONFIG.printNode.labelPrinterId);
+    await sendToPrintNode(lab.labelBase64, CONFIG.printNode.labelPrinterId, 'REPRINT ' + order.name);
+    if (order.name) delete queuedWhileOffline[order.name];
+    res.send('<p style="font:16px sans-serif">Re-sent label <b>' + trk + '</b> for ' + order.name + ' to the printer — <b>no charge</b>.<br>Printer state: <b>' + pstate + '</b>' +
+      (pstate !== 'online' ? ' ⚠️ printer looks OFFLINE — it will print once it reconnects.' : ' ✓') + '</p>');
+  } catch (e) { res.status(500).send('<p style="font:16px sans-serif;color:#b00">Reprint error: ' + e.message + '</p>'); }
 });
 
 // Manual trigger: open in browser to buy+print a label for one order.

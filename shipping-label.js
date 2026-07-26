@@ -227,4 +227,17 @@ async function buyLabelForOrder(order) {
   };
 }
 
-module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz };
+// Re-fetch an already-purchased label's PDF from Shippo by its tracking number (no new purchase).
+async function reprintLabelByTracking(tracking) {
+  if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
+  var res = await fetch('https://api.goshippo.com/transactions/?results=100', {
+    headers: { 'Authorization': 'ShippoToken ' + SHIPPO_TOKEN }
+  });
+  var data = await res.json();
+  var txns = (data && data.results) || [];
+  var match = txns.filter(function (t) { return t.tracking_number === tracking && t.label_url; })[0];
+  if (!match) throw new Error('No Shippo label found for tracking ' + tracking + ' (older than the last 100 labels?)');
+  return { labelBase64: await urlToBase64(match.label_url), tracking: tracking };
+}
+
+module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking };
