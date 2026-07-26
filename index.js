@@ -353,6 +353,26 @@ app.get('/dashboard/label-status', async function (req, res) {
   });
 });
 
+// Deep PrintNode diagnostic: printer + computer state, and recent print jobs with their states.
+app.get('/dashboard/printnode-debug', async (req, res) => {
+  try {
+    var auth = 'Basic ' + Buffer.from(CONFIG.printNode.apiKey + ':').toString('base64');
+    var pr = await fetch('https://api.printnode.com/printers/' + CONFIG.printNode.labelPrinterId, { headers: { Authorization: auth } });
+    var parr = await pr.json(); var p = Array.isArray(parr) ? parr[0] : parr;
+    var jr = await fetch('https://api.printnode.com/printjobs?limit=15', { headers: { Authorization: auth } });
+    var jobs = await jr.json();
+    res.json({
+      labelPrinter: p ? {
+        name: p.name, state: p.state,
+        computer: p.computer ? { name: p.computer.name, state: p.computer.state } : null
+      } : 'not found',
+      recentJobs: (Array.isArray(jobs) ? jobs : []).map(function (j) {
+        return { id: j.id, title: j.title, state: j.state, printer: j.printer && j.printer.name, created: j.createTimestamp };
+      })
+    });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // Reprint an ALREADY-BOUGHT label to the label printer (no re-charge). Use this instead of
 // print-label when a label was bought but didn't physically print. Pass the order number, e.g. /dashboard/reprint/36226
 app.get('/dashboard/reprint/:name', async (req, res) => {
