@@ -2022,7 +2022,7 @@ app.get('/switch-shipping', async (req, res) => {
           '<div class="owe-sub">The Shippo refund was for <b>our</b> label cost &mdash; the customer has NOT been charged or refunded anything.<br>' +
           'They paid $' + paidNow.toFixed(2) + ' for shipping at checkout; the new ' + escapeHtml(lab.service) + ' label is $' + escapeHtml(lab.amount) + ' + 10%.</div>' +
           '<a class="paybtn" href="/switch-shipping/collect?order=' + encodeURIComponent(clean) + '&amount=' + oweNow.toFixed(2) + '&svc=' + encodeURIComponent(lab.service) + '" ' +
-          'onclick="return confirm(\'Email the customer a Shopify pay link for $' + oweNow.toFixed(2) + '?\')">Email $' + oweNow.toFixed(2) + ' pay link through Shopify</a></div>';
+          'onclick="return confirm(\'Create a $' + oweNow.toFixed(2) + ' upgrade invoice for ' + escapeHtml(order.name) + ' in Shopify? (Nothing is emailed yet.)\')">Create $' + oweNow.toFixed(2) + ' invoice in Shopify</a></div>';
       } else {
         oweHtml = '<div class="note"><div class="big">No extra charge to the customer</div>They already paid $' + paidNow.toFixed(2) + ' for shipping, which covers the new $' + escapeHtml(lab.amount) + ' label.</div>';
       }
@@ -2070,7 +2070,6 @@ app.get('/switch-shipping/collect', async (req, res) => {
     var orders = await searchShopifyOrders('#' + clean);
     var order = (orders || []).filter(function (o) { return String(o.order_number) === clean; })[0];
     if (!order) return res.send(switchShell('<div class="note"><div class="big">Order not found</div>Nothing matches #' + escapeHtml(clean) + '.</div>', clean));
-    if (!order.email) return res.send(switchShell('<div class="note"><div class="big">No email on this order</div>Create the $' + amount.toFixed(2) + ' invoice by hand in Shopify &rarr; Drafts and take payment over the phone.</div>', clean));
 
     var draft = {
       line_items: [{
@@ -2079,10 +2078,10 @@ app.get('/switch-shipping/collect', async (req, res) => {
         quantity: 1,
         requires_shipping: false
       }],
-      email: order.email,
       note: 'Shipping speed upgrade for order ' + order.name + ' (difference + 10%). Created from the Change Shipping Speed dashboard.',
       tags: 'st_dashboard, shipping-upgrade'
     };
+    if (order.email) draft.email = order.email;
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders.json', {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
@@ -2092,21 +2091,43 @@ app.get('/switch-shipping/collect', async (req, res) => {
     if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
     var d = j.draft_order;
     var adminUrl = 'https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/draft_orders/' + d.id;
+    upgradeInvoicesSent[key] = adminUrl;
 
-    var si = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + d.id + '/send_invoice.json', {
+    var inner = '<div class="note good"><div class="big">&#10004; Invoice ' + escapeHtml(d.name) + ' created &mdash; $' + amount.toFixed(2) + '</div>' +
+      'Now collect it one of two ways:' +
+      '<div class="muted" style="margin:16px 0 6px"><b>Over the phone:</b> open it in Shopify and use <i>Collect payment &rarr; Enter credit card</i>.</div>' +
+      '<a class="paybtn" style="background:#2A2A2A" href="' + adminUrl + '" target="_blank" rel="noopener">Open in Shopify (phone payment)</a>' +
+      '<div class="muted" style="margin:18px 0 6px"><b>Or by email:</b> send them Shopify&#39;s pay link &mdash; when they pay, it completes automatically.</div>' +
+      (order.email
+        ? '<a class="paybtn" href="/switch-shipping/email-invoice?draft=' + d.id + '&order=' + encodeURIComponent(clean) + '" onclick="return confirm(\'Email the $' + amount.toFixed(2) + ' pay link to ' + escapeHtml(order.email) + '?\')">Email pay link to ' + escapeHtml(order.email) + '</a>'
+        : '<div class="muted">No email on this order &mdash; phone payment only.</div>') +
+      '</div>';
+    res.send(switchShell(inner, clean));
+  } catch (e) {
+    res.send(switchShell('<div class="note"><div class="big">Couldn&#39;t create the invoice</div>' + escapeHtml(e.message) + '</div>', String(req.query.order || '')));
+  }
+});
+
+// Email the pay link for a draft created above. Separate click so phone-payment drafts never email.
+var invoiceEmailsSent = {};
+app.get('/switch-shipping/email-invoice', async (req, res) => {
+  try {
+    var did = String(req.query.draft || '').replace(/\D/g, '');
+    var clean = String(req.query.order || '').replace(/[^0-9]/g, '');
+    if (!did) return res.send(switchShell('<div class="note">Bad email link.</div>', clean));
+    if (invoiceEmailsSent[did]) return res.send(switchShell('<div class="note"><div class="big">Already emailed</div>The pay link for this invoice was already sent to ' + escapeHtml(invoiceEmailsSent[did]) + '.</div>', clean));
+    var si = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + did + '/send_invoice.json', {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ draft_order_invoice: {} })
     });
     var sj = await si.json();
-    if (!si.ok || sj.errors) throw new Error('Draft ' + d.name + ' created but the email failed: ' + JSON.stringify(sj.errors || sj) + ' — open it in Shopify and send the invoice from there.');
-    upgradeInvoicesSent[key] = adminUrl;
-
-    res.send(switchShell('<div class="note good"><div class="big">&#10004; Pay link emailed</div>' +
-      '$' + amount.toFixed(2) + ' invoice (' + escapeHtml(d.name) + ') sent to ' + escapeHtml((sj.draft_order_invoice && sj.draft_order_invoice.to) || order.email) + ' for order ' + escapeHtml(order.name) +
-      '<div class="muted">When they pay, it completes in Shopify automatically. <a href="' + adminUrl + '" target="_blank" rel="noopener">Open the draft</a></div></div>', clean));
+    if (!si.ok || sj.errors) throw new Error(JSON.stringify(sj.errors || sj));
+    var to = (sj.draft_order_invoice && sj.draft_order_invoice.to) || 'the customer';
+    invoiceEmailsSent[did] = to;
+    res.send(switchShell('<div class="note good"><div class="big">&#10004; Pay link emailed</div>Sent to ' + escapeHtml(to) + '. When they pay, the invoice completes in Shopify automatically.</div>', clean));
   } catch (e) {
-    res.send(switchShell('<div class="note"><div class="big">Couldn&#39;t send the invoice</div>' + escapeHtml(e.message) + '</div>', String(req.query.order || '')));
+    res.send(switchShell('<div class="note"><div class="big">Email failed</div>' + escapeHtml(e.message) + '<div class="muted">Open the draft in Shopify and send the invoice from there.</div></div>', String(req.query.order || '')));
   }
 });
 
