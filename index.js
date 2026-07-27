@@ -1222,7 +1222,8 @@ var DASH_ICONS = {
   cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
   hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
   truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
-  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  percent: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>'
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
@@ -1278,6 +1279,7 @@ app.get('/', (req, res) => {
   tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer', newTab: true });
   tiles += dashTile('Reprint Shipping Label', '/reprint-label', { icon: 'truck' });
   tiles += dashTile('Change Shipping Speed', '/switch-shipping', { icon: 'zap' });
+  tiles += dashTile('Create a Discount Code', '/create-discount', { icon: 'percent' });
   tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit', newTab: true });
   tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift', newTab: true });
   tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
@@ -2128,6 +2130,104 @@ app.get('/switch-shipping/email-invoice', async (req, res) => {
     res.send(switchShell('<div class="note good"><div class="big">&#10004; Pay link emailed</div>Sent to ' + escapeHtml(to) + '. When they pay, the invoice completes in Shopify automatically.</div>', clean));
   } catch (e) {
     res.send(switchShell('<div class="note"><div class="big">Email failed</div>' + escapeHtml(e.message) + '<div class="muted">Open the draft in Shopify and send the invoice from there.</div></div>', String(req.query.order || '')));
+  }
+});
+
+// ============ CREATE A DISCOUNT CODE (Shopify price rule + code, employee-friendly) ============
+function discountShell(inner, vals) {
+  vals = vals || {};
+  var html = '<!DOCTYPE html><html><head><title>Create a Discount Code — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:96px 24px 44px}';
+  html += '.wrap{max-width:640px;margin:0 auto}';
+  html += TOPBAR_CSS;
+  html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:24px;margin:28px 0 18px}';
+  html += '.field{margin-bottom:16px}.field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:6px}';
+  html += '.field input,.field select{width:100%;padding:14px 16px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.field input:focus,.field select:focus{outline:none;border-color:#F7B5CD}';
+  html += '.row2{display:flex;gap:12px}.row2 .field{flex:1}';
+  html += '.gobtn{width:100%;padding:16px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16.5px;font-weight:800;cursor:pointer}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
+  html += '.note .code{font-size:34px;font-weight:800;letter-spacing:2px;background:#FAF7F8;border:1.5px dashed #E8C7D3;border-radius:12px;padding:14px;margin:12px 0}';
+  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>Create a Discount Code</h1>';
+  html += inner;
+  html += '<div class="card"><form action="/create-discount" method="get" onsubmit="return checkDisc(this)">';
+  html += '<div class="field"><label>Code (leave blank to auto-generate)</label><input type="text" name="code" placeholder="e.g. SORRY20" value="' + escapeHtml(vals.code || '') + '" style="text-transform:uppercase"></div>';
+  html += '<div class="row2">';
+  html += '<div class="field"><label>Type</label><select name="type"><option value="percentage">% off</option><option value="fixed_amount">$ off</option></select></div>';
+  html += '<div class="field"><label>Amount</label><input type="number" name="value" step="0.01" min="0.01" placeholder="e.g. 20" required></div>';
+  html += '</div>';
+  html += '<div class="row2">';
+  html += '<div class="field"><label>Minimum order $ (optional)</label><input type="number" name="min" step="0.01" min="0" placeholder="none"></div>';
+  html += '<div class="field"><label>Expires (optional)</label><input type="date" name="ends"></div>';
+  html += '</div>';
+  html += '<input type="hidden" name="create" value="1">';
+  html += '<button class="gobtn" type="submit">Create Discount Code</button>';
+  html += '</form></div>';
+  html += '<div class="hint">Creates a real code in Shopify (all products, all customers, unlimited uses unless it expires).<br>Manage or delete codes anytime in Shopify &rarr; Discounts.</div>';
+  html += '<script>function checkDisc(f){var v=parseFloat(f.value.value);if(!(v>0)){alert("Enter the discount amount.");return false}';
+  html += 'if(f.type.value==="percentage"&&v>100){alert("Percent can\\u2019t be over 100.");return false}';
+  html += 'var c=(f.code.value||"auto-generated").toUpperCase();return confirm("Create code "+c+" for "+(f.type.value==="percentage"?v+"% off":"$"+v.toFixed(2)+" off")+"?")}</script>';
+  html += '</div></body></html>';
+  return html;
+}
+
+var discountCodesMade = {};
+app.get('/create-discount', async (req, res) => {
+  if (req.query.create !== '1') return res.send(discountShell(''));
+  try {
+    var type = req.query.type === 'fixed_amount' ? 'fixed_amount' : 'percentage';
+    var value = parseFloat(req.query.value);
+    if (!(value > 0) || (type === 'percentage' && value > 100)) return res.send(discountShell('<div class="note">Enter a valid amount.</div>'));
+    var code = String(req.query.code || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (!code) code = 'SWEET-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    if (discountCodesMade[code]) {
+      return res.send(discountShell('<div class="note"><div class="big">Already created</div>' + escapeHtml(code) + ' was just created &mdash; it&#39;s live. Make a different code if you need another.</div>'));
+    }
+    var rule = {
+      title: code,
+      target_type: 'line_item', target_selection: 'all', allocation_method: 'across',
+      customer_selection: 'all',
+      value_type: type,
+      value: '-' + value.toFixed(2),
+      starts_at: new Date().toISOString()
+    };
+    var min = parseFloat(req.query.min);
+    if (min > 0) rule.prerequisite_subtotal_range = { greater_than_or_equal_to: min.toFixed(2) };
+    if (req.query.ends) rule.ends_at = req.query.ends + 'T23:59:59-04:00';
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/price_rules.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ price_rule: rule })
+    });
+    var j = await r.json();
+    if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+    var pr = j.price_rule;
+    var cr = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/price_rules/' + pr.id + '/discount_codes.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ discount_code: { code: code } })
+    });
+    var cj = await cr.json();
+    if (!cr.ok || cj.errors) throw new Error('Rule created but the code failed: ' + JSON.stringify(cj.errors || cj));
+    discountCodesMade[code] = true;
+
+    var what = type === 'percentage' ? value + '% off' : '$' + value.toFixed(2) + ' off';
+    res.send(discountShell('<div class="note good"><div class="big">&#10004; Code is live</div>' +
+      '<div class="code">' + escapeHtml(code) + '</div>' + escapeHtml(what) +
+      (min > 0 ? ' &middot; orders $' + min.toFixed(2) + '+' : '') +
+      (req.query.ends ? ' &middot; expires ' + escapeHtml(req.query.ends) : ' &middot; never expires') +
+      '<div class="muted">Give this code to the customer &mdash; it works at checkout right now.<br><a href="https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/discounts" target="_blank" rel="noopener">Manage in Shopify &rarr; Discounts</a></div></div>'));
+  } catch (e) {
+    res.send(discountShell('<div class="note"><div class="big">Couldn&#39;t create it</div>' + escapeHtml(e.message) + '</div>'));
   }
 });
 
