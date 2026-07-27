@@ -2000,6 +2000,18 @@ app.get('/switch-shipping', async (req, res) => {
       } catch (te) {
         steps += '&#9888; Could not update Shopify tracking automatically (' + escapeHtml(te.message) + ') &mdash; new tracking is ' + escapeHtml(lab.tracking) + ', update the order by hand.';
       }
+      // Stamp a note on the order so nobody is confused by the original checkout shipping line.
+      try {
+        var when = new Date().toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' });
+        var noteLine = 'SHIPPING SWITCHED ' + when + ': now ' + lab.carrier + ' ' + lab.service + ' — tracking ' + lab.tracking +
+          (trk ? ' (old label ' + trk + ' voided in Shippo)' : '') + '. Checkout line still shows the original service; that is just what the customer paid.';
+        await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders/' + order.id + '.json', {
+          method: 'PUT',
+          headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order: { id: order.id, note: (order.note ? order.note + '\n\n' : '') + noteLine } })
+        });
+        steps += '<br>&#10004; Note stamped on the order';
+      } catch (ne) { /* note is nice-to-have; don't fail the switch over it */ }
       // --- What the customer owes (big, red, unmissable) ---
       var paidNow = parseFloat((order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].price) || 0);
       var oweNow = upgradeCharge(lab.amount, paidNow);
