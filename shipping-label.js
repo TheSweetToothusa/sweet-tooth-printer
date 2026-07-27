@@ -266,4 +266,49 @@ async function quoteRatesForOrder(order) {
   });
 }
 
-module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking, quoteRatesForOrder };
+// Request a refund (void) for an unused label, found by its tracking number.
+// Shippo/UPS only refund labels that were never scanned; the refund posts back in a few days.
+async function voidLabelByTracking(tracking) {
+  if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
+  var res = await fetch('https://api.goshippo.com/transactions/?results=100', {
+    headers: { 'Authorization': 'ShippoToken ' + SHIPPO_TOKEN }
+  });
+  var data = await res.json();
+  var match = ((data && data.results) || []).filter(function (t) { return t.tracking_number === tracking; })[0];
+  if (!match) throw new Error('No Shippo label found for tracking ' + tracking);
+  var refund = await shippo('/refunds/', { transaction: match.object_id, async: false });
+  return { status: refund.status, amount: match.rate && match.rate.amount };
+}
+
+// Buy a label for a SPECIFIC service the human just picked (used by Change Shipping Speed).
+// No price cap here — the price was shown on screen and confirmed before this runs.
+async function buyLabelWithService(order, serviceToken) {
+  if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
+  var parcel = buildParcel(order);
+  var shipment = await shippo('/shipments/', {
+    address_from: STORE_ADDRESS,
+    address_to: shippoAddressFromOrder(order),
+    parcels: [{
+      length: String(parcel.box[0]), width: String(parcel.box[1]), height: String(parcel.box[2]),
+      distance_unit: 'in',
+      weight: String(parcel.weightOz), mass_unit: 'oz'
+    }],
+    async: false
+  });
+  var match = (shipment.rates || []).filter(function (r) { return r.servicelevel && r.servicelevel.token === serviceToken; });
+  if (!match.length) throw new Error('Service "' + serviceToken + '" is not available for this address');
+  match.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
+  var rate = match[0];
+  var txn = await shippo('/transactions/', { rate: rate.object_id, label_file_type: 'PDF_4x6', async: false });
+  if (txn.status !== 'SUCCESS') throw new Error('Shippo transaction failed: ' + JSON.stringify(txn.messages || txn));
+  return {
+    labelBase64: await urlToBase64(txn.label_url),
+    tracking: txn.tracking_number,
+    trackingUrl: txn.tracking_url_provider || null,
+    carrier: rate.provider,
+    service: rate.servicelevel && rate.servicelevel.name,
+    amount: rate.amount
+  };
+}
+
+module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService };

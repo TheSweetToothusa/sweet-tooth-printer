@@ -6,7 +6,7 @@ const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { extractOrderData, generateInvoiceHTML } = require('./order-utils');
 const { generateGiftCardHTML } = require('./gift-card-template');
-const { buyLabelForOrder, reprintLabelByTracking, quoteRatesForOrder } = require('./shipping-label');
+const { buyLabelForOrder, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService } = require('./shipping-label');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1221,7 +1221,8 @@ var DASH_ICONS = {
   mail: '<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>',
   cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
   hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
-  truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>'
+  truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
@@ -1275,6 +1276,7 @@ app.get('/', (req, res) => {
   tiles += dashTile('Create a Draft Order', '/draft-order', { icon: 'filePlus' });
   tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer', newTab: true });
   tiles += dashTile('Reprint Shipping Label', '/reprint-label', { icon: 'truck' });
+  tiles += dashTile('Change Shipping Speed', '/switch-shipping', { icon: 'zap' });
   tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit', newTab: true });
   tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift', newTab: true });
   tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
@@ -1885,6 +1887,117 @@ app.get('/reprint-label', async (req, res) => {
   } catch (e) {
     res.send(reprintShell('<div class="note"><div class="big">Couldn&#39;t reprint</div>' + escapeHtml(e.message) +
       '<div class="muted">Nothing was charged.</div></div>', q, pstate));
+  }
+});
+
+// ============ CHANGE SHIPPING SPEED (void old label -> buy new service -> print -> fix tracking) ============
+function switchShell(inner, q) {
+  var html = '<!DOCTYPE html><html><head><title>Change Shipping Speed — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:96px 24px 44px}';
+  html += '.wrap{max-width:640px;margin:0 auto}';
+  html += TOPBAR_CSS;
+  html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += '.searchbar{display:flex;gap:10px;margin:28px 0 18px}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
+  html += '.rate-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.rate-row:last-child{border-bottom:none}';
+  html += '.rate-row .svc{font-weight:700}.rate-row .eta{color:#9B8A92;font-size:13.5px;font-weight:600}';
+  html += '.rate-row a{flex-shrink:0;padding:10px 18px;background:#2A2A2A;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;font-size:14.5px}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
+  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.steps{text-align:left;font-size:15px;font-weight:600;line-height:2}';
+  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>Change Shipping Speed</h1>';
+  html += '<form class="searchbar" action="/switch-shipping" method="get">';
+  html += '<input type="text" name="order" inputmode="numeric" placeholder="Order number, like 36229" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<button type="submit">Show Prices</button></form>';
+  html += inner;
+  html += '<div class="hint">Picking a new speed refunds the old unused label and buys the new one.<br>The customer is emailed their new tracking number automatically.</div>';
+  html += '</div></body></html>';
+  return html;
+}
+
+// Update the tracking number on an order's EXISTING fulfillment (order already fulfilled once).
+async function updateTrackingOnFulfillment(order, label) {
+  var f = (order.fulfillments || []).filter(function (x) { return x.status === 'success'; }).pop();
+  if (!f) throw new Error('No fulfillment on ' + order.name + ' to update');
+  var res = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/fulfillments/' + f.id + '/update_tracking.json', {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fulfillment: {
+      notify_customer: true,
+      tracking_info: { number: label.tracking, company: label.carrier, url: label.trackingUrl || undefined }
+    } })
+  });
+  var j = await res.json();
+  if (!res.ok || j.errors) throw new Error(JSON.stringify(j.errors || j));
+}
+
+app.get('/switch-shipping', async (req, res) => {
+  var q = (req.query.order || '').trim();
+  if (!q) return res.send(switchShell('', ''));
+  try {
+    var clean = q.replace(/[^0-9]/g, '');
+    if (!clean) return res.send(switchShell('<div class="note">Type an order number, like 36229.</div>', q));
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = (orders || []).filter(function (o) { return String(o.order_number) === clean; })[0];
+    if (!order) return res.send(switchShell('<div class="note"><div class="big">Order not found</div>Nothing matches &quot;' + escapeHtml(q) + '&quot;.</div>', q));
+
+    var trk = null;
+    (order.fulfillments || []).forEach(function (f) { if (f.tracking_number) trk = f.tracking_number; });
+
+    // ---- EXECUTE (came from a Switch button; guard against refresh double-buys) ----
+    if (req.query.token && req.query.confirm === '1') {
+      if ((req.query.from || 'none') !== (trk || 'none')) {
+        return res.send(switchShell('<div class="note"><div class="big">Already switched</div>This order&#39;s label has changed since that page was loaded. Look it up again to see the current state.</div>', q));
+      }
+      var steps = '';
+      var voidNote = '';
+      if (trk) {
+        var v = await voidLabelByTracking(trk);
+        voidNote = '&#10004; Old label ' + escapeHtml(trk) + ' refund requested (' + escapeHtml(v.status || 'submitted') + (v.amount ? ', $' + escapeHtml(v.amount) + ' coming back' : '') + ')<br>';
+      }
+      var lab = await buyLabelWithService(order, req.query.token);
+      steps += voidNote;
+      steps += '&#10004; New label bought: ' + escapeHtml(lab.carrier + ' ' + lab.service) + ' &mdash; $' + escapeHtml(lab.amount) + '<br>';
+      var pstate = await printerState(CONFIG.printNode.labelPrinterId);
+      await sendToPrintNode(lab.labelBase64, CONFIG.printNode.labelPrinterId, 'SWITCH ' + order.name);
+      steps += '&#10004; Sent to the label printer' + (pstate === 'online' ? '' : ' (printer is ' + escapeHtml(pstate) + ' &mdash; prints when it reconnects)') + '<br>';
+      try {
+        await updateTrackingOnFulfillment(order, lab);
+        steps += '&#10004; Customer emailed the new tracking: ' + escapeHtml(lab.tracking);
+      } catch (te) {
+        steps += '&#9888; Could not update Shopify tracking automatically (' + escapeHtml(te.message) + ') &mdash; new tracking is ' + escapeHtml(lab.tracking) + ', update the order by hand.';
+      }
+      return res.send(switchShell('<div class="note good"><div class="big">&#10004; ' + escapeHtml(order.name) + ' switched</div><div class="steps">' + steps + '</div></div>', q));
+    }
+
+    // ---- SHOW current label + rate options ----
+    var cur = (order.shipping_lines && order.shipping_lines[0]) || {};
+    var inner = '<div class="card"><h2>' + escapeHtml(order.name) + ' &mdash; current shipping</h2>';
+    inner += '<div class="rate-row"><span><span class="svc">' + escapeHtml(cur.title || 'Unknown') + '</span><br><span class="eta">Customer paid $' + escapeHtml(cur.price || '0') + (trk ? ' &middot; label ' + escapeHtml(trk) : ' &middot; no label bought yet') + '</span></span></div></div>';
+
+    var rates = await quoteRatesForOrder(order);
+    rates.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
+    inner += '<div class="card"><h2>Switch to</h2>';
+    rates.forEach(function (r) {
+      var eta = r.estimatedDays ? (r.estimatedDays + ' day' + (r.estimatedDays > 1 ? 's' : '')) : '';
+      inner += '<div class="rate-row"><span><span class="svc">' + escapeHtml(r.carrier + ' ' + r.service) + '</span><br><span class="eta">$' + escapeHtml(r.amount) + (eta ? ' &middot; ' + eta : '') + '</span></span>';
+      inner += '<a href="/switch-shipping?order=' + encodeURIComponent(clean) + '&token=' + encodeURIComponent(r.token) + '&from=' + encodeURIComponent(trk || 'none') + '&confirm=1" onclick="return confirm(\'Switch ' + escapeHtml(order.name) + ' to ' + escapeHtml(r.carrier + ' ' + r.service) + ' for $' + escapeHtml(r.amount) + '?' + (trk ? ' The old label will be refunded.' : '') + '\')">Switch</a></div>';
+    });
+    inner += '</div>';
+    res.send(switchShell(inner, q));
+  } catch (e) {
+    res.send(switchShell('<div class="note"><div class="big">Couldn&#39;t switch</div>' + escapeHtml(e.message) + '</div>', q));
   }
 });
 
