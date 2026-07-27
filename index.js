@@ -1242,7 +1242,7 @@ function dashTile(label, href, opts) {
   return html;
 }
 
-function dashPage(title, subtitle, tilesHtml, backHref) {
+function dashPage(title, subtitle, tilesHtml, backHref, notice) {
   var html = '<!DOCTYPE html><html><head><title>' + title + ' — The Sweet Tooth</title>';
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
@@ -1265,6 +1265,7 @@ function dashPage(title, subtitle, tilesHtml, backHref) {
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
+  if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
   html += '<div class="grid">' + tilesHtml + '</div>';
   html += '</div></body></html>';
   return html;
@@ -1282,7 +1283,14 @@ app.get('/', (req, res) => {
   tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
   tiles += dashTile('Supplies', '/supplies', { icon: 'box' });
   tiles += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true, icon: 'mail' });
-  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, tiles));
+  // One-off hold notice for #36229 — auto-disappears after Thursday July 30, 2026 (ET).
+  var notice = null;
+  var nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  if (nowET < new Date('2026-07-31T00:00:00')) {
+    notice = '&#128230; HOLD Order <b>#36229</b> &mdash; do NOT ship before <b>THURSDAY July 30</b>.<br>' +
+      'The overnight label is already printed &mdash; keep it with the order paperwork. Ships Thursday, arrives Friday.';
+  }
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, tiles, null, notice));
 });
 
 app.get('/supplies', (req, res) => {
