@@ -6,7 +6,7 @@ const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { extractOrderData, generateInvoiceHTML } = require('./order-utils');
 const { generateGiftCardHTML } = require('./gift-card-template');
-const { buyLabelForOrder, reprintLabelByTracking } = require('./shipping-label');
+const { buyLabelForOrder, reprintLabelByTracking, quoteRatesForOrder } = require('./shipping-label');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1840,6 +1840,19 @@ function reprintShell(inner, q, pstate) {
   html += '</div></body></html>';
   return html;
 }
+
+// Read-only rate quote for an order (JSON). Never buys a label, never charges anything.
+app.get('/dashboard/rate-quote/:name', async (req, res) => {
+  try {
+    var clean = String(req.params.name).replace(/[^0-9]/g, '');
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = (orders || []).filter(function (o) { return String(o.order_number) === clean; })[0];
+    if (!order) return res.status(404).json({ error: 'Order ' + clean + ' not found' });
+    var rates = await quoteRatesForOrder(order);
+    rates.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
+    res.json({ order: order.name, rates: rates });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.get('/reprint-label', async (req, res) => {
   var q = (req.query.order || '').trim();

@@ -240,4 +240,30 @@ async function reprintLabelByTracking(tracking) {
   return { labelBase64: await urlToBase64(match.label_url), tracking: tracking };
 }
 
-module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking };
+// Read-only: quote all available rates for an order's parcel. Creates a Shippo shipment
+// (free) but never buys a transaction, so it cannot charge anything.
+async function quoteRatesForOrder(order) {
+  if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
+  var parcel = buildParcel(order);
+  var shipment = await shippo('/shipments/', {
+    address_from: STORE_ADDRESS,
+    address_to: shippoAddressFromOrder(order),
+    parcels: [{
+      length: String(parcel.box[0]), width: String(parcel.box[1]), height: String(parcel.box[2]),
+      distance_unit: 'in',
+      weight: String(parcel.weightOz), mass_unit: 'oz'
+    }],
+    async: false
+  });
+  return (shipment.rates || []).map(function (r) {
+    return {
+      carrier: r.provider,
+      service: r.servicelevel && r.servicelevel.name,
+      token: r.servicelevel && r.servicelevel.token,
+      amount: r.amount,
+      estimatedDays: r.estimated_days
+    };
+  });
+}
+
+module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking, quoteRatesForOrder };
