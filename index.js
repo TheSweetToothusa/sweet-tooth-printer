@@ -1923,6 +1923,12 @@ function switchShell(inner, q) {
   html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
   html += '.steps{text-align:left;font-size:15px;font-weight:600;line-height:2}';
   html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '.owe-inline{color:#C4423A;font-weight:800;font-size:13.5px}';
+  html += '.owe{background:#fff;border:1px solid #EFEBED;border-top:6px solid #C4423A;border-radius:20px;padding:26px 24px;margin-bottom:18px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.owe-title{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#C4423A}';
+  html += '.owe .amt{font-size:46px;font-weight:800;color:#C4423A;margin:8px 0 2px}';
+  html += '.owe-sub{color:#6B5B62;font-size:14.5px;font-weight:600;line-height:1.6;margin:10px 0 18px}';
+  html += '.paybtn{display:inline-block;padding:14px 26px;background:#C4423A;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;font-size:15.5px}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Change Shipping Speed</h1>';
   html += '<form class="searchbar" action="/switch-shipping" method="get">';
@@ -1932,6 +1938,14 @@ function switchShell(inner, q) {
   html += '<div class="hint">Picking a new speed refunds the old unused label and buys the new one.<br>The customer is emailed their new tracking number automatically.</div>';
   html += '</div></body></html>';
   return html;
+}
+
+// What the customer owes for an upgrade: (new label cost - what they paid at checkout) + 10%.
+// Never negative — a cheaper label just means no extra charge (we don't refund the difference here).
+function upgradeCharge(newAmount, customerPaid) {
+  var diff = parseFloat(newAmount) - parseFloat(customerPaid || 0);
+  if (!(diff > 0.009)) return 0;
+  return Math.round(diff * 1.10 * 100) / 100;
 }
 
 // Update the tracking number on an order's EXISTING fulfillment (order already fulfilled once).
@@ -1986,7 +2000,21 @@ app.get('/switch-shipping', async (req, res) => {
       } catch (te) {
         steps += '&#9888; Could not update Shopify tracking automatically (' + escapeHtml(te.message) + ') &mdash; new tracking is ' + escapeHtml(lab.tracking) + ', update the order by hand.';
       }
-      return res.send(switchShell('<div class="note good"><div class="big">&#10004; ' + escapeHtml(order.name) + ' switched</div><div class="steps">' + steps + '</div></div>', q));
+      // --- What the customer owes (big, red, unmissable) ---
+      var paidNow = parseFloat((order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].price) || 0);
+      var oweNow = upgradeCharge(lab.amount, paidNow);
+      var oweHtml;
+      if (oweNow > 0) {
+        oweHtml = '<div class="owe"><div class="owe-title">&#128222; Call the customer &mdash; they owe</div>' +
+          '<div class="amt">$' + oweNow.toFixed(2) + '</div>' +
+          '<div class="owe-sub">The Shippo refund was for <b>our</b> label cost &mdash; the customer has NOT been charged or refunded anything.<br>' +
+          'They paid $' + paidNow.toFixed(2) + ' for shipping at checkout; the new ' + escapeHtml(lab.service) + ' label is $' + escapeHtml(lab.amount) + ' + 10%.</div>' +
+          '<a class="paybtn" href="/switch-shipping/collect?order=' + encodeURIComponent(clean) + '&amount=' + oweNow.toFixed(2) + '&svc=' + encodeURIComponent(lab.service) + '" ' +
+          'onclick="return confirm(\'Email the customer a Shopify pay link for $' + oweNow.toFixed(2) + '?\')">Email $' + oweNow.toFixed(2) + ' pay link through Shopify</a></div>';
+      } else {
+        oweHtml = '<div class="note"><div class="big">No extra charge to the customer</div>They already paid $' + paidNow.toFixed(2) + ' for shipping, which covers the new $' + escapeHtml(lab.amount) + ' label.</div>';
+      }
+      return res.send(switchShell('<div class="note good"><div class="big">&#10004; ' + escapeHtml(order.name) + ' switched</div><div class="steps">' + steps + '</div></div>' + oweHtml, q));
     }
 
     // ---- SHOW current label + rate options ----
@@ -1994,18 +2022,79 @@ app.get('/switch-shipping', async (req, res) => {
     var inner = '<div class="card"><h2>' + escapeHtml(order.name) + ' &mdash; current shipping</h2>';
     inner += '<div class="rate-row"><span><span class="svc">' + escapeHtml(cur.title || 'Unknown') + '</span><br><span class="eta">Customer paid $' + escapeHtml(cur.price || '0') + (trk ? ' &middot; label ' + escapeHtml(trk) : ' &middot; no label bought yet') + '</span></span></div></div>';
 
+    var paid = parseFloat((order.shipping_lines && order.shipping_lines[0] && order.shipping_lines[0].price) || 0);
     var rates = await quoteRatesForOrder(order);
     rates.sort(function (a, b) { return parseFloat(a.amount) - parseFloat(b.amount); });
     inner += '<div class="card"><h2>Switch to</h2>';
     rates.forEach(function (r) {
       var eta = r.estimatedDays ? (r.estimatedDays + ' day' + (r.estimatedDays > 1 ? 's' : '')) : '';
-      inner += '<div class="rate-row"><span><span class="svc">' + escapeHtml(r.carrier + ' ' + r.service) + '</span><br><span class="eta">$' + escapeHtml(r.amount) + (eta ? ' &middot; ' + eta : '') + '</span></span>';
-      inner += '<a href="/switch-shipping?order=' + encodeURIComponent(clean) + '&token=' + encodeURIComponent(r.token) + '&from=' + encodeURIComponent(trk || 'none') + '&confirm=1" onclick="return confirm(\'Switch ' + escapeHtml(order.name) + ' to ' + escapeHtml(r.carrier + ' ' + r.service) + ' for $' + escapeHtml(r.amount) + '?' + (trk ? ' The old label will be refunded.' : '') + '\')">Switch</a></div>';
+      var owe = upgradeCharge(r.amount, paid);
+      var oweTxt = owe > 0
+        ? '<span class="owe-inline">customer owes +$' + owe.toFixed(2) + '</span>'
+        : '<span class="eta">no extra charge</span>';
+      inner += '<div class="rate-row"><span><span class="svc">' + escapeHtml(r.carrier + ' ' + r.service) + '</span><br><span class="eta">$' + escapeHtml(r.amount) + (eta ? ' &middot; ' + eta : '') + ' &middot; </span>' + oweTxt + '</span>';
+      inner += '<a href="/switch-shipping?order=' + encodeURIComponent(clean) + '&token=' + encodeURIComponent(r.token) + '&from=' + encodeURIComponent(trk || 'none') + '&confirm=1" onclick="return confirm(\'Switch ' + escapeHtml(order.name) + ' to ' + escapeHtml(r.carrier + ' ' + r.service) + '? Customer owes ' + (owe > 0 ? '$' + owe.toFixed(2) + ' extra' : 'nothing extra') + '.' + (trk ? ' Our old label will be refunded by Shippo.' : '') + '\')">Switch</a></div>';
     });
     inner += '</div>';
     res.send(switchShell(inner, q));
   } catch (e) {
     res.send(switchShell('<div class="note"><div class="big">Couldn&#39;t switch</div>' + escapeHtml(e.message) + '</div>', q));
+  }
+});
+
+// Create a Shopify draft order for the upgrade difference and email the customer the pay link.
+// Guarded so a page refresh can't create or email a second invoice.
+var upgradeInvoicesSent = {};
+app.get('/switch-shipping/collect', async (req, res) => {
+  try {
+    var clean = String(req.query.order || '').replace(/[^0-9]/g, '');
+    var amount = parseFloat(req.query.amount);
+    var svc = String(req.query.svc || 'faster shipping');
+    if (!clean || isNaN(amount) || amount <= 0) return res.send(switchShell('<div class="note">Bad invoice link &mdash; look the order up again.</div>', clean));
+    var key = clean + ':' + amount.toFixed(2);
+    if (upgradeInvoicesSent[key]) {
+      return res.send(switchShell('<div class="note"><div class="big">Already invoiced</div>A $' + amount.toFixed(2) + ' pay link for #' + escapeHtml(clean) + ' was already emailed.<div class="muted"><a href="' + upgradeInvoicesSent[key] + '" target="_blank" rel="noopener">Open the draft in Shopify</a></div></div>', clean));
+    }
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = (orders || []).filter(function (o) { return String(o.order_number) === clean; })[0];
+    if (!order) return res.send(switchShell('<div class="note"><div class="big">Order not found</div>Nothing matches #' + escapeHtml(clean) + '.</div>', clean));
+    if (!order.email) return res.send(switchShell('<div class="note"><div class="big">No email on this order</div>Create the $' + amount.toFixed(2) + ' invoice by hand in Shopify &rarr; Drafts and take payment over the phone.</div>', clean));
+
+    var draft = {
+      line_items: [{
+        title: 'Shipping upgrade to ' + svc + ' — order ' + order.name,
+        price: amount.toFixed(2),
+        quantity: 1,
+        requires_shipping: false
+      }],
+      email: order.email,
+      note: 'Shipping speed upgrade for order ' + order.name + ' (difference + 10%). Created from the Change Shipping Speed dashboard.',
+      tags: 'st_dashboard, shipping-upgrade'
+    };
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_order: draft })
+    });
+    var j = await r.json();
+    if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+    var d = j.draft_order;
+    var adminUrl = 'https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/draft_orders/' + d.id;
+
+    var si = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + d.id + '/send_invoice.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ draft_order_invoice: {} })
+    });
+    var sj = await si.json();
+    if (!si.ok || sj.errors) throw new Error('Draft ' + d.name + ' created but the email failed: ' + JSON.stringify(sj.errors || sj) + ' — open it in Shopify and send the invoice from there.');
+    upgradeInvoicesSent[key] = adminUrl;
+
+    res.send(switchShell('<div class="note good"><div class="big">&#10004; Pay link emailed</div>' +
+      '$' + amount.toFixed(2) + ' invoice (' + escapeHtml(d.name) + ') sent to ' + escapeHtml((sj.draft_order_invoice && sj.draft_order_invoice.to) || order.email) + ' for order ' + escapeHtml(order.name) +
+      '<div class="muted">When they pay, it completes in Shopify automatically. <a href="' + adminUrl + '" target="_blank" rel="noopener">Open the draft</a></div></div>', clean));
+  } catch (e) {
+    res.send(switchShell('<div class="note"><div class="big">Couldn&#39;t send the invoice</div>' + escapeHtml(e.message) + '</div>', String(req.query.order || '')));
   }
 });
 
