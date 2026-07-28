@@ -1272,8 +1272,13 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
   html += '.sec + .grid{margin-top:20px}';
   html += '.postit{position:relative;max-width:430px;margin:26px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:26px 20px 15px;font-size:14.5px;font-weight:600;line-height:1.55;transform:rotate(-1.2deg);color:#5C5335}';
   html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
-  html += '.dash-search{display:block;width:100%;margin-top:30px;padding:17px 22px;border:1.5px solid #E8E2E5;border-radius:16px;font-size:17.5px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.04)}';
-  html += '.dash-search:focus{outline:none;border-color:#F7B5CD}';
+  html += '.actionbar{display:flex;gap:14px;margin-top:30px}';
+  html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:2.5px solid #F7B5CD;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.searchwrap .mag{font-size:19px}';
+  html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
+  html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#F7B5CD}';
+  html += '.askai{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:16px;padding:0 24px;font-weight:800;font-size:15.5px;text-decoration:none}';
+  html += '@media (max-width:760px){.actionbar{flex-direction:column}.askai{padding:15px;justify-content:center}}';
   html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
@@ -1297,17 +1302,17 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
-  body += '<input class="dash-search" id="dashq" type="text" placeholder="What do you need? Try one word: order, label, reprint, discount, gift&hellip;">';
+  body += '<div class="actionbar">';
+  body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
+  body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
+  body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
+  body += '<a class="askai" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener">&#10024; Ask Shopify AI</a>';
+  body += '</div>';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
   body += dashTile('Order Lookup', '/order-lookup', { emoji: '&#128269;', kw: 'order customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
   body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
   body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
-  body += '</div>';
-
-  body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
-  body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
-  body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
   body += '</div>';
 
   body += '<h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2><div class="grid">';
@@ -1320,7 +1325,11 @@ app.get('/', (req, res) => {
   body += '<h2 class="sec">&#127978; Shop</h2><div class="grid">';
   body += dashTile('Supplies', '/supplies', { emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
   body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
-  body += dashTile('Ask Shopify AI (Sidekick)', 'https://admin.shopify.com/store/thesweettoothfl', { emoji: '&#10024;', newTab: true, kw: 'ask shopify ai sidekick help question how bot expert answer' });
+  body += '</div>';
+
+  body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
+  body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
+  body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
   body += '</div>';
 
   body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
@@ -1331,7 +1340,15 @@ app.get('/', (req, res) => {
   body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
   body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
   body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
-  body += 'miss.style.display=(v&&!any)?"block":"none"});})();</script>';
+  body += 'miss.style.display=(v&&!any)?"block":"none"});';
+  // Voice search: Chrome's built-in speech recognition. Mic button hides if unsupported.
+  body += 'var mic=document.getElementById("dashmic");var SR=window.SpeechRecognition||window.webkitSpeechRecognition;';
+  body += 'if(!SR){mic.style.display="none"}else{mic.addEventListener("click",function(){var r=new SR();r.lang="en-US";';
+  body += 'mic.classList.add("listening");mic.textContent="\\uD83D\\uDD34";';
+  body += 'r.onresult=function(e){q.value=e.results[0][0].transcript;q.dispatchEvent(new Event("input"))};';
+  body += 'r.onend=function(){mic.classList.remove("listening");mic.textContent="\\uD83C\\uDFA4"};';
+  body += 'r.onerror=r.onend;r.start()})}';
+  body += '})();</script>';
 
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true));
 });
@@ -2202,6 +2219,7 @@ function discountShell(inner, vals) {
   html += inner;
   html += '<div class="card"><form action="/create-discount" method="get" onsubmit="return checkDisc(this)">';
   html += '<div class="field"><label>Code (leave blank to auto-generate)</label><input type="text" name="code" placeholder="e.g. SORRY20" value="' + escapeHtml(vals.code || '') + '" style="text-transform:uppercase"></div>';
+  html += '<div class="field"><label>Reason for this discount (required)</label><input type="text" name="reason" placeholder="e.g. melted bar on order 36150, offered 20% on next order" required></div>';
   html += '<div class="row2">';
   html += '<div class="field"><label>Type</label><select name="type"><option value="percentage">% off</option><option value="fixed_amount">$ off</option></select></div>';
   html += '<div class="field"><label>Amount</label><input type="number" name="value" step="0.01" min="0.01" placeholder="e.g. 20" required></div>';
@@ -2215,6 +2233,7 @@ function discountShell(inner, vals) {
   html += '</form></div>';
   html += '<div class="hint">Creates a real code in Shopify (all products, all customers, unlimited uses unless it expires).<br>Manage or delete codes anytime in Shopify &rarr; Discounts.</div>';
   html += '<script>function checkDisc(f){var v=parseFloat(f.value.value);if(!(v>0)){alert("Enter the discount amount.");return false}';
+  html += 'if(!f.reason.value.trim()||f.reason.value.trim().length<5){alert("Please give a real reason for the discount \\u2014 a few words about why.");return false}';
   html += 'if(f.type.value==="percentage"&&v>100){alert("Percent can\\u2019t be over 100.");return false}';
   html += 'var c=(f.code.value||"auto-generated").toUpperCase();return confirm("Create code "+c+" for "+(f.type.value==="percentage"?v+"% off":"$"+v.toFixed(2)+" off")+"?")}</script>';
   html += '</div></body></html>';
@@ -2228,13 +2247,15 @@ app.get('/create-discount', async (req, res) => {
     var type = req.query.type === 'fixed_amount' ? 'fixed_amount' : 'percentage';
     var value = parseFloat(req.query.value);
     if (!(value > 0) || (type === 'percentage' && value > 100)) return res.send(discountShell('<div class="note">Enter a valid amount.</div>'));
+    var reason = String(req.query.reason || '').trim();
+    if (reason.length < 5) return res.send(discountShell('<div class="note"><div class="big">Reason required</div>Say why this discount is being given &mdash; a few words is fine. Nothing was created.</div>'));
     var code = String(req.query.code || '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
     if (!code) code = 'SWEET-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     if (discountCodesMade[code]) {
       return res.send(discountShell('<div class="note"><div class="big">Already created</div>' + escapeHtml(code) + ' was just created &mdash; it&#39;s live. Make a different code if you need another.</div>'));
     }
     var rule = {
-      title: code,
+      title: code + ' — ' + reason.slice(0, 120),
       target_type: 'line_item', target_selection: 'all', allocation_method: 'across',
       customer_selection: 'all',
       value_type: type,
