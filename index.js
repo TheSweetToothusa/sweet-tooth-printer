@@ -1258,7 +1258,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
   html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px;margin-top:34px;justify-content:center}';
-  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:140px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:20px 18px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
+  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:118px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:16px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
   html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
   html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
   html += '.tile:hover:before{opacity:1}';
@@ -1267,9 +1267,11 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
   html += '.tile .emoji{font-size:36px;line-height:1}';
   html += '.tile.dim{opacity:.18}';
-  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:30px 0 0;padding-bottom:8px;border-bottom:2px solid #F3EDF0}';
-  html += '.sec:first-of-type{margin-top:26px}';
-  html += '.sec + .grid{margin-top:15px}';
+  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:22px 0 0;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
+  html += '.sec:first-of-type{margin-top:20px}';
+  html += '.sec + .grid{margin-top:13px}';
+  html += '.duo{display:flex;gap:18px;align-items:flex-start}.duo .half{flex:1;min-width:0}';
+  html += '@media (max-width:760px){.duo{flex-direction:column;align-items:stretch}}';
   html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:22px 18px 12px;font-size:14px;font-weight:600;line-height:1.5;transform:rotate(-1.2deg);color:#5C5335}';
   html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
@@ -1319,15 +1321,15 @@ app.get('/', (req, res) => {
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
   body += '</div>';
 
+  body += '<div class="duo"><div class="half">';
   body += '<h2 class="sec">&#127978; Shop</h2><div class="grid">';
   body += dashTile('Supplies', '/supplies', { emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
   body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
-  body += '</div>';
-
+  body += '</div></div><div class="half">';
   body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
   body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
   body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
-  body += '</div>';
+  body += '</div></div></div>';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
   body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
