@@ -1235,15 +1235,18 @@ function dashTile(label, href, opts) {
   opts = opts || {};
   var html = '<a class="tile" href="' + (href || '#') + '"';
   if (opts.newTab) html += ' target="_blank" rel="noopener"';
+  if (opts.kw) html += ' data-kw="' + escapeHtml((label + ' ' + opts.kw).toLowerCase()) + '"';
   html += '>';
-  if (opts.icon && DASH_ICONS[opts.icon]) {
+  if (opts.emoji) {
+    html += '<span class="emoji">' + opts.emoji + '</span>';
+  } else if (opts.icon && DASH_ICONS[opts.icon]) {
     html += '<span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + DASH_ICONS[opts.icon] + '</svg></span>';
   }
   html += '<span class="label">' + label + '</span></a>';
   return html;
 }
 
-function dashPage(title, subtitle, tilesHtml, backHref, notice) {
+function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
   var html = '<!DOCTYPE html><html><head><title>' + title + ' — The Sweet Tooth</title>';
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
@@ -1262,29 +1265,62 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice) {
   html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
   html += '.icon-badge svg{width:34px;height:34px}';
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
+  html += '.tile .emoji{font-size:42px;line-height:1}';
+  html += '.tile.dim{opacity:.18}';
+  html += '.sec{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:40px 0 0;padding-bottom:10px;border-bottom:2px solid #F3EDF0}';
+  html += '.sec:first-of-type{margin-top:34px}';
+  html += '.sec + .grid{margin-top:20px}';
+  html += '.dash-search{display:block;width:100%;margin-top:30px;padding:17px 22px;border:1.5px solid #E8E2E5;border-radius:16px;font-size:17.5px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.04)}';
+  html += '.dash-search:focus{outline:none;border-color:#F7B5CD}';
+  html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
   if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
-  html += '<div class="grid">' + tilesHtml + '</div>';
+  html += rawBody ? tilesHtml : '<div class="grid">' + tilesHtml + '</div>';
   html += '</div></body></html>';
   return html;
 }
 
 app.get('/', (req, res) => {
-  var tiles = '';
-  tiles += dashTile('Order Lookup', '/order-lookup', { icon: 'search' });
-  tiles += dashTile('Create a Draft Order', '/draft-order', { icon: 'filePlus' });
-  tiles += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { icon: 'printer', newTab: true });
-  tiles += dashTile('Reprint Shipping Label', '/reprint-label', { icon: 'truck' });
-  tiles += dashTile('Change Shipping Speed', '/switch-shipping', { icon: 'zap' });
-  tiles += dashTile('Create a Discount Code', '/create-discount', { icon: 'percent' });
-  tiles += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { icon: 'edit', newTab: true });
-  tiles += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { icon: 'gift', newTab: true });
-  tiles += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { newTab: true, icon: 'penTool' });
-  tiles += dashTile('Supplies', '/supplies', { icon: 'box' });
-  tiles += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { newTab: true, icon: 'mail' });
+  // Grouped sections: like tiles with like. data-kw powers the search box (label + synonyms).
+  var body = '';
+  body += '<input class="dash-search" id="dashq" type="text" placeholder="What do you need? Try one word: order, label, reprint, discount, gift&hellip;">';
+
+  body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
+  body += dashTile('Order Lookup', '/order-lookup', { emoji: '&#128269;', kw: 'order customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
+  body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += '</div>';
+
+  body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
+  body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
+  body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
+  body += '</div>';
+
+  body += '<h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2><div class="grid">';
+  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { emoji: '&#128424;&#65039;', newTab: true, kw: 'invoice receipt reprint print edit' });
+  body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', newTab: true, kw: 'gift card message edit reprint note' });
+  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', newTab: true, kw: 'gift card message new create note' });
+  body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
+  body += '</div>';
+
+  body += '<h2 class="sec">&#127978; Shop</h2><div class="grid">';
+  body += dashTile('Supplies', '/supplies', { emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
+  body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
+  body += '</div>';
+
+  body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
+
+  body += '<script>(function(){var q=document.getElementById("dashq"),miss=document.getElementById("dashmiss");';
+  body += 'var tiles=[].slice.call(document.querySelectorAll(".tile[data-kw]"));';
+  body += 'var secs=[].slice.call(document.querySelectorAll(".sec"));';
+  body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
+  body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
+  body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
+  body += 'miss.style.display=(v&&!any)?"block":"none"});})();</script>';
+
   // One-off hold notice for #36229 — auto-disappears after Thursday July 30, 2026 (ET).
   var notice = null;
   var nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
@@ -1292,7 +1328,7 @@ app.get('/', (req, res) => {
     notice = '&#128230; HOLD Order <b>#36229</b> &mdash; do NOT ship before <b>THURSDAY July 30</b>.<br>' +
       'The overnight label is already printed &mdash; keep it with the order paperwork. Ships Thursday, arrives Friday.';
   }
-  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, tiles, null, notice));
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, notice, true));
 });
 
 app.get('/supplies', (req, res) => {
