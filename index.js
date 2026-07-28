@@ -327,6 +327,70 @@ async function writeTrackingToShopify(order, label) {
 }
 
 // Diagnostic: confirms config + that the app is receiving orders. No secrets exposed.
+// ============ SUPPLY-RUN ALERTS (strawberries/apples = store run, B&W cookies/rugelach = Sonny's) ============
+// Alerts live until someone clicks Got It, which tags the order st_supplies_ok in Shopify —
+// so the ack is shared by every device and survives restarts. \bapples?\b avoids matching "pineapple".
+var SUPPLY_RULES = [
+  { re: /strawberr/i, emoji: '🍓', what: 'Buy FRESH STRAWBERRIES' },
+  { re: /\bapples?\b/i, emoji: '🍎', what: 'Buy FRESH APPLES' },
+  { re: /black\s*(and|&|'?n'?)\s*white/i, emoji: '🍪', what: "Pick up from SONNY'S BAKERY" },
+  { re: /rug[aeu]la/i, emoji: '🥯', what: "Pick up from SONNY'S BAKERY" }
+];
+
+function supplyNeedsForOrder(order) {
+  var needs = [];
+  (order.line_items || []).forEach(function (li) {
+    var t = li.title || li.name || '';
+    SUPPLY_RULES.forEach(function (r) {
+      if (r.re.test(t)) needs.push({ emoji: r.emoji, what: r.what, item: t, qty: li.quantity || 1 });
+    });
+  });
+  return needs;
+}
+
+app.get('/dashboard/supply-alerts', async function (req, res) {
+  try {
+    var since = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders.json?status=any&limit=50&created_at_min=' + encodeURIComponent(since) +
+      '&fields=id,name,tags,line_items,note_attributes,created_at,cancelled_at';
+    var r = await fetch(url, { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    if (!r.ok) throw new Error('Shopify ' + r.status);
+    var alerts = [];
+    (((await r.json()).orders) || []).forEach(function (o) {
+      if (o.cancelled_at) return;
+      if ((o.tags || '').indexOf('st_supplies_ok') > -1) return;
+      var needs = supplyNeedsForOrder(o);
+      if (!needs.length) return;
+      var dd = null;
+      (o.note_attributes || []).forEach(function (na) {
+        if (/delivery date/i.test(na.name || '')) dd = na.value;
+      });
+      alerts.push({ id: o.id, name: o.name, deliveryDate: dd, needs: needs });
+    });
+    res.json({ alerts: alerts });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/dashboard/supply-alerts/ack', async function (req, res) {
+  try {
+    var id = String(req.query.id || '').replace(/\D/g, '');
+    if (!id) return res.status(400).json({ error: 'missing id' });
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,tags',
+      { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    var o = ((await r.json()) || {}).order;
+    if (!o) return res.status(404).json({ error: 'order not found' });
+    var tags = (o.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+    if (tags.indexOf('st_supplies_ok') === -1) tags.push('st_supplies_ok');
+    var pr = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json', {
+      method: 'PUT',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: { id: parseInt(id, 10), tags: tags.join(', ') } })
+    });
+    if (!pr.ok) throw new Error('Shopify ' + pr.status);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/dashboard/label-status', async function (req, res) {
   var tok = process.env.SHIPPO_API_TOKEN || '';
   var canFulfill = null, fulfillScopes = null;
@@ -1274,6 +1338,9 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '@media (max-width:760px){.duo{flex-direction:column;align-items:stretch}}';
   html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:22px 18px 12px;font-size:14px;font-weight:600;line-height:1.5;transform:rotate(-1.2deg);color:#5C5335}';
   html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
+  html += '.postit.supply{background:#FFE1C9;color:#5C4326;transform:rotate(.8deg);margin-top:12px}';
+  html += '.postit.supply .got{display:inline-block;margin-top:10px;padding:9px 16px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer}';
+  html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
   html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
   html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.askai.dim{opacity:.18}';
@@ -1307,6 +1374,21 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
+  body += '<div id="supply-alerts"></div>';
+  // Supply-run post-its: poll every 60s; Got It tags the order in Shopify so it clears everywhere.
+  body += '<script>(function(){var box=document.getElementById("supply-alerts");';
+  body += 'function render(d){box.innerHTML="";(d.alerts||[]).slice(0,6).forEach(function(a){';
+  body += 'var n=document.createElement("div");n.className="postit supply";';
+  body += 'var h=document.createElement("div");var b=document.createElement("b");b.textContent="\\uD83D\\uDED2 "+a.name+" needs a store run";h.appendChild(b);';
+  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="  \\u2014 for "+a.deliveryDate;h.appendChild(s)}n.appendChild(h);';
+  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;n.appendChild(l)});';
+  body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Got it \\u2014 items are covered";';
+  body += 'g.addEventListener("click",function(){if(!confirm("Confirm: the items for "+a.name+" are bought / picked up?"))return;';
+  body += 'g.disabled=true;fetch("/dashboard/supply-alerts/ack?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else{g.disabled=false;alert("Could not save \\u2014 try again")}}).catch(function(){g.disabled=false;alert("Could not save \\u2014 try again")})});';
+  body += 'n.appendChild(g);box.appendChild(n)})}';
+  body += 'function load(){fetch("/dashboard/supply-alerts").then(function(r){return r.json()}).then(render).catch(function(){})}';
+  body += 'load();setInterval(load,60000)})();</script>';
+
   body += '<div class="actionbar">';
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
