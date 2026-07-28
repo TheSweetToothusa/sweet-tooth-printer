@@ -1309,6 +1309,7 @@ app.get('/', (req, res) => {
   body += '<h2 class="sec">&#127978; Shop</h2><div class="grid">';
   body += dashTile('Supplies', '/supplies', { emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
   body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
+  body += dashTile('Ask Shopify AI (Sidekick)', 'https://admin.shopify.com/store/thesweettoothfl', { emoji: '&#10024;', newTab: true, kw: 'ask shopify ai sidekick help question how bot expert answer' });
   body += '</div>';
 
   body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
