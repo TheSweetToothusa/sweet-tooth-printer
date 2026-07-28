@@ -371,11 +371,100 @@ app.get('/dashboard/supply-alerts', async function (req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// ============ SHARED POST-IT NOTES + ARCHIVE (stored as shop metafields — shared, durable) ============
+async function shopJsonRead(key) {
+  var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/metafields.json?namespace=st_dashboard&key=' + key,
+    { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+  var m = (((await r.json()) || {}).metafields || [])[0];
+  if (!m) return { id: null, data: null };
+  try { return { id: m.id, data: JSON.parse(m.value) }; } catch (e) { return { id: m.id, data: null }; }
+}
+
+async function shopJsonWrite(key, data, existingId) {
+  var body, url, method;
+  if (existingId) {
+    url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/metafields/' + existingId + '.json';
+    method = 'PUT';
+    body = { metafield: { id: existingId, type: 'json', value: JSON.stringify(data) } };
+  } else {
+    url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/metafields.json';
+    method = 'POST';
+    body = { metafield: { namespace: 'st_dashboard', key: key, type: 'json', value: JSON.stringify(data) } };
+  }
+  var r = await fetch(url, { method: method, headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('Metafield write failed: ' + r.status + ' ' + JSON.stringify(await r.json()));
+}
+
+async function archivePush(entry) {
+  var a = await shopJsonRead('postit_archive');
+  var list = Array.isArray(a.data) ? a.data : [];
+  list.unshift(entry);
+  if (list.length > 300) list = list.slice(0, 300);
+  await shopJsonWrite('postit_archive', list, a.id);
+}
+
+app.get('/dashboard/notes', async function (req, res) {
+  try {
+    var n = await shopJsonRead('postit_notes');
+    res.json({ notes: Array.isArray(n.data) ? n.data : [] });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/dashboard/notes/add', async function (req, res) {
+  try {
+    var text = String(req.query.text || '').trim().slice(0, 300);
+    if (!text) return res.status(400).json({ error: 'empty note' });
+    var n = await shopJsonRead('postit_notes');
+    var list = Array.isArray(n.data) ? n.data : [];
+    list.unshift({ id: String(Date.now()), text: text, created: new Date().toISOString() });
+    if (list.length > 20) list = list.slice(0, 20);
+    await shopJsonWrite('postit_notes', list, n.id);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/dashboard/notes/done', async function (req, res) {
+  try {
+    var id = String(req.query.id || '');
+    var n = await shopJsonRead('postit_notes');
+    var list = Array.isArray(n.data) ? n.data : [];
+    var note = list.filter(function (x) { return x.id === id; })[0];
+    if (!note) return res.json({ ok: true });
+    await shopJsonWrite('postit_notes', list.filter(function (x) { return x.id !== id; }), n.id);
+    await archivePush({ type: 'note', text: note.text, created: note.created, doneAt: new Date().toISOString() });
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/dashboard/postit-archive', async function (req, res) {
+  try {
+    var a = await shopJsonRead('postit_archive');
+    var list = Array.isArray(a.data) ? a.data : [];
+    var html = '<!DOCTYPE html><html><head><title>Post-it Archive — The Sweet Tooth</title>';
+    html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>';
+    html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:72px 24px 36px}';
+    html += '.wrap{max-width:720px;margin:0 auto}' + TOPBAR_CSS;
+    html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:24px}';
+    html += '.entry{background:#fff;border:1px solid #EFEBED;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:14px 18px;margin-bottom:10px;font-size:15px;font-weight:600}';
+    html += '.entry .meta{color:#9B8A92;font-size:12.5px;font-weight:700;margin-top:5px}';
+    html += '.empty{text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:40px}';
+    html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap"><h1>&#128452;&#65039; Post-it Archive</h1>';
+    if (!list.length) html += '<div class="empty">Nothing archived yet. Post-its land here when someone clicks Got It / Done.</div>';
+    list.slice(0, 100).forEach(function (e) {
+      var icon = e.type === 'supply' ? '&#128722;' : '&#128221;';
+      var when = e.doneAt ? new Date(e.doneAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+      html += '<div class="entry">' + icon + ' ' + escapeHtml(e.text) + '<div class="meta">done ' + escapeHtml(when) + ' ET</div></div>';
+    });
+    html += '</div></body></html>';
+    res.send(html);
+  } catch (e) { res.status(500).send('Archive error: ' + escapeHtml(e.message)); }
+});
+
 app.get('/dashboard/supply-alerts/ack', async function (req, res) {
   try {
     var id = String(req.query.id || '').replace(/\D/g, '');
     if (!id) return res.status(400).json({ error: 'missing id' });
-    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,tags',
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,name,tags,line_items,note_attributes',
       { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
     var o = ((await r.json()) || {}).order;
     if (!o) return res.status(404).json({ error: 'order not found' });
@@ -387,6 +476,12 @@ app.get('/dashboard/supply-alerts/ack', async function (req, res) {
       body: JSON.stringify({ order: { id: parseInt(id, 10), tags: tags.join(', ') } })
     });
     if (!pr.ok) throw new Error('Shopify ' + pr.status);
+    try {
+      var needs = supplyNeedsForOrder(o).map(function (x) { return x.what + ': ' + x.item + ' ×' + x.qty; }).join(' · ');
+      var dd = null;
+      (o.note_attributes || []).forEach(function (na) { if (/delivery date/i.test(na.name || '')) dd = na.value; });
+      await archivePush({ type: 'supply', text: (o.name || '#' + id) + ' — ' + needs + (dd ? ' (for ' + dd + ')' : ''), doneAt: new Date().toISOString() });
+    } catch (ae) { console.error('archive push failed:', ae.message); }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -1341,6 +1436,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.postit.supply{background:#FFE1C9;color:#5C4326;transform:rotate(.8deg);margin-top:12px}';
   html += '.postit.supply .got{display:inline-block;margin-top:10px;padding:9px 16px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer}';
   html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
+  html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
+  html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
   html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
   html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.askai.dim{opacity:.18}';
@@ -1374,7 +1471,25 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
+  body += '<div class="notesbar"><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
+  body += '<div id="custom-notes"></div>';
   body += '<div id="supply-alerts"></div>';
+  // Shared notes: stored in a Shopify shop metafield — same for every device, survive restarts.
+  body += '<script>(function(){var nbox=document.getElementById("custom-notes");';
+  body += 'function renderNotes(d){nbox.innerHTML="";(d.notes||[]).slice(0,8).forEach(function(a){';
+  body += 'var n=document.createElement("div");n.className="postit";n.style.marginTop="12px";';
+  body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;n.appendChild(t);';
+  body += 'var m=document.createElement("div");m.style.cssText="font-size:12px;color:#A89B66;margin-top:4px;font-weight:700";';
+  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});n.appendChild(m);';
+  body += 'var g=document.createElement("button");g.className="got";g.style.cssText="display:inline-block;margin-top:8px;padding:8px 15px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13px;cursor:pointer";g.textContent="\\u2713 Done";';
+  body += 'g.addEventListener("click",function(){if(!confirm("Mark this note done? It moves to the archive."))return;g.disabled=true;';
+  body += 'fetch("/dashboard/notes/done?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else g.disabled=false}).catch(function(){g.disabled=false})});';
+  body += 'n.appendChild(g);nbox.appendChild(n)})}';
+  body += 'function loadNotes(){fetch("/dashboard/notes").then(function(r){return r.json()}).then(renderNotes).catch(function(){})}';
+  body += 'document.getElementById("addnote").addEventListener("click",function(e){e.preventDefault();';
+  body += 'var t=prompt("What should the post-it say? (everyone will see it)");if(!t||!t.trim())return;';
+  body += 'fetch("/dashboard/notes/add?text="+encodeURIComponent(t.trim())).then(function(r){return r.json()}).then(function(j){if(j.ok)loadNotes();else alert("Could not save the note")}).catch(function(){alert("Could not save the note")})});';
+  body += 'loadNotes();setInterval(loadNotes,60000)})();</script>';
   // Supply-run post-its: poll every 60s; Got It tags the order in Shopify so it clears everywhere.
   body += '<script>(function(){var box=document.getElementById("supply-alerts");';
   body += 'function render(d){box.innerHTML="";(d.alerts||[]).slice(0,6).forEach(function(a){';
