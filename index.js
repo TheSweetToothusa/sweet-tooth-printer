@@ -1229,7 +1229,7 @@ var DASH_ICONS = {
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
 var TOPBAR_HTML = '<header class="topbar"><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
 var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
-  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;border-bottom:2.5px solid #F7B5CD;padding-bottom:1px}';
+  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}';
 
 function dashTile(label, href, opts) {
   opts = opts || {};
@@ -1277,7 +1277,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
   html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.askai.dim{opacity:.18}';
-  html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:2.5px solid #F7B5CD;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.searchwrap:focus-within{border-color:#C9BFC4}';
   html += '.searchwrap .mag{font-size:19px}';
   html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
   html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#F7B5CD}';
