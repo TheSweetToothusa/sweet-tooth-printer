@@ -1270,6 +1270,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
   html += '.sec{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:40px 0 0;padding-bottom:10px;border-bottom:2px solid #F3EDF0}';
   html += '.sec:first-of-type{margin-top:34px}';
   html += '.sec + .grid{margin-top:20px}';
+  html += '.postit{position:relative;max-width:430px;margin:26px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:15px 20px;font-size:14.5px;font-weight:600;line-height:1.55;transform:rotate(-1.2deg);color:#5C5335}';
+  html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.dash-search{display:block;width:100%;margin-top:30px;padding:17px 22px;border:1.5px solid #E8E2E5;border-radius:16px;font-size:17.5px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.04)}';
   html += '.dash-search:focus{outline:none;border-color:#F7B5CD}';
   html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
@@ -1286,6 +1288,15 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
 app.get('/', (req, res) => {
   // Grouped sections: like tiles with like. data-kw powers the search box (label + synonyms).
   var body = '';
+  // Post-it reminder for #36229 — small, dismissible per device for the day, auto-expires Fri Jul 31.
+  var nowET2 = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  if (nowET2 < new Date('2026-07-31T00:00:00')) {
+    body += '<div class="postit" id="postit"><a class="hide" id="postit-hide">hide for today &#10005;</a>' +
+      '&#128204; <b>#36229 ships THURSDAY July 30</b> &mdash; overnight label is already printed, keep it with the paperwork.</div>';
+    body += '<script>(function(){var p=document.getElementById("postit"),h=document.getElementById("postit-hide");' +
+      'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
+      'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
+  }
   body += '<input class="dash-search" id="dashq" type="text" placeholder="What do you need? Try one word: order, label, reprint, discount, gift&hellip;">';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
@@ -1322,14 +1333,7 @@ app.get('/', (req, res) => {
   body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
   body += 'miss.style.display=(v&&!any)?"block":"none"});})();</script>';
 
-  // One-off hold notice for #36229 — auto-disappears after Thursday July 30, 2026 (ET).
-  var notice = null;
-  var nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  if (nowET < new Date('2026-07-31T00:00:00')) {
-    notice = '&#128230; HOLD Order <b>#36229</b> &mdash; do NOT ship before <b>THURSDAY July 30</b>.<br>' +
-      'The overnight label is already printed &mdash; keep it with the order paperwork. Ships Thursday, arrives Friday.';
-  }
-  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, notice, true));
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true));
 });
 
 app.get('/supplies', (req, res) => {
