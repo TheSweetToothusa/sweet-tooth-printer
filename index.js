@@ -1227,7 +1227,7 @@ var DASH_ICONS = {
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
-var TOPBAR_HTML = '<header class="topbar"><a href="/">The Sweet Tooth</a></header>';
+var TOPBAR_HTML = '<header class="topbar"><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
 var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
   '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;border-bottom:2.5px solid #F7B5CD;padding-bottom:1px}';
 
@@ -1246,33 +1246,35 @@ function dashTile(label, href, opts) {
   return html;
 }
 
-function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
+function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   var html = '<!DOCTYPE html><html><head><title>' + title + ' — The Sweet Tooth</title>';
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;padding:100px 28px 48px}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;padding:72px 24px 36px}';
   html += '.wrap{width:100%;max-width:1080px;margin:auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
-  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(225px,1fr));gap:24px;margin-top:44px;justify-content:center}';
-  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:180px;background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:28px 24px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
+  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px;margin-top:34px;justify-content:center}';
+  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:140px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:20px 18px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
   html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
   html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
   html += '.tile:hover:before{opacity:1}';
   html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
   html += '.icon-badge svg{width:34px;height:34px}';
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
-  html += '.tile .emoji{font-size:42px;line-height:1}';
+  html += '.tile .emoji{font-size:36px;line-height:1}';
   html += '.tile.dim{opacity:.18}';
-  html += '.sec{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:40px 0 0;padding-bottom:10px;border-bottom:2px solid #F3EDF0}';
-  html += '.sec:first-of-type{margin-top:34px}';
-  html += '.sec + .grid{margin-top:20px}';
-  html += '.postit{position:relative;max-width:430px;margin:26px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:26px 20px 15px;font-size:14.5px;font-weight:600;line-height:1.55;transform:rotate(-1.2deg);color:#5C5335}';
+  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:30px 0 0;padding-bottom:8px;border-bottom:2px solid #F3EDF0}';
+  html += '.sec:first-of-type{margin-top:26px}';
+  html += '.sec + .grid{margin-top:15px}';
+  html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:22px 18px 12px;font-size:14px;font-weight:600;line-height:1.5;transform:rotate(-1.2deg);color:#5C5335}';
   html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
-  html += '.actionbar{display:flex;gap:14px;margin-top:30px}';
+  html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
+  html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
+  html += '.askai.dim{opacity:.18}';
   html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:2.5px solid #F7B5CD;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
   html += '.searchwrap .mag{font-size:19px}';
   html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
@@ -1282,7 +1284,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody) {
   html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
-  html += '<h1>' + title + '</h1>';
+  if (!noH1) html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
   if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
   html += rawBody ? tilesHtml : '<div class="grid">' + tilesHtml + '</div>';
@@ -1306,13 +1308,8 @@ app.get('/', (req, res) => {
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
   body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
-  body += '<a class="askai" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener">&#10024; Ask Shopify AI</a>';
-  body += '</div>';
-
-  body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
-  body += dashTile('Order Lookup', '/order-lookup', { emoji: '&#128269;', kw: 'order customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
-  body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
-  body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += '<a class="askai light" href="/order-lookup" data-kw="order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund">&#128269; Order Lookup</a>';
+  body += '<a class="askai" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer">&#10024; Ask Shopify AI</a>';
   body += '</div>';
 
   body += '<h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2><div class="grid">';
@@ -1332,10 +1329,15 @@ app.get('/', (req, res) => {
   body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
   body += '</div>';
 
+  body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
+  body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += '</div>';
+
   body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
 
   body += '<script>(function(){var q=document.getElementById("dashq"),miss=document.getElementById("dashmiss");';
-  body += 'var tiles=[].slice.call(document.querySelectorAll(".tile[data-kw]"));';
+  body += 'var tiles=[].slice.call(document.querySelectorAll("[data-kw]"));';
   body += 'var secs=[].slice.call(document.querySelectorAll(".sec"));';
   body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
   body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
@@ -1350,7 +1352,7 @@ app.get('/', (req, res) => {
   body += 'r.onerror=r.onend;r.start()})}';
   body += '})();</script>';
 
-  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true));
+  res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true, true));
 });
 
 app.get('/supplies', (req, res) => {
