@@ -71,6 +71,7 @@ var MAX_ORDERS = 250;
 app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/sticker-files', express.static(__dirname + '/sticker-files'));
 
 function verifyShopifyWebhook(req) {
   var hmac = req.get('X-Shopify-Hmac-Sha256');
@@ -1517,6 +1518,7 @@ app.get('/', (req, res) => {
   body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', newTab: true, kw: 'gift card message edit reprint note' });
   body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', newTab: true, kw: 'gift card message new create note' });
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
+  body += dashTile('Stickers &amp; Labels', '/stickers', { emoji: '&#128278;', kw: 'sticker stickers label labels niimbot print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink' });
   body += '</div>';
 
   body += '<div class="duo"><div class="half">';
@@ -2493,6 +2495,60 @@ app.get('/create-discount', async (req, res) => {
   } catch (e) {
     res.send(discountShell('<div class="note"><div class="big">Couldn&#39;t create it</div>' + escapeHtml(e.message) + '</div>'));
   }
+});
+
+// ============ STICKERS & LABELS (one place for every sticker file + how to print or order) ============
+var STICKERS = [
+  { file: 'gluten-free-treats.png', name: 'Gluten-Free Treats', how: 'niimbot' },
+  { file: 'pecan-pralines.png', name: 'Pecan Pralines', how: 'niimbot' },
+  { file: 'frozen-hot-chocolate.png', name: 'Frozen Hot Chocolate', how: 'niimbot' },
+  { file: 'dubai-zero-series.png', name: 'Dubai Chocolate Zero Series', how: 'order' },
+  { file: 'dairy-rectangle.png', name: 'DAIRY (gold rectangle)', how: 'order' },
+  { file: 'parve-oval.png', name: 'PARVE (oval)', how: 'order' },
+  { file: 'parve-rectangle.png', name: 'PARVE (gold rectangle)', how: 'order' }
+];
+var STICKERS_MISSING = ['Mucho Gusto Munch', 'Chocolate Chunks', 'Gift message cards', 'Hang tags'];
+
+app.get('/stickers', function (req, res) {
+  var html = '<!DOCTYPE html><html><head><title>Stickers &amp; Labels — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:72px 24px 36px}';
+  html += '.wrap{max-width:960px;margin:0 auto}' + TOPBAR_CSS;
+  html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:8px}';
+  html += '.sub{text-align:center;color:#9B8A92;font-size:14.5px;font-weight:600;margin-bottom:26px}';
+  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
+  html += '.howto{background:#fff;border:1px solid #EFEBED;border-left:5px solid #F7B5CD;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;line-height:1.7;margin-bottom:16px}';
+  html += '.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}';
+  html += '.scard{background:#fff;border:1px solid #EFEBED;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:14px;text-align:center}';
+  html += '.scard img{width:100%;height:150px;object-fit:contain;background:#FAF7F8;border-radius:10px}';
+  html += '.scard .nm{font-weight:800;font-size:14.5px;margin:10px 0 8px;line-height:1.3}';
+  html += '.scard a{display:inline-block;padding:9px 16px;background:#2A2A2A;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}';
+  html += '.miss{background:#fff;border:1px dashed #D9CFD4;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;color:#9B8A92;line-height:1.7}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>&#128278; Stickers &amp; Labels</h1>';
+  html += '<div class="sub">Every sticker file in one place &mdash; no more digging through Canva, email, and Google Drive.</div>';
+
+  html += '<div class="sec">&#128424;&#65039; Print in store &mdash; NIIMBOT label printer</div>';
+  html += '<div class="howto"><b>How to print:</b> 1&#65039;&#8419; Load the <b>2-inch pink circle</b> roll into the portable NIIMBOT printer. &nbsp;2&#65039;&#8419; Open the free <b>NIIMBOT app</b> on the phone (it connects by Bluetooth). &nbsp;3&#65039;&#8419; Download the sticker below to the phone, import it in the app, and print. The printer is inkless &mdash; it prints black on the pink sticker.</div>';
+  html += '<div class="sgrid">';
+  STICKERS.filter(function (s) { return s.how === 'niimbot'; }).forEach(function (s) {
+    html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="sec">&#127981; Ordered from the printing company</div>';
+  html += '<div class="howto">These are professionally printed. Download the file and send it to the printing company we use (ask Mikey which company for which sticker), or attach it when reordering.</div>';
+  html += '<div class="sgrid">';
+  STICKERS.filter(function (s) { return s.how === 'order'; }).forEach(function (s) {
+    html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="sec">&#128203; Not here yet</div>';
+  html += '<div class="miss">Files we still need to add: <b>' + STICKERS_MISSING.join('</b> &middot; <b>') + '</b>.<br>Drop the file in the STICKERS folder on Mikey&#39;s desktop and ask Claude to add it to this page.</div>';
+
+  html += '</div></body></html>';
+  res.send(html);
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
