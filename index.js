@@ -2528,8 +2528,9 @@ app.get('/stickers', function (req, res) {
   html += '<h1>&#128278; Stickers &amp; Labels</h1>';
   html += '<div class="sub">Every sticker file in one place &mdash; no more digging through Canva, email, and Google Drive.</div>';
 
-  html += '<div class="sec">&#128424;&#65039; Print in store &mdash; NIIMBOT label printer</div>';
-  html += '<div class="howto"><b>How to print:</b> 1&#65039;&#8419; Load the <b>2-inch pink circle</b> roll into the portable NIIMBOT printer. &nbsp;2&#65039;&#8419; Open the free <b>NIIMBOT app</b> on the phone (it connects by Bluetooth). &nbsp;3&#65039;&#8419; Download the sticker below to the phone, import it in the app, and print. The printer is inkless &mdash; it prints black on the pink sticker.</div>';
+  html += '<div class="sec">&#128424;&#65039; Print in store &mdash; label printers</div>';
+  html += '<div class="howto"><b>&#127852; Pink 2&quot; round stickers (the ones below) &mdash; MUNBYN printer:</b> 1&#65039;&#8419; Load the <b>2-inch pink circle</b> roll into the Munbyn printer. &nbsp;2&#65039;&#8419; Open the free <b>Munbyn Print app</b> on the phone (it connects by Bluetooth). &nbsp;3&#65039;&#8419; Download the sticker below to the phone, import it in the app, and print. The printer is inkless &mdash; it prints black on the pink sticker.<br><br>' +
+    '<b>&#9898; White stickers (all other store labels) &mdash; NIIMBOT printer:</b> same idea, but use the free <b>NIIMBOT app</b> with the white sticker rolls.</div>';
   html += '<div class="sgrid">';
   STICKERS.filter(function (s) { return s.how === 'niimbot'; }).forEach(function (s) {
     html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
