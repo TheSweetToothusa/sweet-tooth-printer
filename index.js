@@ -2537,7 +2537,7 @@ app.get('/stickers', function (req, res) {
   html += '</div>';
 
   html += '<div class="sec">&#127981; Ordered from the printing company</div>';
-  html += '<div class="howto">These are professionally printed. Download the file and send it to the printing company we use (ask Mikey which company for which sticker), or attach it when reordering.</div>';
+  html += '<div class="howto">These are professionally printed by <b>UPrinting</b> &mdash; order at <a href="https://www.uprinting.com" target="_blank" rel="noopener">UPrinting.com</a>, log in as <b>mike@thesweettooth.com</b> (past orders there have the exact product specs, e.g. 2&quot;&times;2&quot; roll labels for the circles). Reorder from order history and attach the file below if asked. UPrinting support: 888-888-4211.</div>';
   html += '<div class="sgrid">';
   STICKERS.filter(function (s) { return s.how === 'order'; }).forEach(function (s) {
     html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
