@@ -2536,13 +2536,29 @@ app.get('/stickers', function (req, res) {
   });
   html += '</div>';
 
-  html += '<div class="sec">&#127981; Ordered from the printing company</div>';
-  html += '<div class="howto">These are professionally printed by <b>UPrinting</b> &mdash; order at <a href="https://www.uprinting.com" target="_blank" rel="noopener">UPrinting.com</a>, log in as <b>mike@thesweettooth.com</b> (past orders there have the exact product specs, e.g. 2&quot;&times;2&quot; roll labels for the circles). Reorder from order history and attach the file below if asked. UPrinting support: 888-888-4211.</div>';
+  html += '<div class="sec">&#127981; Ordered from our printing companies</div>';
+
+  html += '<div class="howto"><b>&#129472; SheetLabels.com &mdash; DAIRY &amp; PARVE stickers</b><br>' +
+    'Email <a href="mailto:support@sheetlabels.com">support@sheetlabels.com</a> &middot; phone 888-391-7165 &middot; fax 518-798-0289. Attach the file when reordering.</div>';
   html += '<div class="sgrid">';
-  STICKERS.filter(function (s) { return s.how === 'order'; }).forEach(function (s) {
+  ['dairy-rectangle.png', 'parve-oval.png', 'parve-rectangle.png'].forEach(function (f) {
+    var s = STICKERS.filter(function (x) { return x.file === f; })[0];
     html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
   });
   html += '</div>';
+
+  html += '<div class="howto" style="margin-top:16px"><b>&#127991;&#65039; UPrinting &mdash; circle product stickers</b><br>' +
+    'Order at <a href="https://www.uprinting.com" target="_blank" rel="noopener">UPrinting.com</a>, log in as <b>mike@thesweettooth.com</b> &mdash; past orders have the exact specs (2&quot;&times;2&quot; roll labels). Reorder from order history. Support: 888-888-4211.</div>';
+  html += '<div class="sgrid">';
+  STICKERS.filter(function (s) { return s.how === 'order' && ['dairy-rectangle.png', 'parve-oval.png', 'parve-rectangle.png'].indexOf(s.file) === -1; }).forEach(function (s) {
+    html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
+  });
+  html += '</div>';
+
+  html += '<div class="howto" style="margin-top:16px"><b>&#127872; Elegant Packages &mdash; hang tags, gift message cards, coupon cards</b><br>' +
+    'James Anderson (Sales) &middot; <a href="tel:+16815252420">+1 681 525 2420</a> &middot; <a href="mailto:info@elegantpackages.com">info@elegantpackages.com</a> &middot; <a href="https://www.elegantpackages.com" target="_blank" rel="noopener">elegantpackages.com</a><br>' +
+    'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br>' +
+    '<span style="color:#9B8A92">Last orders: 2,000 DAIRY + 1,000 PARVE swinging hang tags (Dec 2025, gold Pantone D3AF37) &middot; 1,000 coupon cards 3&quot;&times;2&quot; (Nov 2025). Proofs are in Mikey&#39;s email.</span></div>';
 
   html += '<div class="sec">&#128203; Not here yet</div>';
   html += '<div class="miss">Files we still need to add: <b>' + STICKERS_MISSING.join('</b> &middot; <b>') + '</b>.<br>Drop the file in the STICKERS folder on Mikey&#39;s desktop and ask Claude to add it to this page.</div>';
