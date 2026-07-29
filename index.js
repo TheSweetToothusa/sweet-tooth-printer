@@ -2561,6 +2561,12 @@ app.get('/stickers', function (req, res) {
     'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br>' +
     '<span style="color:#9B8A92">Last orders: 2,000 DAIRY + 1,000 PARVE swinging hang tags (Dec 2025, gold Pantone D3AF37) &middot; 1,000 coupon cards 3&quot;&times;2&quot; (Nov 2025). Proofs are in Mikey&#39;s email.</span></div>';
 
+  html += '<div class="sec">&#128722; Bought on Amazon &mdash; Mucho Gusto Munch supplies</div>';
+  html += '<div class="howto"><b>&#127775; Blank sticker labels:</b> 3&quot; round printable glossy white waterproof vinyl sticker labels &mdash; any brand is fine. ' +
+    '<a href="https://www.amazon.com/dp/B0D6VPH6LY" target="_blank" rel="noopener">Last one we bought</a>. We print the Mucho Gusto Munch design onto these ourselves.<br><br>' +
+    '<b>&#127853; Pink bags:</b> resealable stand-up foil pouches with a matte window, <b>pink, 5.5&quot; &times; 7.8&quot;</b> &mdash; any brand is fine. ' +
+    'Last order for reference: <i>FireKylin 100 Pack Resealable Bags with Matte Window (Pink, 5.5&quot; x 7.8&quot;), smell proof, stand up</i> &mdash; search that on Amazon.</div>';
+
   html += '<div class="sec">&#128203; Not here yet</div>';
   html += '<div class="miss">Files we still need to add: <b>' + STICKERS_MISSING.join('</b> &middot; <b>') + '</b>.<br>Drop the file in the STICKERS folder on Mikey&#39;s desktop and ask Claude to add it to this page.</div>';
 
