@@ -77,7 +77,7 @@ function extractOrderData(order) {
     }
   }
   var shippingTitleLower = shippingTitle.toLowerCase();
-  var deliveryType = 'shipping';
+  var deliveryType = shippingTitle ? 'shipping' : 'pickup';
   
   if (isPOS) {
     deliveryType = 'in-store';
@@ -90,6 +90,10 @@ function extractOrderData(order) {
   var deliveryMethod = (notes['Delivery Method'] || '').toLowerCase();
   if (deliveryMethod.indexOf('pickup') > -1 || deliveryMethod.indexOf('pick up') > -1) {
     deliveryType = 'pickup';
+  } else if (deliveryMethod.indexOf('in-store') > -1 || deliveryMethod.indexOf('in store') > -1) {
+    deliveryType = 'in-store';
+  } else if (deliveryMethod.indexOf('ship') > -1) {
+    deliveryType = 'shipping';
   } else if (deliveryMethod.indexOf('delivery') > -1) {
     deliveryType = 'local-delivery';
   }
