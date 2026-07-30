@@ -676,12 +676,18 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
     var specialInstructions = (orderData.specialInstructions || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     var giftMessage = (orderData.giftMessage || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
+    var dtChoices = [['pickup', 'Pickup'], ['local-delivery', 'Local Delivery'], ['shipping', 'Shipping'], ['in-store', 'In Store']];
+    var dtOptions = '';
+    for (var dti = 0; dti < dtChoices.length; dti++) {
+      dtOptions += '<option value="' + dtChoices[dti][0] + '"' + (orderData.deliveryType === dtChoices[dti][0] ? ' selected' : '') + '>' + dtChoices[dti][1] + '</option>';
+    }
+
     res.send('<!DOCTYPE html><html><head><title>Edit Invoice ' + orderData.orderNumber + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}@media print{.no-print{display:none!important}body{display:block;background:white}.editor-panel{display:none}.preview-wrap{padding:0}}' +
       '.editor-panel{width:360px;min-width:360px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto;flex-shrink:0}' +
       '.preview-wrap{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;align-items:center}' +
       '.editor-panel h2{font-size:18px;font-weight:800;margin-bottom:4px}.order-sub{font-size:12px;color:#888;margin-bottom:16px}' +
       '.field{margin-bottom:12px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#555}' +
-      '.field input,.field textarea{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit}.field textarea{height:80px;resize:vertical}' +
+      '.field input,.field textarea,.field select{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff}.field textarea{height:80px;resize:vertical}.field select{cursor:pointer;font-weight:700}' +
       '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
       '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
       '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}' +
@@ -697,6 +703,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>State</label><input type="text" id="province" value="' + province + '" oninput="refreshPreview()"></div>' +
         '<div class="field"><label>ZIP</label><input type="text" id="zip" value="' + zip + '" oninput="refreshPreview()"></div>' +
         '<div class="section-label">Delivery</div>' +
+        '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="refreshPreview()">' + dtOptions + '</select></div>' +
         '<div class="field"><label>Delivery Date</label><input type="text" id="deliveryDate" value="' + deliveryDate + '" oninput="refreshPreview()"></div>' +
         '<div class="section-label">Notes</div>' +
         '<div class="field"><label>Special Instructions</label><textarea id="specialInstructions" oninput="refreshPreview()">' + specialInstructions + '</textarea></div>' +
@@ -717,6 +724,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           'city:document.getElementById("city").value,' +
           'province:document.getElementById("province").value,' +
           'zip:document.getElementById("zip").value,' +
+          'deliveryType:document.getElementById("deliveryType").value,' +
           'deliveryDate:document.getElementById("deliveryDate").value,' +
           'specialInstructions:document.getElementById("specialInstructions").value,' +
           'giftMessage:document.getElementById("giftMessage").value' +
@@ -766,6 +774,7 @@ app.get('/dashboard/invoice-preview/:orderId', async (req, res) => {
     if (req.query.city !== undefined) orderData.recipient.city = req.query.city;
     if (req.query.province !== undefined) orderData.recipient.province = req.query.province;
     if (req.query.zip !== undefined) orderData.recipient.zip = req.query.zip;
+    if (req.query.deliveryType) orderData.deliveryType = req.query.deliveryType;
     if (req.query.deliveryDate !== undefined) orderData.deliveryDate = req.query.deliveryDate;
     if (req.query.specialInstructions !== undefined) orderData.specialInstructions = req.query.specialInstructions;
     if (req.query.giftMessage !== undefined) orderData.giftMessage = req.query.giftMessage;
@@ -792,6 +801,7 @@ app.post('/dashboard/invoice-print-edited/:orderId', async (req, res) => {
     if (body.city !== undefined) orderData.recipient.city = body.city;
     if (body.province !== undefined) orderData.recipient.province = body.province;
     if (body.zip !== undefined) orderData.recipient.zip = body.zip;
+    if (body.deliveryType) orderData.deliveryType = body.deliveryType;
     if (body.deliveryDate !== undefined) orderData.deliveryDate = body.deliveryDate;
     if (body.specialInstructions !== undefined) orderData.specialInstructions = body.specialInstructions;
     if (body.giftMessage !== undefined) orderData.giftMessage = body.giftMessage;
@@ -1031,6 +1041,17 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
       if (body.zip) updatePayload.order.shipping_address.zip = body.zip;
     }
     if (noteLines.length > 0) updatePayload.order.note = noteLines.join('\n');
+
+    if (body.deliveryType) {
+      var dtLabelMap = { 'pickup': 'Pickup', 'local-delivery': 'Local Delivery', 'shipping': 'Shipping', 'in-store': 'In Store' };
+      var dtLabel = dtLabelMap[body.deliveryType] || body.deliveryType;
+      var existingOrder = await fetchOrderFromShopify(req.params.orderId);
+      var attrs = (existingOrder.note_attributes || []).filter(function (a) {
+        return (a.name || '').toLowerCase().replace(/[\s_\-]+/g, '') !== 'deliverymethod';
+      });
+      attrs.push({ name: 'Delivery Method', value: dtLabel });
+      updatePayload.order.note_attributes = attrs;
+    }
 
     var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + req.params.orderId + '.json';
     var response = await fetch(url, {
