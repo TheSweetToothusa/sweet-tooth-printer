@@ -1539,7 +1539,7 @@ app.get('/', (req, res) => {
   body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', newTab: true, kw: 'gift card message edit reprint note' });
   body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', newTab: true, kw: 'gift card message new create note' });
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
-  body += dashTile('Stickers &amp; Labels', '/stickers', { emoji: '&#128278;', kw: 'sticker stickers label labels niimbot print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink' });
+  body += dashTile('Stickers &amp; Labels', '/stickers', { emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
   body += '</div>';
 
   body += '<div class="duo"><div class="half">';
@@ -2581,6 +2581,13 @@ app.get('/stickers', function (req, res) {
     'James Anderson (Sales) &middot; <a href="tel:+16815252420">+1 681 525 2420</a> &middot; <a href="mailto:info@elegantpackages.com">info@elegantpackages.com</a> &middot; <a href="https://www.elegantpackages.com" target="_blank" rel="noopener">elegantpackages.com</a><br>' +
     'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br>' +
     '<span style="color:#9B8A92">Last orders: 2,000 DAIRY + 1,000 PARVE swinging hang tags (Dec 2025, gold Pantone D3AF37) &middot; 1,000 coupon cards 3&quot;&times;2&quot; (Nov 2025). Proofs are in Mikey&#39;s email.</span></div>';
+
+  html += '<div class="sec">&#128196; Printable guides</div>';
+  html += '<div class="sgrid">';
+  html += '<div class="scard"><img src="/sticker-files/basket-making-guide-preview.png" alt=""><div class="nm">Basket Making Guide</div>' +
+    '<a href="/sticker-files/basket-making-guide.pdf" target="_blank" rel="noopener">&#128065;&#65039; Open</a> ' +
+    '<a href="/sticker-files/basket-making-guide.pdf" download>&#11015;&#65039; Download</a></div>';
+  html += '</div>';
 
   html += '<div class="sec">&#128722; Bought on Amazon &mdash; Mucho Gusto Munch supplies</div>';
   html += '<div class="howto"><b>&#127775; Blank sticker labels:</b> 3&quot; round printable glossy white waterproof vinyl sticker labels &mdash; any brand is fine. ' +
