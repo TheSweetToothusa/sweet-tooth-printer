@@ -2561,7 +2561,7 @@ app.get('/stickers', function (req, res) {
   html += '<div class="sec">&#127981; Ordered from our printing companies</div>';
 
   html += '<div class="howto"><b>&#129472; SheetLabels.com &mdash; DAIRY &amp; PARVE gold stickers</b><br>' +
-    'Log in at <a href="https://www.sheetlabels.com" target="_blank" rel="noopener">SheetLabels.com</a> as <b>orders@thesweettooth.com</b> (password: <b>Muchogusto</b>) and reorder from order history &mdash; easiest way.<br>' +
+    '<a href="https://www.sheetlabels.com/customer/orders/" target="_blank" rel="noopener"><b>See past orders &amp; reorder here</b></a> &mdash; log in as <b>orders@thesweettooth.com</b> (password: <b>Muchogusto</b>).<br>' +
     '<b>Reference order SL343776-4:</b> Custom Sticker Rolls, 2&quot; &times; 1&quot; custom shape, Silver BOPP Permanent (SBP), gloss laminate, white ink: yes.<br>' +
     'Help: <a href="mailto:support@sheetlabels.com">support@sheetlabels.com</a> &middot; phone 888-391-7165 &middot; fax 518-798-0289.</div>';
   html += '<div class="sgrid">';
@@ -2581,8 +2581,13 @@ app.get('/stickers', function (req, res) {
 
   html += '<div class="howto" style="margin-top:16px"><b>&#127872; Elegant Packages &mdash; hang tags, gift message cards, coupon cards</b><br>' +
     'James Anderson (Sales) &middot; <a href="tel:+16815252420">+1 681 525 2420</a> &middot; <a href="mailto:info@elegantpackages.com">info@elegantpackages.com</a> &middot; <a href="https://www.elegantpackages.com" target="_blank" rel="noopener">elegantpackages.com</a><br>' +
-    'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br>' +
-    '<span style="color:#9B8A92">Last orders: 2,000 DAIRY + 1,000 PARVE swinging hang tags (Dec 2025, gold Pantone D3AF37) &middot; 1,000 coupon cards 3&quot;&times;2&quot; (Nov 2025). Proofs are in Mikey&#39;s email.</span></div>';
+    'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br><br>' +
+    '<b>&#127991;&#65039; ORDER HANG TAGS:</b> reference quote <b>EPCOM-103051</b> &mdash; round swing tags 2.5&quot;&times;2.5&quot;, SBS white coated card 300gsm/14pt, full color both sides, no lamination. Last order: 2,000 DAIRY + 1,000 PARVE, $0.26 each ($693.90 after 10% discount, Dec 2025, gold Pantone D3AF37).<br><br>' +
+    '<b>&#128140; ORDER GIFT CARDS:</b> same company &mdash; email James the gift message card file. Size: <b>4.3&quot; &times; 8.3&quot;</b>. Also does the coupon cards (3&quot;&times;2&quot;, rounded corners, hole punched).<br><br>' +
+    '<span style="color:#9B8A92">Old vendor for these was hangtagsco.com &mdash; repeated problems (wrong QR codes twice, wrong card sizes, refund fights in 2025). Use Elegant Packages instead.</span></div>';
+  html += '<div class="sgrid" style="margin-top:16px">';
+  html += '<div class="scard"><img src="/sticker-files/elegant-packages-products.png" alt=""><div class="nm">What their products look like<br><span style="font-weight:600;color:#9B8A92;font-size:12.5px">gift card &middot; coupon card &middot; parve + dairy hang tags</span></div><a href="/sticker-files/elegant-packages-products.png" target="_blank" rel="noopener">&#128065;&#65039; View full size</a></div>';
+  html += '</div>';
 
   html += '<div class="sec">&#128196; Printable guides</div>';
   html += '<div class="sgrid">';
