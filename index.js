@@ -2560,8 +2560,10 @@ app.get('/stickers', function (req, res) {
 
   html += '<div class="sec">&#127981; Ordered from our printing companies</div>';
 
-  html += '<div class="howto"><b>&#129472; SheetLabels.com &mdash; DAIRY &amp; PARVE stickers</b><br>' +
-    'Email <a href="mailto:support@sheetlabels.com">support@sheetlabels.com</a> &middot; phone 888-391-7165 &middot; fax 518-798-0289. Attach the file when reordering.</div>';
+  html += '<div class="howto"><b>&#129472; SheetLabels.com &mdash; DAIRY &amp; PARVE gold stickers</b><br>' +
+    'Log in at <a href="https://www.sheetlabels.com" target="_blank" rel="noopener">SheetLabels.com</a> as <b>orders@thesweettooth.com</b> (password: <b>Muchogusto</b>) and reorder from order history &mdash; easiest way.<br>' +
+    '<b>Reference order SL343776-4:</b> Custom Sticker Rolls, 2&quot; &times; 1&quot; custom shape, Silver BOPP Permanent (SBP), gloss laminate, white ink: yes.<br>' +
+    'Help: <a href="mailto:support@sheetlabels.com">support@sheetlabels.com</a> &middot; phone 888-391-7165 &middot; fax 518-798-0289.</div>';
   html += '<div class="sgrid">';
   ['dairy-rectangle.png', 'parve-oval.png', 'parve-rectangle.png'].forEach(function (f) {
     var s = STICKERS.filter(function (x) { return x.file === f; })[0];
