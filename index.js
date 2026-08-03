@@ -1550,6 +1550,7 @@ app.get('/', (req, res) => {
   body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
   body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
   body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
+  body += dashTile('Shipping Rates (ShipStation)', 'https://ship.shipstation.com/rates', { emoji: '&#128178;', newTab: true, kw: 'shipping rates rate quote cost shipstation calculator how much price estimate' });
   body += '</div></div></div>';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
