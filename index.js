@@ -1587,16 +1587,29 @@ app.get('/supplies', (req, res) => {
 });
 
 app.get('/supplies/buy', (req, res) => {
-  var tiles = '';
-  tiles += dashTile('Amazon', 'https://www.amazon.com', { newTab: true });
-  tiles += dashTile('Restaurant Depot', 'https://www.restaurantdepot.com', { newTab: true });
-  tiles += dashTile('Instacart (Costco)', 'https://www.instacart.com/store/costco/storefront', { newTab: true });
-  tiles += dashTile('Sam&#39;s Club', 'https://www.samsclub.com', { newTab: true });
-  tiles += dashTile('Linnea&#39;s', 'https://linneasinc.com', { newTab: true });
-  tiles += dashTile('Uline', 'https://www.uline.com', { newTab: true });
-  tiles += dashTile('Hialeah Products', 'https://www.newurbanfarms.com/', { newTab: true });
-  tiles += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com/myaccount/orders', { newTab: true });
-  res.send(dashPage('Buy Supplies', null, tiles, '/supplies'));
+  var body = '';
+  body += '<h2 class="sec">&#127857; Food &amp; General</h2><div class="grid">';
+  body += dashTile('Amazon', 'https://www.amazon.com', { newTab: true, emoji: '&#128230;' });
+  body += dashTile('Restaurant Depot', 'https://www.restaurantdepot.com', { newTab: true, emoji: '&#127978;' });
+  body += dashTile('Instacart (Costco)', 'https://www.instacart.com/store/costco/storefront', { newTab: true, emoji: '&#128717;&#65039;' });
+  body += dashTile('Sam&#39;s Club', 'https://www.samsclub.com', { newTab: true, emoji: '&#128722;' });
+  body += dashTile('Linnea&#39;s', 'https://linneasinc.com', { newTab: true, emoji: '&#127850;' });
+  body += dashTile('Hialeah Products', 'https://www.newurbanfarms.com/', { newTab: true, emoji: '&#129746;' });
+  body += dashTile('WebstaurantStore', 'https://www.webstaurantstore.com/myaccount/orders', { newTab: true, emoji: '&#127869;&#65039;' });
+  body += '</div>';
+
+  body += '<h2 class="sec">&#129530; Baskets, Boxes &amp; Packaging</h2><div class="grid">';
+  body += dashTile('United Baskets', 'http://www.unitedbasketco.com/', { newTab: true, emoji: '&#129530;' });
+  body += dashTile('Longhorn Imports (assorted baskets)', 'https://www.longhornimports.com/', { newTab: true, emoji: '&#129712;' });
+  body += dashTile('Maryland Plastics (plastic trays)', 'https://www.marylandplastics.com/', { newTab: true, emoji: '&#127860;&#65039;' });
+  body += dashTile('A Specialty Box (chocolate boxes)', 'https://aspecialtybox.com/', { newTab: true, emoji: '&#127873;' });
+  body += dashTile('Nashville Wraps (boxes &amp; supplies)', 'https://www.nashvillewraps.com/', { newTab: true, emoji: '&#127880;' });
+  body += dashTile('Sweet Tooth Branded Ribbon (Etsy)', 'https://www.etsy.com/shop/GlobalHomeStudio', { newTab: true, emoji: '&#127872;' });
+  body += dashTile('Crinkle Paper (shred)', 'https://crinklepaper.com/', { newTab: true, emoji: '&#127744;' });
+  body += dashTile('Uline (ice packs)', 'https://www.uline.com/MyAccount/MyUline', { newTab: true, emoji: '&#129482;' });
+  body += '</div>';
+
+  res.send(dashPage('Buy Supplies', 'Restaurant Depot membership #: 1016417192', body, '/supplies', null, true));
 });
 
 // ============ ORDER LOOKUP ============
