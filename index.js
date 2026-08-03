@@ -1600,7 +1600,7 @@ app.get('/supplies/buy', (req, res) => {
 
   body += '<h2 class="sec">&#129530; Baskets, Boxes &amp; Packaging</h2><div class="grid">';
   body += dashTile('United Baskets', 'http://www.unitedbasketco.com/', { newTab: true, emoji: '&#129530;' });
-  body += dashTile('Longhorn Imports (assorted baskets)', 'https://www.longhornimports.com/', { newTab: true, emoji: '&#129712;' });
+  body += dashTile('Longhorn Imports (assorted baskets)', 'https://www.longhornimports.com/', { newTab: true, emoji: '&#127806;' });
   body += dashTile('Maryland Plastics (plastic trays)', 'https://www.marylandplastics.com/', { newTab: true, emoji: '&#127860;&#65039;' });
   body += dashTile('A Specialty Box (chocolate boxes)', 'https://aspecialtybox.com/', { newTab: true, emoji: '&#127873;' });
   body += dashTile('Nashville Wraps (Sweet Tooth bags)', 'https://www.nashvillewraps.com/', { newTab: true, emoji: '&#128717;&#65039;' });
