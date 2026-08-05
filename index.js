@@ -1582,22 +1582,35 @@ app.get('/', (req, res) => {
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true, true));
 });
 
-// Where-to-buy lookup: type a product, get the vendor. Grow this list by telling Claude.
+// Where-to-buy lookup: type a product, get the vendor. Sources: Vendor List spreadsheet
+// (Google Drive) + everything documented on the dashboard. Grow it by telling Claude.
 var WHERE_TO_BUY = [
   { t: ['strawberr'], p: 'Fresh strawberries', w: 'Publix — order on Instacart (or store run)' },
   { t: ['apple'], p: 'Fresh apples (candy / caramel apples)', w: 'Publix — order on Instacart (or store run)' },
+  { t: ['caramel apple coating', 'caramel coating', 'caramel'], p: 'Caramel apple coating', w: 'Florida Choice Foods — 954-989-7964' },
   { t: ['pretzel'], p: 'Gluten-free pretzels', w: 'Publix — order on Instacart' },
-  { t: ['oreo'], p: 'Gluten-free Oreos', w: 'Publix — order on Instacart' },
-  { t: ['rugelach', 'rugulach', 'rugalach', 'black and white', 'black & white', 'cookie'], p: "Sonny's rugelach & black-and-white cookies", w: "Sonny's Bakery — pick up in person" },
+  { t: ['oreo'], p: 'Gluten-free Oreos: Publix (Instacart). Parve Oreos & parve marshmallows', w: 'M&E Foods — 305-654-5674' },
+  { t: ['marshmallow'], p: 'Parve marshmallows', w: 'M&E Foods — 305-654-5674' },
+  { t: ['rugelach', 'rugulach', 'rugalach', 'black and white', 'black & white'], p: "Rugelach & black-and-white cookies", w: "Sonny's Bakery (same-day pickup) · wholesale rugelach: My Mother's Delicacies, Caitlin, 570-343-5266" },
+  { t: ['cookie'], p: 'Cookies (wholesale)', w: 'BakeMark — Carlos Ayala, 561-335-8534' },
   { t: ['ice pack', 'gel pack', 'ice'], p: 'Ice packs', w: 'Uline (ice packs tile below)' },
-  { t: ['pink bag', 'mucho gusto bag', 'foil bag', 'resealable', 'bag'], p: 'Pink Mucho Gusto bags (5.5" x 7.8")', w: 'Amazon — any brand (FireKylin last time). Sweet Tooth shopping bags: Nashville Wraps' },
+  { t: ['pink bag', 'mucho gusto bag', 'foil bag', 'resealable', 'bag'], p: 'Pink Mucho Gusto bags (5.5" x 7.8")', w: 'Amazon — any brand. Sweet Tooth bags & papers: Nashville Wraps 800-547-9727 · also Glenup-Revere Co' },
   { t: ['blank label', 'vinyl', 'round label'], p: '3" blank round vinyl labels (Mucho Gusto)', w: 'Amazon — any brand' },
-  { t: ['basket'], p: 'Baskets', w: 'United Baskets · assorted baskets: Longhorn Imports' },
-  { t: ['tray'], p: 'Plastic trays', w: 'Maryland Plastics' },
-  { t: ['box'], p: 'Chocolate boxes', w: 'A Specialty Box · Nashville Wraps' },
-  { t: ['ribbon'], p: 'Sweet Tooth branded ribbon', w: 'Etsy — GlobalHomeStudio (tile below)' },
-  { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'crinklepaper.com (tile below)' },
-  { t: ['sticker', 'label', 'hang tag', 'hangtag', 'gift card', 'coupon'], p: 'Stickers, hang tags, gift & coupon cards', w: 'Stickers & Labels page on the dashboard (all vendors + files there)' }
+  { t: ['basket'], p: 'Baskets', w: 'United Baskets · assorted: Longhorn Imports 800-641-8348' },
+  { t: ['tray'], p: 'Plastic trays', w: 'Maryland Plastics · Atlantic Can Company 609-518-9950' },
+  { t: ['chocolate box'], p: 'Chocolate boxes', w: 'A Specialty Box · Nashville Wraps' },
+  { t: ['box', 'tape', 'bubble', 'peanut', 'packing'], p: 'Shipping boxes, tape, bubble wrap, packing peanuts', w: 'Broward Paper — Jim, 305-798-1668 · Mac Paper 800-622-2968. Chocolate boxes: A Specialty Box · Nashville Wraps' },
+  { t: ['ribbon'], p: 'Ribbon', w: 'Sweet Tooth branded: Etsy GlobalHomeStudio · bulk: Berwick Offray, John Wangrin, 770-458-8888' },
+  { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'Crinkle Pak — Mark Gannon, 708-307-3528 (crinklepaper.com tile below)' },
+  { t: ['cellophane', 'celophane', 'wrap'], p: 'Cellophane', w: 'Designer Films — 305-828-0605' },
+  { t: ['transfer sheet'], p: 'Chocolate transfer sheets', w: 'Choco — 702-899-9296' },
+  { t: ['fruit', 'nut', 'sprinkle'], p: 'Fruits, nuts, sprinkles (+ Passover items)', w: 'Hialeah Products — 800-923-3379' },
+  { t: ['glace', 'glacie'], p: 'Glacé fruit', w: 'International Glace — 760-731-3220' },
+  { t: ['melter', 'machine'], p: 'Chocolate melters', w: 'Hillard Chocolate — 508-587-3666' },
+  { t: ['chocolate', 'color', 'flavor'], p: 'Chocolate, colors, flavoring', w: "Linnea's Cakes & Candles (tile below)" },
+  { t: ['passover'], p: 'Passover chocolate & ingredients', w: 'Hana Spitzer — 718-388-4975 · Passover honey: Marcky’s 305-758-9288 · Hialeah Products' },
+  { t: ['mold'], p: 'Custom chocolate molds', w: 'Chocolate Concepts — Bobby Barton, 330-877-3322' },
+  { t: ['sticker', 'label', 'hang tag', 'hangtag', 'gift card', 'coupon'], p: 'Stickers, hang tags, gift & coupon cards', w: 'Stickers & Labels page on the dashboard (all vendors + files) · bulk label printing: RepaCorp, Rob Gaylon, 937-667-8496' }
 ];
 
 app.get('/supplies', (req, res) => {
