@@ -1411,7 +1411,7 @@ var DASH_ICONS = {
 var TOPBAR_HTML = '<header class="topbar"><a class="homebtn" href="/">&#127968; HOME</a><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
 var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
   '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}' +
-  '.topbar a.homebtn{display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 18px;border-radius:11px;margin-right:16px;padding-bottom:9px}';
+  '.topbar a.homebtn{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 22px;border-radius:11px;padding-bottom:9px}';
 
 function dashTile(label, href, opts) {
   opts = opts || {};
@@ -1582,18 +1582,51 @@ app.get('/', (req, res) => {
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true, true));
 });
 
+// Where-to-buy lookup: type a product, get the vendor. Grow this list by telling Claude.
+var WHERE_TO_BUY = [
+  { t: ['strawberr'], p: 'Fresh strawberries', w: 'Publix — order on Instacart (or store run)' },
+  { t: ['apple'], p: 'Fresh apples (candy / caramel apples)', w: 'Publix — order on Instacart (or store run)' },
+  { t: ['pretzel'], p: 'Gluten-free pretzels', w: 'Publix — order on Instacart' },
+  { t: ['oreo'], p: 'Gluten-free Oreos', w: 'Publix — order on Instacart' },
+  { t: ['rugelach', 'rugulach', 'rugalach', 'black and white', 'black & white', 'cookie'], p: "Sonny's rugelach & black-and-white cookies", w: "Sonny's Bakery — pick up in person" },
+  { t: ['ice pack', 'gel pack', 'ice'], p: 'Ice packs', w: 'Uline (ice packs tile below)' },
+  { t: ['pink bag', 'mucho gusto bag', 'foil bag', 'resealable', 'bag'], p: 'Pink Mucho Gusto bags (5.5" x 7.8")', w: 'Amazon — any brand (FireKylin last time). Sweet Tooth shopping bags: Nashville Wraps' },
+  { t: ['blank label', 'vinyl', 'round label'], p: '3" blank round vinyl labels (Mucho Gusto)', w: 'Amazon — any brand' },
+  { t: ['basket'], p: 'Baskets', w: 'United Baskets · assorted baskets: Longhorn Imports' },
+  { t: ['tray'], p: 'Plastic trays', w: 'Maryland Plastics' },
+  { t: ['box'], p: 'Chocolate boxes', w: 'A Specialty Box · Nashville Wraps' },
+  { t: ['ribbon'], p: 'Sweet Tooth branded ribbon', w: 'Etsy — GlobalHomeStudio (tile below)' },
+  { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'crinklepaper.com (tile below)' },
+  { t: ['sticker', 'label', 'hang tag', 'hangtag', 'gift card', 'coupon'], p: 'Stickers, hang tags, gift & coupon cards', w: 'Stickers & Labels page on the dashboard (all vendors + files there)' }
+];
+
 app.get('/supplies', (req, res) => {
-  var tiles = '';
-  tiles += dashTile('Buy Supplies', '/supplies/buy', { icon: 'cart' });
-  tiles += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true, icon: 'hand' });
-  res.send(dashPage('Supplies', null, tiles, '/'));
+  var body = '';
+  body += '<form class="searchbar" action="/supplies/buy" method="get" style="margin-top:26px">';
+  body += '<input type="text" name="q" placeholder="What do you need? Type it: strawberries, ribbon, ice packs&hellip;" autofocus>';
+  body += '<button type="submit">Where do I get it?</button></form>';
+  body += '<div class="grid">';
+  body += dashTile('Buy Supplies', '/supplies/buy', { icon: 'cart' });
+  body += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true, icon: 'hand' });
+  body += '</div>';
+  // searchbar CSS lives in lookupShell pages; add minimal here
+  body += '<style>.searchbar{display:flex;gap:10px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}.searchbar button{padding:16px 24px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:15.5px;font-weight:700;cursor:pointer}</style>';
+  res.send(dashPage('Supplies', null, body, '/', null, true));
 });
 
 app.get('/supplies/buy', (req, res) => {
   var body = '';
+  body += '<style>.searchbar{display:flex;gap:10px;margin-top:26px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}';
+  body += '.whr{background:#fff;border:1px solid #EFEBED;border-left:5px solid #F7B5CD;border-radius:14px;padding:14px 18px;font-size:15.5px;font-weight:600;margin-top:12px}.whr b{font-size:16px}';
+  body += '.whr-miss{display:none;background:#fff;border:1px dashed #D9CFD4;border-radius:14px;padding:14px 18px;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:12px}</style>';
+  body += '<div class="searchbar"><input type="text" id="whereq" placeholder="What do you need? Type it: strawberries, ribbon, ice packs&hellip;"></div>';
+  body += '<div id="where-results"></div>';
+  body += '<div class="whr-miss" id="where-miss">Not in the list yet &mdash; ask Mikey where it comes from, then tell Claude to add it here.</div>';
+
   body += '<h2 class="sec">&#127857; Food &amp; General</h2><div class="grid">';
   body += dashTile('Amazon', 'https://www.amazon.com', { newTab: true, emoji: '&#128230;' });
   body += dashTile('Restaurant Depot', 'https://www.restaurantdepot.com', { newTab: true, emoji: '&#127978;' });
+  body += dashTile('Instacart (Publix)', 'https://www.instacart.com/store/publix/storefront', { newTab: true, emoji: '&#129365;' });
   body += dashTile('Instacart (Costco)', 'https://www.instacart.com/store/costco/storefront', { newTab: true, emoji: '&#128717;&#65039;' });
   body += dashTile('Sam&#39;s Club', 'https://www.samsclub.com', { newTab: true, emoji: '&#128722;' });
   body += dashTile('Linnea&#39;s', 'https://linneasinc.com', { newTab: true, emoji: '&#127850;' });
@@ -1612,6 +1645,16 @@ app.get('/supplies/buy', (req, res) => {
   body += dashTile('Uline (ice packs)', 'https://www.uline.com/MyAccount/MyUline', { newTab: true, emoji: '&#129482;' });
   body += '</div>';
 
+  body += '<script>(function(){var DATA=' + JSON.stringify(WHERE_TO_BUY) + ';';
+  body += 'var q=document.getElementById("whereq"),res=document.getElementById("where-results"),miss=document.getElementById("where-miss");';
+  body += 'function run(){var v=q.value.trim().toLowerCase();res.innerHTML="";miss.style.display="none";if(!v)return;';
+  body += 'var hits=DATA.filter(function(it){return it.t.some(function(t){return v.indexOf(t)>-1||t.indexOf(v)>-1})||it.p.toLowerCase().indexOf(v)>-1});';
+  body += 'if(!hits.length){miss.style.display="block";return}';
+  body += 'hits.slice(0,5).forEach(function(it){var d=document.createElement("div");d.className="whr";';
+  body += 'var b=document.createElement("b");b.textContent=it.p;d.appendChild(b);';
+  body += 'var s=document.createElement("div");s.textContent="\\u27A1\\uFE0F "+it.w;d.appendChild(s);res.appendChild(d)})}';
+  body += 'q.addEventListener("input",run);';
+  body += 'var pre=new URLSearchParams(location.search).get("q");if(pre){q.value=pre;run()}})();</script>';
   res.send(dashPage('Buy Supplies', 'Restaurant Depot membership #: 1016417192', body, '/supplies', null, true));
 });
 
