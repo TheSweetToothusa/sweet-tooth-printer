@@ -1584,33 +1584,45 @@ app.get('/', (req, res) => {
 
 // Where-to-buy lookup: type a product, get the vendor. Sources: Vendor List spreadsheet
 // (Google Drive) + everything documented on the dashboard. Grow it by telling Claude.
+var KOSHER3 = "Sarah's Tent (Aventura) \u00b7 KC Market (Hallandale or Hollywood) \u00b7 Kosher Kingdom (Aventura)";
+var PUBLIX_PICKUP = "Pick up in person: Publix, Whole Foods, Walmart \u2014 or Instacart for delivery";
+var RD_NOTE = "Restaurant Depot \u2014 pick up in person, or schedule delivery through Instacart";
 var WHERE_TO_BUY = [
-  { t: ['strawberr'], p: 'Fresh strawberries', w: 'Publix — order on Instacart (or store run)' },
-  { t: ['apple'], p: 'Fresh apples (candy / caramel apples)', w: 'Publix — order on Instacart (or store run)' },
-  { t: ['caramel apple coating', 'caramel coating', 'caramel'], p: 'Caramel apple coating', w: 'Florida Choice Foods — 954-989-7964' },
-  { t: ['pretzel'], p: 'Gluten-free pretzels', w: 'Publix — order on Instacart' },
-  { t: ['oreo'], p: 'Gluten-free Oreos: Publix (Instacart). Parve Oreos & parve marshmallows', w: 'M&E Foods — 305-654-5674' },
-  { t: ['marshmallow'], p: 'Parve marshmallows', w: 'M&E Foods — 305-654-5674' },
-  { t: ['rugelach', 'rugulach', 'rugalach', 'black and white', 'black & white'], p: "Rugelach & black-and-white cookies", w: "Sonny's Bakery (same-day pickup) · wholesale rugelach: My Mother's Delicacies, Caitlin, 570-343-5266" },
-  { t: ['cookie'], p: 'Cookies (wholesale)', w: 'BakeMark — Carlos Ayala, 561-335-8534' },
-  { t: ['ice pack', 'gel pack', 'ice'], p: 'Ice packs', w: 'Uline (ice packs tile below)' },
-  { t: ['pink bag', 'mucho gusto bag', 'foil bag', 'resealable', 'bag'], p: 'Pink Mucho Gusto bags (5.5" x 7.8")', w: 'Amazon — any brand. Sweet Tooth bags & papers: Nashville Wraps 800-547-9727 · also Glenup-Revere Co' },
-  { t: ['blank label', 'vinyl', 'round label'], p: '3" blank round vinyl labels (Mucho Gusto)', w: 'Amazon — any brand' },
-  { t: ['basket'], p: 'Baskets', w: 'United Baskets · assorted: Longhorn Imports 800-641-8348' },
-  { t: ['tray'], p: 'Plastic trays', w: 'Maryland Plastics · Atlantic Can Company 609-518-9950' },
-  { t: ['chocolate box'], p: 'Chocolate boxes', w: 'A Specialty Box · Nashville Wraps' },
-  { t: ['box', 'tape', 'bubble', 'peanut', 'packing'], p: 'Shipping boxes, tape, bubble wrap, packing peanuts', w: 'Broward Paper — Jim, 305-798-1668 · Mac Paper 800-622-2968. Chocolate boxes: A Specialty Box · Nashville Wraps' },
-  { t: ['ribbon'], p: 'Ribbon', w: 'Sweet Tooth branded: Etsy GlobalHomeStudio · bulk: Berwick Offray, John Wangrin, 770-458-8888' },
-  { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'Crinkle Pak — Mark Gannon, 708-307-3528 (crinklepaper.com tile below)' },
-  { t: ['cellophane', 'celophane', 'wrap'], p: 'Cellophane', w: 'Designer Films — 305-828-0605' },
-  { t: ['transfer sheet'], p: 'Chocolate transfer sheets', w: 'Choco — 702-899-9296' },
-  { t: ['fruit', 'nut', 'sprinkle'], p: 'Fruits, nuts, sprinkles (+ Passover items)', w: 'Hialeah Products — 800-923-3379' },
-  { t: ['glace', 'glacie'], p: 'Glacé fruit', w: 'International Glace — 760-731-3220' },
-  { t: ['melter', 'machine'], p: 'Chocolate melters', w: 'Hillard Chocolate — 508-587-3666' },
+  { t: ['strawberr'], p: 'Fresh strawberries', w: PUBLIX_PICKUP },
+  { t: ['apple', 'granny smith'], p: 'Granny Smith apples (candy / caramel apples)', w: 'Publix or Whole Foods \u00b7 big orders: ' + RD_NOTE },
+  { t: ['caramel apple coating', 'caramel coating', 'coating'], p: 'Caramel apple coating', w: 'Florida Choice Foods \u2014 954-989-7964' },
+  { t: ['caramel', 'peter'], p: "Peter's Caramel", w: "Order from Linnea's" },
+  { t: ['dulce', 'parve caramel'], p: 'Parve caramel / dulce de leche', w: KOSHER3 },
+  { t: ['pretzel', 'snyder'], p: 'Pretzels', w: 'Gluten-free: ' + PUBLIX_PICKUP + '. Snyders: Publix \u00b7 Amazon \u00b7 WebstaurantStore' },
+  { t: ['oreo'], p: 'Oreos', w: 'Gluten-free: ' + PUBLIX_PICKUP + '. Parve Oreos: M&E Foods 305-654-5674' },
+  { t: ['marshmallow'], p: 'Marshmallows', w: 'Parve (wholesale): M&E Foods 305-654-5674 \u00b7 Vegan: Amazon, or in person at ' + KOSHER3 },
+  { t: ['nutella'], p: 'Vegan/parve Nutella', w: KOSHER3 },
+  { t: ['graham'], p: 'Graham crackers (all are vegan/parve)', w: KOSHER3 },
+  { t: ['matzah', 'matzo'], p: 'Gluten-free matzah', w: "Amazon \u00b7 Publix \u00b7 Whole Foods \u00b7 Kosher Kingdom \u00b7 Sarah's Tent" },
+  { t: ['biscoff'], p: 'Biscoff (parve)', w: KOSHER3 },
+  { t: ['parve', 'vegan'], p: 'Parve/vegan specialty items \u2014 check these first', w: KOSHER3 },
+  { t: ['almond', 'pecan'], p: 'Almonds & pecans', w: "Costco or Sam's Club" },
+  { t: ['rugelach', 'rugulach', 'rugalach', 'black and white', 'black & white'], p: "Rugelach & black-and-white cookies", w: "Sonny's Bakery (same-day pickup) \u00b7 wholesale rugelach: My Mother's Delicacies, Caitlin, 570-343-5266" },
+  { t: ['cookie'], p: 'Cookies (wholesale)', w: 'BakeMark \u2014 Carlos Ayala, 561-335-8534' },
+  { t: ['ice pack', 'gel pack', 'ice'], p: 'Ice packs', w: 'Uline (ice packs tile below) \u00b7 ' + RD_NOTE },
+  { t: ['pink bag', 'mucho gusto bag', 'foil bag', 'resealable', 'bag'], p: 'Pink Mucho Gusto bags (5.5" x 7.8")', w: 'Amazon \u2014 any brand. Sweet Tooth bags & papers: Nashville Wraps 800-547-9727 \u00b7 also Glenup-Revere Co' },
+  { t: ['blank label', 'vinyl', 'round label'], p: '3" blank round vinyl labels (Mucho Gusto)', w: 'Amazon \u2014 any brand' },
+  { t: ['basket'], p: 'Baskets', w: 'United Baskets \u00b7 assorted: Longhorn Imports 800-641-8348' },
+  { t: ['tray'], p: 'Plastic trays', w: 'Maryland Plastics \u00b7 Atlantic Can Company 609-518-9950' },
+  { t: ['chocolate box'], p: 'Chocolate boxes', w: 'A Specialty Box \u00b7 Nashville Wraps' },
+  { t: ['box', 'tape', 'bubble', 'peanut', 'packing'], p: 'Shipping boxes, tape, bubble wrap, packing peanuts', w: 'Broward Paper \u2014 Jim, 305-798-1668 \u00b7 Mac Paper 800-622-2968. Chocolate boxes: A Specialty Box \u00b7 Nashville Wraps' },
+  { t: ['ribbon'], p: 'Sweet Tooth branded ribbon', w: 'Etsy \u2014 GlobalHomeStudio \u00b7 bulk ribbon: Berwick Offray, John Wangrin, 770-458-8888' },
+  { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'Crinkle Pak \u2014 Mark Gannon, 708-307-3528 (crinklepaper.com tile below)' },
+  { t: ['cellophane', 'celophane', 'wrap'], p: 'Cellophane', w: 'Designer Films \u2014 305-828-0605' },
+  { t: ['transfer sheet'], p: 'Chocolate transfer sheets', w: 'Choco \u2014 702-899-9296' },
+  { t: ['fruit', 'nut', 'sprinkle'], p: 'Fruits, nuts, sprinkles (+ Passover items)', w: 'Hialeah Products \u2014 800-923-3379' },
+  { t: ['glace', 'glacie'], p: 'Glac\u00e9 fruit', w: 'International Glace \u2014 760-731-3220' },
+  { t: ['melter', 'machine'], p: 'Chocolate melters', w: 'Hillard Chocolate \u2014 508-587-3666' },
   { t: ['chocolate', 'color', 'flavor'], p: 'Chocolate, colors, flavoring', w: "Linnea's Cakes & Candles (tile below)" },
-  { t: ['passover'], p: 'Passover chocolate & ingredients', w: 'Hana Spitzer — 718-388-4975 · Passover honey: Marcky’s 305-758-9288 · Hialeah Products' },
-  { t: ['mold'], p: 'Custom chocolate molds', w: 'Chocolate Concepts — Bobby Barton, 330-877-3322' },
-  { t: ['sticker', 'label', 'hang tag', 'hangtag', 'gift card', 'coupon'], p: 'Stickers, hang tags, gift & coupon cards', w: 'Stickers & Labels page on the dashboard (all vendors + files) · bulk label printing: RepaCorp, Rob Gaylon, 937-667-8496' }
+  { t: ['passover'], p: 'Passover chocolate & ingredients', w: "Hana Spitzer \u2014 718-388-4975 \u00b7 Passover honey: Marcky's 305-758-9288 \u00b7 Hialeah Products" },
+  { t: ['mold'], p: 'Custom chocolate molds', w: 'Chocolate Concepts \u2014 Bobby Barton, 330-877-3322' },
+  { t: ['sticker', 'label', 'hang tag', 'hangtag', 'gift card', 'coupon'], p: 'Stickers, hang tags, gift & coupon cards', w: 'Stickers & Labels page on the dashboard (all vendors + files) \u00b7 bulk label printing: RepaCorp, Rob Gaylon, 937-667-8496' },
+  { t: ['restaurant depot'], p: 'Restaurant Depot orders', w: RD_NOTE + ' (membership # is at the top of this page)' }
 ];
 
 app.get('/supplies', (req, res) => {
@@ -1663,7 +1675,7 @@ app.get('/supplies/buy', (req, res) => {
   body += 'function run(){var v=q.value.trim().toLowerCase();res.innerHTML="";miss.style.display="none";if(!v)return;';
   body += 'var hits=DATA.filter(function(it){return it.t.some(function(t){return v.indexOf(t)>-1||t.indexOf(v)>-1})||it.p.toLowerCase().indexOf(v)>-1});';
   body += 'if(!hits.length){miss.style.display="block";return}';
-  body += 'hits.slice(0,5).forEach(function(it){var d=document.createElement("div");d.className="whr";';
+  body += 'hits.slice(0,6).forEach(function(it){var d=document.createElement("div");d.className="whr";';
   body += 'var b=document.createElement("b");b.textContent=it.p;d.appendChild(b);';
   body += 'var s=document.createElement("div");s.textContent="\\u27A1\\uFE0F "+it.w;d.appendChild(s);res.appendChild(d)})}';
   body += 'q.addEventListener("input",run);';
