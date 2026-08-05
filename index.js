@@ -1615,7 +1615,7 @@ var WHERE_TO_BUY = [
   { t: ['crinkle', 'shred'], p: 'Crinkle paper / shred', w: 'Crinkle Pak \u2014 Mark Gannon, 708-307-3528 (crinklepaper.com tile below)' },
   { t: ['cellophane', 'celophane', 'wrap'], p: 'Cellophane', w: 'Designer Films \u2014 305-828-0605' },
   { t: ['transfer sheet'], p: 'Chocolate transfer sheets', w: 'Choco \u2014 702-899-9296' },
-  { t: ['fruit', 'nut', 'sprinkle'], p: 'Fruits, nuts, sprinkles (+ Passover items)', w: 'Hialeah Products \u2014 800-923-3379' },
+  { t: ['fruit', 'nuts', 'sprinkle'], p: 'Fruits, nuts, sprinkles (+ Passover items)', w: 'Hialeah Products \u2014 800-923-3379' },
   { t: ['glace', 'glacie'], p: 'Glac\u00e9 fruit', w: 'International Glace \u2014 760-731-3220' },
   { t: ['melter', 'machine'], p: 'Chocolate melters', w: 'Hillard Chocolate \u2014 508-587-3666' },
   { t: ['chocolate', 'color', 'flavor'], p: 'Chocolate, colors, flavoring', w: "Linnea's Cakes & Candles (tile below)" },
