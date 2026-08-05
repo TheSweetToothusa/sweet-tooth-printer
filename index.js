@@ -1408,9 +1408,10 @@ var DASH_ICONS = {
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
-var TOPBAR_HTML = '<header class="topbar"><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
+var TOPBAR_HTML = '<header class="topbar"><a class="homebtn" href="/">&#127968; HOME</a><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
 var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
-  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}';
+  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}' +
+  '.topbar a.homebtn{display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 18px;border-radius:11px;margin-right:16px;padding-bottom:9px}';
 
 function dashTile(label, href, opts) {
   opts = opts || {};
@@ -1424,7 +1425,7 @@ function dashTile(label, href, opts) {
   } else if (opts.icon && DASH_ICONS[opts.icon]) {
     html += '<span class="icon-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + DASH_ICONS[opts.icon] + '</svg></span>';
   }
-  html += '<span class="label">' + label + '</span></a>';
+  html += '<span class="label">' + label + (opts.sub ? '<br><span class="sublabel">' + opts.sub + '</span>' : '') + '</span></a>';
   return html;
 }
 
@@ -1448,6 +1449,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.icon-badge svg{width:34px;height:34px}';
   html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
   html += '.tile .emoji{font-size:36px;line-height:1}';
+  html += '.tile .sublabel{font-size:12.5px;font-weight:700;color:#9B8A92;letter-spacing:0}';
   html += '.tile.dim{opacity:.18}';
   html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:22px 0 0;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
   html += '.sec:first-of-type{margin-top:20px}';
@@ -1551,7 +1553,7 @@ app.get('/', (req, res) => {
   body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
   body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
   body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
-  body += dashTile('Shipping Rates (ShipStation)', 'https://ship.shipstation.com/rates', { emoji: '&#128178;', newTab: true, kw: 'shipping rates rate quote cost shipstation calculator how much price estimate' });
+  body += dashTile('Create New Shipping Label', 'https://ship.shipstation.com/rates', { emoji: '&#128178;', newTab: true, sub: 'ShipStation', kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
   body += '</div></div></div>';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
