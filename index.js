@@ -1566,7 +1566,8 @@ app.get('/', (req, res) => {
   body += '</div></div></div>';
 
   body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
-  body += dashTile('Create a Draft Order', '/draft-order', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  // The old all-on-one-page version still lives at /draft-order if we ever need it back.
+  body += dashTile('Create a Draft Order', '/draft-order-new', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
   body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
   body += '</div>';
 
