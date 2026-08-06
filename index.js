@@ -2053,9 +2053,41 @@ app.post('/draft-order/create', async (req, res) => {
       // requires_shipping keeps Shopify from dropping a custom shipping/delivery line.
       return { title: String(it.title || 'Custom item'), price: String(parseFloat(it.price) || 0), quantity: qty, requires_shipping: true };
     });
-    var draft = { line_items: lineItems, tags: 'st_dashboard' };
+    // Anything made here is typed by staff, so it carries the same stamp as an order
+    // typed on a store computer — keeps the staff-entered reporting complete.
+    var draft = { line_items: lineItems, tags: 'st_dashboard, st_staff_entered' };
     if (req.body.email) draft.email = String(req.body.email).trim();
     if (req.body.note) draft.note = String(req.body.note).trim();
+
+    // Where it's going. Only set when there's a real street address (pickup has none).
+    var addr = req.body.shippingAddress || {};
+    if (String(addr.address1 || '').trim() || String(addr.name || '').trim()) {
+      // Shopify ignores a plain "name" here — it wants first/last separately.
+      var whole = String(addr.name || '').trim().split(/\s+/);
+      draft.shipping_address = {
+        first_name: whole.shift() || '',
+        last_name: whole.join(' '),
+        address1: String(addr.address1 || '').trim(),
+        address2: String(addr.address2 || '').trim(),
+        city: String(addr.city || '').trim(),
+        province: String(addr.province || 'FL').trim().toUpperCase(),
+        zip: String(addr.zip || '').trim(),
+        country: 'United States',
+        country_code: 'US',
+        phone: String(addr.phone || '').trim()
+      };
+    }
+
+    // Gift Message / Gift Sender / Gift Receiver / Delivery Method / Delivery Date —
+    // same note_attribute names the website puts on web orders, so the gift card,
+    // the invoice and the driver app all read them the usual way.
+    var attrs = [{ name: '⚠️ Order Source', value: '🟠 STAFF ENTERED — made on the employee dashboard' }];
+    (Array.isArray(req.body.attributes) ? req.body.attributes : []).forEach(function (a) {
+      if (a && a.name && String(a.value == null ? '' : a.value).trim()) {
+        attrs.push({ name: String(a.name), value: String(a.value) });
+      }
+    });
+    draft.note_attributes = attrs;
 
     var ship = req.body.shipping || {};
     var shipPrice = parseFloat(ship.price);
@@ -2215,6 +2247,324 @@ app.get('/draft-order', (req, res) => {
   html += 'try{var r=await fetch("/draft-order/send-invoice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})});var j=await r.json();';
   html += 'if(!r.ok||j.error)throw new Error(j.error||"Server error");b.textContent="\\u2714 Invoice emailed"+(j.to?" to "+j.to:"");b.onclick=function(){return false}}';
   html += 'catch(e){b.textContent="Email Invoice to Customer";showErr("Could not email the invoice: "+e.message)}}';
+  html += '</script>';
+  html += '</div></body></html>';
+  res.send(html);
+});
+
+// ============ CREATE A DRAFT ORDER — STEP BY STEP ============
+// One question per screen. On a local delivery the ZIP is asked FIRST so the delivery
+// fee comes straight off the price table instead of staff typing it from memory.
+app.get('/draft-order-new', (req, res) => {
+  var html = '<!DOCTYPE html><html><head><title>Create a Draft Order — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+  html += '<style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:88px 20px 44px}';
+  html += '.wrap{max-width:640px;margin:0 auto}';
+  html += TOPBAR_CSS;
+  html += '.dots{display:flex;gap:7px;justify-content:center;margin-bottom:24px}';
+  html += '.dots i{width:34px;height:7px;border-radius:7px;background:#EDE4E8}';
+  html += '.dots i.done{background:#2A2A2A}.dots i.on{background:#F7B5CD}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:22px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:26px 24px}';
+  html += '.q{font-size:25px;font-weight:800;letter-spacing:-.5px;text-align:center;line-height:1.25}';
+  html += '.qs{font-size:15.5px;color:#9B8A92;text-align:center;margin-top:8px;line-height:1.45}';
+  html += '.body{margin-top:22px}';
+  html += '.pick{display:flex;align-items:center;gap:16px;width:100%;background:#fff;border:2px solid #EFEBED;border-radius:18px;padding:18px 20px;margin-bottom:13px;cursor:pointer;text-align:left;color:#2A2A2A;font-family:inherit}';
+  html += '.pick:hover{border-color:#F7B5CD;background:#FFFCFD}';
+  html += '.pick.on{border-color:#F7B5CD;background:#FFF7FA}';
+  html += '.pick .e{font-size:34px;line-height:1;flex-shrink:0}';
+  html += '.pick .t{display:block;font-size:20px;font-weight:800;letter-spacing:-.2px}';
+  html += '.pick .s{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:3px;line-height:1.35}';
+  html += '.field{margin-bottom:15px}';
+  html += '.field label{display:block;font-size:15.5px;font-weight:800;margin-bottom:7px}';
+  html += '.field .hint{font-size:14px;color:#9B8A92;font-weight:600;margin-top:6px;line-height:1.45}';
+  html += 'input,select,textarea{width:100%;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:13px;font-size:17px;font-family:inherit;background:#fff;color:#2A2A2A}';
+  html += 'input:focus,select:focus,textarea:focus{outline:none;border-color:#F7B5CD}';
+  html += 'textarea{min-height:110px;resize:vertical;line-height:1.5}';
+  html += '.two{display:flex;gap:12px}.two > *{flex:1;min-width:0}';
+  html += '.zipbig input{font-size:30px;font-weight:800;text-align:center;letter-spacing:5px;padding:18px 16px}';
+  html += '.feebox{margin-top:14px;border-radius:16px;padding:20px;text-align:center;background:#FFF7FA;border:2px solid #F7B5CD;display:none}';
+  html += '.feebox .n{font-size:36px;font-weight:800;letter-spacing:-1px}';
+  html += '.feebox .l{font-size:14.5px;font-weight:700;color:#9B8A92;margin-top:4px}';
+  html += '.feebox.miss{background:#FFF6F4;border-color:#E8A79A}';
+  html += '.feebox.miss .n{font-size:20px;line-height:1.4}';
+  html += '.navrow{display:flex;gap:12px;margin-top:24px}';
+  html += '.btn{padding:17px 22px;border:none;border-radius:14px;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;flex-shrink:0}';
+  html += '.btn.next{flex:1;background:#2A2A2A;color:#fff}';
+  html += '.btn.next:disabled{opacity:.35;cursor:default}';
+  html += '.btn.back{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
+  html += '.btn.sm{padding:13px 20px;font-size:15px;border-radius:12px;background:#2A2A2A;color:#fff}';
+  html += '.searchrow{display:flex;gap:10px}.searchrow input{flex:1}';
+  html += '.hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid #F5F1F3;font-size:15.5px;line-height:1.35}.hit:last-child{border-bottom:none}';
+  html += '.hit .add{padding:9px 17px;font-size:14px;border-radius:10px;border:none;background:#2A2A2A;color:#fff;font-weight:800;cursor:pointer;flex-shrink:0;font-family:inherit}';
+  html += '.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.row:last-child{border-bottom:none}';
+  html += '.row .t{flex:1;font-weight:650;line-height:1.35}';
+  html += '.row input.q2{width:66px;padding:9px;text-align:center;font-size:15px}';
+  html += '.row .p{width:86px;text-align:right;font-weight:800}';
+  html += '.row .x{background:none;border:none;color:#C94F7C;font-size:23px;font-weight:800;cursor:pointer;padding:2px 6px;line-height:1}';
+  html += '.tot{display:flex;justify-content:space-between;font-size:19px;font-weight:800;padding-top:15px;margin-top:4px;border-top:2px solid #F3EDF0}';
+  html += '.muted{color:#9B8A92;font-size:15px;line-height:1.5}';
+  html += '.rev h3{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#9B8A92;margin:20px 0 9px}';
+  html += '.rev h3:first-child{margin-top:0}';
+  html += '.rev .l{display:flex;justify-content:space-between;gap:14px;padding:6px 0;font-size:16px;line-height:1.45}';
+  html += '.rev .l .k{color:#9B8A92;flex-shrink:0}.rev .l .v{font-weight:700;text-align:right}';
+  html += '.rev .edit{background:none;border:none;color:#9B8A92;font-size:13.5px;font-weight:800;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}';
+  html += '.rev .msg{background:#FAF7F8;border-radius:12px;padding:14px 16px;font-size:15.5px;line-height:1.5;font-style:italic}';
+  html += '.errbox{background:#fff;border:2px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:16px;font-weight:700;font-size:15.5px;display:none;line-height:1.45}';
+  html += '.done{text-align:center;border-top:5px solid #F7B5CD}';
+  html += '.done .big{font-size:24px;font-weight:800;margin-bottom:4px}';
+  html += '.done .path{display:block;margin-top:14px;padding:18px;border-radius:14px;background:#2A2A2A;color:#fff;text-decoration:none;font-weight:800;font-size:17px;border:none;width:100%;cursor:pointer;font-family:inherit}';
+  html += '.done .path small{display:block;font-size:13.5px;font-weight:600;opacity:.75;margin-top:3px}';
+  html += '.done .path.lite{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
+  html += '.done .path:disabled{opacity:.45;cursor:default}';
+  html += '@media (max-width:600px){body{padding:80px 14px 40px}.card{padding:22px 17px;border-radius:18px}.q{font-size:22px}.two{flex-direction:column;gap:0}.row .p{width:70px}}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+
+  html += '<div class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>';
+  html += '<div id="errbox" class="errbox"></div>';
+
+  // ---- Step 1: how is it going out ----
+  html += '<div class="card step" id="s1">';
+  html += '<div class="q">How is it going out?</div>';
+  html += '<div class="qs">Pick one. You can go back and change it.</div>';
+  html += '<div class="body">';
+  html += '<button type="button" class="pick" id="m-pickup" onclick="pickMethod(\'pickup\')"><span class="e">&#127978;</span><span><span class="t">Pickup</span><span class="s">They come to the store and get it</span></span></button>';
+  html += '<button type="button" class="pick" id="m-local" onclick="pickMethod(\'local\')"><span class="e">&#128663;</span><span><span class="t">Local delivery</span><span class="s">Our driver brings it to them</span></span></button>';
+  html += '<button type="button" class="pick" id="m-ship" onclick="pickMethod(\'ship\')"><span class="e">&#128230;</span><span><span class="t">Shipping</span><span class="s">UPS mails it out of town</span></span></button>';
+  html += '</div></div>';
+
+  // ---- Step 2: where and when ----
+  html += '<div class="card step" id="s2" style="display:none">';
+  html += '<div class="q" id="s2q">Where is it going?</div>';
+  html += '<div class="qs" id="s2s">Start with the ZIP code. It sets the delivery price for you.</div>';
+  html += '<div class="body">';
+
+  html += '<div id="blk-zip"><div class="field zipbig"><label>ZIP code</label>';
+  html += '<input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="33140" autocomplete="off"></div>';
+  html += '<div class="feebox" id="feebox"><div class="n" id="feen"></div><div class="l" id="feel"></div></div></div>';
+
+  html += '<div id="blk-addr" style="margin-top:18px">';
+  html += '<div class="field"><label>Who is getting it?</label><input type="text" id="rname" placeholder="First and last name"></div>';
+  html += '<div class="field"><label>Street address</label><input type="text" id="raddr1" placeholder="1234 Main Street"></div>';
+  html += '<div class="field"><label>Apartment or suite <span class="muted" style="font-weight:600">(if there is one)</span></label><input type="text" id="raddr2" placeholder="Apt 5B"></div>';
+  html += '<div class="two"><div class="field"><label>City</label><input type="text" id="rcity" placeholder="Aventura"></div>';
+  html += '<div class="field" id="blk-state"><label>State</label><input type="text" id="rstate" maxlength="2" placeholder="FL" value="FL"></div></div>';
+  html += '<div class="field" id="blk-shipzip"><label>ZIP code</label><input type="text" id="rzip" inputmode="numeric" maxlength="5" placeholder="33180"></div>';
+  html += '<div class="field"><label>Their phone number</label><input type="tel" id="rphone" placeholder="(305) 555-1234"></div>';
+  html += '</div>';
+
+  html += '<div id="blk-shipprice" style="display:none"><div class="field"><label>Shipping price</label>';
+  html += '<input type="number" id="shipprice" min="0" step="0.01" placeholder="0.00">';
+  html += '<div class="hint">Get the price from ShipStation rates. Leave it empty for free shipping.</div></div></div>';
+
+  html += '<div class="field" style="margin-top:4px"><label id="datelbl">What day does it need to be there?</label><input type="date" id="ddate"></div>';
+  html += '</div>';
+  html += '<div class="navrow"><button type="button" class="btn back" onclick="go(1)">Back</button><button type="button" class="btn next" id="n2" onclick="next(2)">Next</button></div>';
+  html += '</div>';
+
+  // ---- Step 3: what are they getting ----
+  html += '<div class="card step" id="s3" style="display:none">';
+  html += '<div class="q">What are they getting?</div>';
+  html += '<div class="qs">Search the store, or type in anything that is not on the website.</div>';
+  html += '<div class="body">';
+  html += '<div class="field"><label>Search the store</label>';
+  html += '<div class="searchrow"><input type="text" id="psearch" placeholder="Type a product name, like pretzel"><button type="button" class="btn sm" onclick="searchProducts()">Search</button></div>';
+  html += '<div id="presults"></div></div>';
+  html += '<div class="field" style="margin-top:22px"><label>Or type it in yourself</label>';
+  html += '<input type="text" id="mtitle" placeholder="Item name">';
+  html += '<div class="two" style="margin-top:10px"><input type="number" id="mqty" min="1" value="1" placeholder="How many"><input type="number" id="mprice" min="0" step="0.01" placeholder="Price each"></div>';
+  html += '<button type="button" class="btn sm" style="margin-top:10px;width:100%" onclick="addManual()">Add this item</button>';
+  html += '<div class="hint">Example: 30 boxes at $8 each &rarr; name it, 30, then 8.</div></div>';
+  html += '<div style="margin-top:24px"><label style="display:block;font-size:15.5px;font-weight:800;margin-bottom:7px">On the order</label>';
+  html += '<div id="cart"><div class="muted">Nothing added yet.</div></div>';
+  html += '<div class="tot" id="totrow" style="display:none"><span>Items total</span><span id="tot"></span></div></div>';
+  html += '</div>';
+  html += '<div class="navrow"><button type="button" class="btn back" onclick="go(2)">Back</button><button type="button" class="btn next" onclick="next(3)">Next</button></div>';
+  html += '</div>';
+
+  // ---- Step 4: who is paying ----
+  html += '<div class="card step" id="s4" style="display:none">';
+  html += '<div class="q">Who is paying?</div>';
+  html += '<div class="qs">This is the person handing you the card, not the person getting the gift.</div>';
+  html += '<div class="body">';
+  html += '<div class="field"><label>Their name</label><input type="text" id="bname" placeholder="First and last name"></div>';
+  html += '<div class="field"><label>Their phone number</label><input type="tel" id="bphone" placeholder="(305) 555-1234"></div>';
+  html += '<div class="field"><label>Their email <span class="muted" style="font-weight:600">(only if you want to email them the pay link)</span></label>';
+  html += '<input type="email" id="bemail" placeholder="name@email.com">';
+  html += '<div class="hint">No email is fine. You can still take the card over the phone.</div></div>';
+  html += '</div>';
+  html += '<div class="navrow"><button type="button" class="btn back" onclick="go(3)">Back</button><button type="button" class="btn next" onclick="next(4)">Next</button></div>';
+  html += '</div>';
+
+  // ---- Step 5: gift message ----
+  html += '<div class="card step" id="s5" style="display:none">';
+  html += '<div class="q">Is there a gift message?</div>';
+  html += '<div class="qs">This is what we print on the gift card that goes in the box.</div>';
+  html += '<div class="body">';
+  html += '<button type="button" class="pick" id="g-yes" onclick="pickGift(true)"><span class="e">&#128140;</span><span><span class="t">Yes, there is a message</span><span class="s">Type it on the next line</span></span></button>';
+  html += '<button type="button" class="pick" id="g-no" onclick="pickGift(false)"><span class="e">&#128683;</span><span><span class="t">No gift message</span><span class="s">The card prints NO GIFT MESSAGE</span></span></button>';
+  html += '<div id="giftfields" style="display:none;margin-top:20px">';
+  html += '<div class="field"><label>To</label><input type="text" id="gto" placeholder="Who the card is to"></div>';
+  html += '<div class="field"><label>From</label><input type="text" id="gfrom" placeholder="Who it is from"></div>';
+  html += '<div class="field"><label>Message <span class="muted" id="gcount" style="font-weight:700">0/300</span></label>';
+  html += '<textarea id="gmsg" maxlength="300" placeholder="Type the message exactly the way they said it"></textarea></div>';
+  html += '</div></div>';
+  html += '<div class="navrow"><button type="button" class="btn back" onclick="go(4)">Back</button><button type="button" class="btn next" onclick="next(5)">Next</button></div>';
+  html += '</div>';
+
+  // ---- Step 6: review ----
+  html += '<div class="card step" id="s6" style="display:none">';
+  html += '<div class="q">Check it over</div>';
+  html += '<div class="qs">Read it back to the customer before you make the order.</div>';
+  html += '<div class="body rev" id="review"></div>';
+  html += '<div class="navrow"><button type="button" class="btn back" onclick="go(5)">Back</button><button type="button" class="btn next" id="createbtn" onclick="createDraft()">Make the order</button></div>';
+  html += '<div class="muted" style="text-align:center;margin-top:14px">Nothing is charged yet. This just puts the order in Shopify.</div>';
+  html += '</div>';
+
+  html += '<div id="done"></div>';
+
+  // ---------------- script ----------------
+  html += '<script>';
+  html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
+  html += 'var S={method:"",fee:null,items:[],gift:null};';
+  html += 'var step=1;';
+  html += 'function $(i){return document.getElementById(i)}';
+  html += 'function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}';
+  html += 'function val(i){return ($(i).value||"").trim()}';
+  html += 'function showErr(m){var b=$("errbox");b.textContent=m||"";b.style.display=m?"block":"none";if(m)window.scrollTo(0,0)}';
+  html += 'function go(n){step=n;showErr("");for(var i=1;i<=6;i++)$("s"+i).style.display=(i===n?"block":"none");';
+  html += 'var d=$("dots").children;for(var j=0;j<6;j++){d[j].className=(j+1<n?"done":(j+1===n?"on":""))}window.scrollTo(0,0)}';
+
+  // step 1
+  html += 'function pickMethod(m){S.method=m;["pickup","local","ship"].forEach(function(k){$("m-"+k).className="pick"+(k===m?" on":"")});';
+  html += 'var isLocal=m==="local",isPickup=m==="pickup";';
+  html += '$("blk-zip").style.display=isLocal?"block":"none";';
+  html += '$("blk-addr").style.display=isPickup?"none":"block";';
+  html += '$("blk-state").style.display=isLocal?"none":"block";';
+  html += '$("blk-shipzip").style.display=isLocal?"none":"block";';
+  html += '$("blk-shipprice").style.display=(m==="ship")?"block":"none";';
+  html += 'if(isPickup){$("s2q").textContent="When are they picking it up?";$("s2s").textContent="Pick the day they are coming in.";$("datelbl").textContent="Pickup day"}';
+  html += 'else if(isLocal){$("s2q").textContent="Where is it going?";$("s2s").textContent="Start with the ZIP code. It sets the delivery price for you.";$("datelbl").textContent="Delivery day"}';
+  html += 'else{$("s2q").textContent="Where is it going?";$("s2s").textContent="Type the full address the way it goes on the box.";$("datelbl").textContent="Day it needs to arrive"}';
+  html += 'checkFee();go(2)}';
+
+  // zip fee
+  html += 'function checkFee(){var z=(val("zip")).replace(/\\D/g,"").slice(0,5);var box=$("feebox"),n=$("feen"),l=$("feel");';
+  html += 'S.fee=null;$("n2").disabled=false;';
+  html += 'if(S.method!=="local"){box.style.display="none";return}';
+  html += 'if(z.length<5){box.style.display="none";return}';
+  html += 'box.style.display="block";';
+  html += 'if(FEES[z]!=null){S.fee=FEES[z];box.className="feebox";n.textContent="$"+FEES[z];l.textContent="Local delivery price for "+z}';
+  html += 'else{box.className="feebox miss";n.textContent="We do not deliver to "+z;l.textContent="Ask Mikey before you promise this one.";$("n2").disabled=true}}';
+  html += '$("zip").addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,5);checkFee()});';
+
+  // step 2 next
+  html += 'function next(n){showErr("");';
+  html += 'if(n===2){';
+  html += 'if(!val("ddate")){showErr("Pick the day first.");return}';
+  html += 'if(S.method!=="pickup"){';
+  html += 'if(!val("rname")){showErr("Type the name of the person getting it.");return}';
+  html += 'if(!val("raddr1")){showErr("Type the street address.");return}';
+  html += 'if(!val("rcity")){showErr("Type the city.");return}';
+  html += 'if(S.method==="local"&&S.fee==null){showErr("Type a ZIP code we deliver to.");return}';
+  html += 'if(S.method==="ship"){if(val("rzip").length<5){showErr("Type the 5-digit ZIP code.");return}if(val("rstate").length!==2){showErr("Type the 2-letter state, like NY.");return}}}';
+  html += 'go(3);return}';
+  html += 'if(n===3){if(!S.items.length){showErr("Add at least one item.");return}go(4);return}';
+  html += 'if(n===4){if(!val("bname")){showErr("Type the name of the person paying.");return}';
+  html += 'if(!val("bphone")){showErr("Type their phone number.");return}';
+  html += 'if(val("bemail")&&val("bemail").indexOf("@")<1){showErr("That email does not look right.");return}';
+  html += 'if(!val("gto")&&val("rname"))$("gto").value=val("rname");';
+  html += 'if(!val("gfrom"))$("gfrom").value=val("bname");';
+  html += 'go(5);return}';
+  html += 'if(n===5){if(S.gift===null){showErr("Tell me if there is a gift message.");return}';
+  html += 'if(S.gift&&!val("gmsg")){showErr("Type the gift message, or pick No gift message.");return}';
+  html += 'buildReview();go(6);return}}';
+
+  // step 5 gift
+  html += 'function pickGift(y){S.gift=y;$("g-yes").className="pick"+(y?" on":"");$("g-no").className="pick"+(y?"":" on");';
+  html += '$("giftfields").style.display=y?"block":"none";if(y)$("gmsg").focus()}';
+  html += '$("gmsg").addEventListener("input",function(){$("gcount").textContent=this.value.length+"/300"});';
+
+  // items
+  html += 'function renderCart(){var el=$("cart");if(!S.items.length){el.innerHTML=\'<div class="muted">Nothing added yet.</div>\';$("totrow").style.display="none";return}';
+  html += 'var h="";S.items.forEach(function(it,i){h+=\'<div class="row"><span class="t">\'+esc(it.title)+\'</span><input class="q2" type="number" min="1" value="\'+it.qty+\'" onchange="setQty(\'+i+\',this.value)"><span class="p">$\'+(it.price*it.qty).toFixed(2)+\'</span><button type="button" class="x" onclick="removeItem(\'+i+\')" title="Take it off">&times;</button></div>\'});';
+  html += 'el.innerHTML=h;$("tot").textContent="$"+itemsTotal().toFixed(2);$("totrow").style.display="flex"}';
+  html += 'function itemsTotal(){return S.items.reduce(function(s,it){return s+it.price*it.qty},0)}';
+  html += 'function setQty(i,v){S.items[i].qty=Math.max(1,parseInt(v,10)||1);renderCart()}';
+  html += 'function removeItem(i){S.items.splice(i,1);renderCart()}';
+  html += 'function addManual(){var t=val("mtitle");var q=Math.max(1,parseInt($("mqty").value,10)||1);var p=parseFloat($("mprice").value);';
+  html += 'if(!t){showErr("Type a name for the item.");return}if(isNaN(p)||p<0){showErr("Type a price for the item.");return}showErr("");';
+  html += 'S.items.push({title:t,qty:q,price:p});$("mtitle").value="";$("mqty").value=1;$("mprice").value="";renderCart()}';
+  html += 'async function searchProducts(){var q=val("psearch");var out=$("presults");';
+  html += 'if(q.length<2){out.innerHTML=\'<div class="muted" style="padding-top:10px">Type at least 2 letters.</div>\';return}';
+  html += 'out.innerHTML=\'<div class="muted" style="padding-top:10px">Looking&hellip;</div>\';';
+  html += 'try{var r=await fetch("/draft-order/products?q="+encodeURIComponent(q));var j=await r.json();if(j.error)throw new Error(j.error);';
+  html += 'if(!j.products.length){out.innerHTML=\'<div class="muted" style="padding-top:10px">Nothing matches that.</div>\';return}';
+  html += 'var h="";j.products.forEach(function(p){p.variants.forEach(function(v){var label=p.title+(v.title?" \\u2014 "+v.title:"");';
+  html += 'h+=\'<div class="hit"><span>\'+esc(label)+\' <span class="muted">$\'+esc(v.price)+\'</span></span><button type="button" class="add" onclick=\\\'addVariant(\'+JSON.stringify(JSON.stringify({id:v.id,label:label,price:v.price}))+\')\\\'>Add</button></div>\'})});';
+  html += 'out.innerHTML=h}catch(e){out.innerHTML="";showErr("The product search did not work: "+e.message)}}';
+  html += 'function addVariant(json){var v=JSON.parse(json);showErr("");S.items.push({title:v.label,qty:1,price:parseFloat(v.price)||0,variantId:v.id});renderCart()}';
+  html += '$("psearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchProducts()}});';
+
+  // dates
+  html += 'var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];';
+  html += 'var DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];';
+  html += 'function dparts(v){var p=(v||"").split("-");return new Date(+p[0],+p[1]-1,+p[2])}';
+  html += 'function fmtDate(v){var d=dparts(v);return MON[d.getMonth()]+" "+d.getDate()+", "+d.getFullYear()}';
+  html += 'function fmtDay(v){return DAYS[dparts(v).getDay()]}';
+
+  // review
+  html += 'function methodLabel(){return S.method==="pickup"?"Pickup":(S.method==="local"?"Local delivery":"Shipping")}';
+  html += 'function shipPrice(){if(S.method==="local")return S.fee||0;if(S.method==="ship"){var p=parseFloat($("shipprice").value);return isNaN(p)?0:p}return 0}';
+  html += 'function line(k,v){return \'<div class="l"><span class="k">\'+k+\'</span><span class="v">\'+v+\'</span></div>\'}';
+  html += 'function buildReview(){var h="";';
+  html += 'h+=\'<h3>How it goes out <button type="button" class="edit" onclick="go(1)">change</button></h3>\';';
+  html += 'h+=line("Way",esc(methodLabel()));';
+  html += 'h+=line(S.method==="pickup"?"Pickup day":"Day",esc(fmtDay(val("ddate"))+", "+fmtDate(val("ddate"))));';
+  html += 'if(S.method!=="pickup"){h+=line("Name",esc(val("rname")));';
+  html += 'var a=val("raddr1")+(val("raddr2")?", "+val("raddr2"):"")+", "+val("rcity")+", "+(S.method==="local"?"FL":val("rstate").toUpperCase())+" "+(S.method==="local"?val("zip"):val("rzip"));';
+  html += 'h+=line("Address",esc(a));if(val("rphone"))h+=line("Phone",esc(val("rphone")))}';
+  html += 'h+=\'<h3>Items <button type="button" class="edit" onclick="go(3)">change</button></h3>\';';
+  html += 'S.items.forEach(function(it){h+=line(esc(it.qty+" \\u00d7 "+it.title),"$"+(it.price*it.qty).toFixed(2))});';
+  html += 'if(shipPrice()>0)h+=line(S.method==="local"?"Local delivery":"Shipping","$"+shipPrice().toFixed(2));';
+  html += 'h+=\'<div class="tot"><span>Total</span><span>$\'+(itemsTotal()+shipPrice()).toFixed(2)+\'</span></div>\';';
+  html += 'h+=\'<h3>Paying <button type="button" class="edit" onclick="go(4)">change</button></h3>\';';
+  html += 'h+=line("Name",esc(val("bname")))+line("Phone",esc(val("bphone")))+line("Email",val("bemail")?esc(val("bemail")):"<span style=\\"color:#9B8A92;font-weight:600\\">none</span>");';
+  html += 'h+=\'<h3>Gift card <button type="button" class="edit" onclick="go(5)">change</button></h3>\';';
+  html += 'if(S.gift){h+=line("To",esc(val("gto")))+line("From",esc(val("gfrom")));h+=\'<div class="msg">&ldquo;\'+esc(val("gmsg"))+\'&rdquo;</div>\'}';
+  html += 'else{h+=\'<div class="muted">No gift message.</div>\'}';
+  html += '$("review").innerHTML=h}';
+
+  // create
+  html += 'async function createDraft(){showErr("");var b=$("createbtn");b.disabled=true;b.textContent="Making it\\u2026";';
+  html += 'var attrs=[{name:"Delivery Method",value:S.method==="pickup"?"Pickup":(S.method==="local"?"Delivery":"Shipping")},';
+  html += '{name:"Delivery Date",value:fmtDate(val("ddate"))},{name:"Delivery Day",value:fmtDay(val("ddate"))},';
+  html += '{name:"Customer Phone",value:val("bphone")}];';
+  html += 'if(S.gift){attrs.push({name:"Gift Message",value:val("gmsg")});attrs.push({name:"Gift Sender",value:val("gfrom")});attrs.push({name:"Gift Receiver",value:val("gto")});attrs.push({name:"Gift Wrap",value:"yes"})}';
+  html += 'var addr=S.method==="pickup"?{name:val("bname"),phone:val("bphone")}:{name:val("rname"),address1:val("raddr1"),address2:val("raddr2"),city:val("rcity"),';
+  html += 'province:S.method==="local"?"FL":val("rstate").toUpperCase(),zip:S.method==="local"?val("zip"):val("rzip"),phone:val("rphone")||val("bphone")};';
+  html += 'var noteLines=["Taken by staff on the dashboard.","Paying: "+val("bname")+" "+val("bphone")];';
+  html += 'var payload={items:S.items,email:val("bemail"),note:noteLines.join("\\n"),attributes:attrs,shippingAddress:addr,';
+  html += 'shipping:{title:S.method==="local"?"Local Delivery":(S.method==="ship"?"Shipping":""),price:shipPrice()>0?String(shipPrice()):""}};';
+  html += 'try{var r=await fetch("/draft-order/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});';
+  html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server problem");';
+  html += 'for(var i=1;i<=6;i++)$("s"+i).style.display="none";$("dots").style.display="none";';
+  html += 'var d=$("done");var h=\'<div class="card done"><div class="big">&#10004; Order \'+esc(j.name)+\' is made</div>\';';
+  html += 'h+=\'<div class="muted">Total $\'+esc(j.total)+\'. Nothing is charged yet.</div>\';';
+  html += 'h+=\'<div style="font-size:15.5px;font-weight:800;margin-top:22px">How are they paying?</div>\';';
+  html += 'h+=\'<a class="path" href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">&#128222; They are on the phone<small>Opens Shopify so you can type the card in</small></a>\';';
+  html += 'if(j.hasEmail){h+=\'<button type="button" class="path lite" id="sendinv" onclick="sendInvoice(\'+j.id+\')">&#9993;&#65039; Email them a pay link<small>Sends the Shopify pay link to \'+esc(val("bemail"))+\'</small></button>\'}';
+  html += 'else{h+=\'<div class="muted" style="margin-top:14px">No email on this one, so there is no pay link to send.</div>\'}';
+  html += 'h+=\'<a class="path lite" href="/draft-order-new">&#10133; Start another order</a></div>\';';
+  html += 'd.innerHTML=h;window.scrollTo(0,0)}';
+  html += 'catch(e){showErr("Could not make the order: "+e.message);b.disabled=false;b.textContent="Make the order"}}';
+  html += 'async function sendInvoice(id){var b=$("sendinv");b.disabled=true;b.innerHTML="Sending\\u2026";';
+  html += 'try{var r=await fetch("/draft-order/send-invoice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})});';
+  html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server problem");';
+  html += 'b.innerHTML="&#10004; Pay link sent"+(j.to?"<small>to "+esc(j.to)+"</small>":"")}';
+  html += 'catch(e){b.disabled=false;b.innerHTML="&#9993;&#65039; Email them a pay link";showErr("Could not send the pay link: "+e.message)}}';
+  html += 'go(1);';
   html += '</script>';
   html += '</div></body></html>';
   res.send(html);
