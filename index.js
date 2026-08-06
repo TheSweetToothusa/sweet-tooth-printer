@@ -1443,14 +1443,14 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}';
-  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;padding:72px 24px 36px}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#3D3D3D;min-height:100vh;display:flex;padding:62px 24px 24px}';
   html += '.wrap{width:100%;max-width:1080px;margin:auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
-  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:18px;margin-top:34px;justify-content:center}';
-  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:118px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:16px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
+  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:22px;justify-content:center}';
+  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:102px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:14px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
   html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
   html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
   html += '.tile:hover:before{opacity:1}';
@@ -1460,19 +1460,23 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.tile .emoji{font-size:36px;line-height:1}';
   html += '.tile .sublabel{font-size:12.5px;font-weight:700;color:#9B8A92;letter-spacing:0}';
   html += '.tile.dim{opacity:.18}';
-  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:22px 0 0;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
+  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:15px 0 0;padding-bottom:6px;border-bottom:2px solid #F3EDF0}';
   html += '.sec:first-of-type{margin-top:20px}';
-  html += '.sec + .grid{margin-top:13px}';
+  html += '.sec + .grid{margin-top:10px}';
   html += '.duo{display:flex;gap:18px;align-items:flex-start}.duo .half{flex:1;min-width:0}';
   html += '@media (max-width:760px){.duo{flex-direction:column;align-items:stretch}}';
-  html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:22px 18px 12px;font-size:14px;font-weight:600;line-height:1.5;transform:rotate(-1.2deg);color:#5C5335}';
+  // Post-its hover over the corner instead of shoving every tile below the fold.
+  html += '#postit-layer{position:fixed;bottom:16px;right:16px;width:296px;z-index:90;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none}';
+  html += '#postit-layer > div > *{pointer-events:auto}';
+  html += '@media (max-width:1100px){#postit-layer{position:static;width:auto;max-height:none;overflow:visible;margin-bottom:10px}}';
+  html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:20px 16px 11px;font-size:13.5px;font-weight:600;line-height:1.45;transform:rotate(-1.2deg);color:#5C5335}';
   html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.postit.supply{background:#FFE1C9;color:#5C4326;transform:rotate(.8deg);margin-top:12px}';
   html += '.postit.supply .got{display:inline-block;margin-top:10px;padding:9px 16px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer}';
   html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
   html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
-  html += '.actionbar{display:flex;gap:12px;margin-top:16px}';
+  html += '.actionbar{display:flex;gap:12px;margin-top:10px}';
   html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.askai.dim{opacity:.18}';
   html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
@@ -1506,8 +1510,9 @@ app.get('/', (req, res) => {
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
   body += '<div class="notesbar"><a href="/dashboard/this-is-the-store" title="Click once from each store computer">&#128205; This is the store computer</a><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
-  body += '<div id="custom-notes"></div>';
-  body += '<div id="supply-alerts"></div>';
+  // Post-its float over the corner of the page. They used to sit in the flow and push
+  // every tile below the fold.
+  body += '<div id="postit-layer"><div id="custom-notes"></div><div id="supply-alerts"></div></div>';
   // Shared notes: stored in a Shopify shop metafield — same for every device, survive restarts.
   body += '<script>(function(){var nbox=document.getElementById("custom-notes");';
   body += 'function renderNotes(d){nbox.innerHTML="";(d.notes||[]).slice(0,8).forEach(function(a){';
@@ -2305,7 +2310,21 @@ app.get('/draft-order-new', (req, res) => {
   html += 'input:focus,select:focus,textarea:focus{outline:none;border-color:#F7B5CD}';
   html += 'textarea{min-height:110px;resize:vertical;line-height:1.5}';
   html += '.two{display:flex;gap:12px}.two > *{flex:1;min-width:0}';
-  html += '.zipbig input{font-size:30px;font-weight:800;text-align:center;letter-spacing:5px;padding:18px 16px}';
+  html += '.eyebrow{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;text-align:center;margin-bottom:9px}';
+  // No little up/down arrows anywhere — staff hit them by accident.
+  html += 'input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}';
+  html += 'input[type=number]{-moz-appearance:textfield}';
+  html += '.pricerow{display:flex;gap:14px;align-items:flex-end;margin-bottom:15px}';
+  html += '.pricerow .grow{flex:1;min-width:0}.pricerow .field{margin-bottom:0}';
+  html += '.money{display:flex;align-items:center;border:1.5px solid #E8E2E5;border-radius:13px;background:#fff;padding-left:15px}';
+  html += '.money:focus-within{border-color:#F7B5CD}';
+  html += '.money span{font-size:19px;font-weight:800;color:#9B8A92}';
+  html += '.money input{border:none;border-radius:0;padding-left:7px}.money input:focus{outline:none}';
+  html += '.counter{display:inline-flex;align-items:center;border:2px solid #F7B5CD;border-radius:999px;background:#fff;overflow:hidden}';
+  html += '.counter button{border:none;background:none;width:46px;height:50px;font-size:24px;font-weight:800;color:#2A2A2A;cursor:pointer;line-height:1;font-family:inherit;padding:0}';
+  html += '.counter button:active{background:#FFF0F6}';
+  html += '.counter input{width:52px;border:none;border-radius:0;text-align:center;font-size:19px;font-weight:800;padding:0}';
+  html += '.counter input:focus{outline:none}';
   html += '.feebox{margin-top:14px;border-radius:16px;padding:20px;text-align:center;background:#FFF7FA;border:2px solid #F7B5CD;display:none}';
   html += '.feebox .n{font-size:36px;font-weight:800;letter-spacing:-1px}';
   html += '.feebox .l{font-size:14.5px;font-weight:700;color:#9B8A92;margin-top:4px}';
@@ -2366,21 +2385,23 @@ app.get('/draft-order-new', (req, res) => {
 
   // ---- Step 2: where and when ----
   html += '<div class="card step" id="s2" style="display:none">';
-  html += '<div class="q" id="s2q">Where is it going?</div>';
-  html += '<div class="qs" id="s2s">Start with the ZIP code. It sets the delivery price for you.</div>';
+  html += '<div class="eyebrow" id="s2eye">Local Delivery Information</div>';
+  html += '<div class="q" id="s2q">Where&#39;s it Going?</div>';
+  html += '<div class="qs" id="s2s">Type the address the way it goes on the box.</div>';
   html += '<div class="body">';
 
-  html += '<div id="blk-zip"><div class="field zipbig"><label>ZIP code</label>';
-  html += '<input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="33140" autocomplete="off"></div>';
-  html += '<div class="feebox" id="feebox"><div class="n" id="feen"></div><div class="l" id="feel"></div></div></div>';
-
-  html += '<div id="blk-addr" style="margin-top:18px">';
+  // One address block for local delivery and shipping. ZIP sits under the city, the way
+  // every other address form does it.
+  html += '<div id="blk-addr">';
   html += '<div class="field"><label>Who is getting it?</label><input type="text" id="rname" placeholder="First and last name"></div>';
   html += '<div class="field"><label>Street address</label><input type="text" id="raddr1" placeholder="1234 Main Street"></div>';
   html += '<div class="field"><label>Apartment or suite <span class="muted" style="font-weight:600">(if there is one)</span></label><input type="text" id="raddr2" placeholder="Apt 5B"></div>';
   html += '<div class="two"><div class="field"><label>City</label><input type="text" id="rcity" placeholder="Aventura"></div>';
   html += '<div class="field" id="blk-state"><label>State</label><input type="text" id="rstate" maxlength="2" placeholder="FL" value="FL"></div></div>';
-  html += '<div class="field" id="blk-shipzip"><label>ZIP code</label><input type="text" id="rzip" inputmode="numeric" maxlength="5" placeholder="33180"></div>';
+  html += '<div class="field"><label>ZIP code</label>';
+  html += '<input type="text" id="zip" inputmode="numeric" maxlength="5" placeholder="33180" autocomplete="off">';
+  html += '<div class="hint" id="ziphint">Enter the ZIP code to get the local delivery fee.</div>';
+  html += '<div class="feebox" id="feebox"><div class="n" id="feen"></div><div class="l" id="feel"></div></div></div>';
   html += '<div class="field"><label>Their phone number</label><input type="tel" id="rphone" placeholder="(305) 555-1234"></div>';
   html += '</div>';
 
@@ -2399,10 +2420,17 @@ app.get('/draft-order-new', (req, res) => {
   html += '<div class="qs">Type each item, how many, and the price for one.</div>';
   html += '<div class="body">';
   html += '<div class="field"><label>Item</label>';
-  html += '<input type="text" id="mtitle" placeholder="Item name">';
-  html += '<div class="two" style="margin-top:10px"><input type="number" id="mqty" min="1" value="1" placeholder="How many"><input type="number" id="mprice" min="0" step="0.01" placeholder="Price each"></div>';
-  html += '<button type="button" class="btn sm" style="margin-top:10px;width:100%" onclick="addManual()">Add this item</button>';
-  html += '<div class="hint">Example: 30 boxes at $8 each &rarr; name it, 30, then 8.</div></div>';
+  html += '<input type="text" id="mtitle" placeholder="Item name"></div>';
+  html += '<div class="pricerow">';
+  html += '<div class="field grow"><label>Price each</label>';
+  html += '<div class="money"><span>$</span><input type="text" id="mprice" inputmode="decimal" placeholder="0.00"></div></div>';
+  html += '<div class="field"><label>How many</label>';
+  html += '<div class="counter"><button type="button" onclick="bump(-1)">&minus;</button>';
+  html += '<input type="text" id="mqty" inputmode="numeric" maxlength="4" placeholder="0">';
+  html += '<button type="button" onclick="bump(1)">+</button></div></div>';
+  html += '</div>';
+  html += '<button type="button" class="btn sm" style="width:100%" onclick="addManual()">Add this item</button>';
+  html += '<div class="hint">Example: 30 boxes at $8 each &rarr; name it, price 8, then 30.</div>';
   html += '<div style="margin-top:24px"><label style="display:block;font-size:15.5px;font-weight:800;margin-bottom:7px">On the order</label>';
   html += '<div id="cart"><div class="muted">Nothing added yet.</div></div>';
   html += '<div class="tot" id="totrow" style="display:none"><span>Items total</span><span id="tot"></span></div></div>';
@@ -2474,14 +2502,13 @@ app.get('/draft-order-new', (req, res) => {
   // step 1
   html += 'function pickMethod(m){S.method=m;["pickup","local","ship"].forEach(function(k){$("m-"+k).className="pick"+(k===m?" on":"")});';
   html += 'var isLocal=m==="local",isPickup=m==="pickup";';
-  html += '$("blk-zip").style.display=isLocal?"block":"none";';
   html += '$("blk-addr").style.display=isPickup?"none":"block";';
   html += '$("blk-state").style.display=isLocal?"none":"block";';
-  html += '$("blk-shipzip").style.display=isLocal?"none":"block";';
+  html += '$("ziphint").style.display=isLocal?"block":"none";';
   html += '$("blk-shipprice").style.display=(m==="ship")?"block":"none";';
-  html += 'if(isPickup){$("s2q").textContent="When are they picking it up?";$("s2s").textContent="Pick the day they are coming in.";$("datelbl").textContent="Pickup day"}';
-  html += 'else if(isLocal){$("s2q").textContent="Where is it going?";$("s2s").textContent="Start with the ZIP code. It sets the delivery price for you.";$("datelbl").textContent="Delivery day"}';
-  html += 'else{$("s2q").textContent="Where is it going?";$("s2s").textContent="Type the full address the way it goes on the box.";$("datelbl").textContent="Day it needs to arrive"}';
+  html += 'if(isPickup){$("s2eye").textContent="Pickup Information";$("s2q").textContent="When are they picking it up?";$("s2s").textContent="Pick the day they are coming in.";$("datelbl").textContent="Pickup day"}';
+  html += 'else if(isLocal){$("s2eye").textContent="Local Delivery Information";$("s2q").textContent="Where\'s it Going?";$("s2s").textContent="Type the address the way it goes on the box.";$("datelbl").textContent="Delivery day"}';
+  html += 'else{$("s2eye").textContent="Shipping Information";$("s2q").textContent="Where\'s it Going?";$("s2s").textContent="Type the address the way it goes on the box.";$("datelbl").textContent="Day it needs to arrive"}';
   html += 'checkFee();go(2)}';
 
   // zip fee
@@ -2503,7 +2530,7 @@ app.get('/draft-order-new', (req, res) => {
   html += 'if(!val("raddr1")){showErr("Type the street address.");return}';
   html += 'if(!val("rcity")){showErr("Type the city.");return}';
   html += 'if(S.method==="local"&&S.fee==null){showErr("Type a ZIP code we deliver to.");return}';
-  html += 'if(S.method==="ship"){if(val("rzip").length<5){showErr("Type the 5-digit ZIP code.");return}if(val("rstate").length!==2){showErr("Type the 2-letter state, like NY.");return}}}';
+  html += 'if(S.method==="ship"){if(val("zip").length<5){showErr("Type the 5-digit ZIP code.");return}if(val("rstate").length!==2){showErr("Type the 2-letter state, like NY.");return}}}';
   html += 'go(3);return}';
   html += 'if(n===3){if(!S.items.length){showErr("Add at least one item.");return}go(4);return}';
   html += 'if(n===4){if(!val("bname")){showErr("Type the name of the person paying.");return}';
@@ -2528,9 +2555,16 @@ app.get('/draft-order-new', (req, res) => {
   html += 'function itemsTotal(){return S.items.reduce(function(s,it){return s+it.price*it.qty},0)}';
   html += 'function setQty(i,v){S.items[i].qty=Math.max(1,parseInt(v,10)||1);renderCart()}';
   html += 'function removeItem(i){S.items.splice(i,1);renderCart()}';
-  html += 'function addManual(){var t=val("mtitle");var q=Math.max(1,parseInt($("mqty").value,10)||1);var p=parseFloat($("mprice").value);';
-  html += 'if(!t){showErr("Type a name for the item.");return}if(isNaN(p)||p<0){showErr("Type a price for the item.");return}showErr("");';
-  html += 'S.items.push({title:t,qty:q,price:p});$("mtitle").value="";$("mqty").value=1;$("mprice").value="";renderCart()}';
+  // The counter starts empty on purpose, so nobody adds 1 of something by accident.
+  html += 'function bump(d){var v=parseInt($("mqty").value,10);if(isNaN(v))v=0;v+=d;if(v<1)v=d>0?1:0;';
+  html += '$("mqty").value=v>0?v:""}';
+  html += '$("mqty").addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,4)});';
+  html += '$("mprice").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"")});';
+  html += 'function addManual(){var t=val("mtitle");var q=parseInt($("mqty").value,10);var p=parseFloat($("mprice").value);';
+  html += 'if(!t){showErr("Type a name for the item.");return}';
+  html += 'if(isNaN(p)||p<0){showErr("Type a price for the item.");return}';
+  html += 'if(isNaN(q)||q<1){showErr("Say how many, using the + button.");return}showErr("");';
+  html += 'S.items.push({title:t,qty:q,price:p});$("mtitle").value="";$("mqty").value="";$("mprice").value="";$("mtitle").focus();renderCart()}';
 
   // dates
   html += 'var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];';
@@ -2548,7 +2582,7 @@ app.get('/draft-order-new', (req, res) => {
   html += 'h+=line("Way",esc(methodLabel()));';
   html += 'h+=line(S.method==="pickup"?"Pickup day":"Day",esc(fmtDay(val("ddate"))+", "+fmtDate(val("ddate"))));';
   html += 'if(S.method!=="pickup"){h+=line("Name",esc(val("rname")));';
-  html += 'var a=val("raddr1")+(val("raddr2")?", "+val("raddr2"):"")+", "+val("rcity")+", "+(S.method==="local"?"FL":val("rstate").toUpperCase())+" "+(S.method==="local"?val("zip"):val("rzip"));';
+  html += 'var a=val("raddr1")+(val("raddr2")?", "+val("raddr2"):"")+", "+val("rcity")+", "+(S.method==="local"?"FL":val("rstate").toUpperCase())+" "+val("zip");';
   html += 'h+=line("Address",esc(a));if(val("rphone"))h+=line("Phone",esc(val("rphone")))}';
   html += 'h+=\'<h3>Items <button type="button" class="edit" onclick="go(3)">change</button></h3>\';';
   html += 'S.items.forEach(function(it){h+=line(esc(it.qty+" \\u00d7 "+it.title),"$"+(it.price*it.qty).toFixed(2))});';
@@ -2568,7 +2602,7 @@ app.get('/draft-order-new', (req, res) => {
   html += '{name:"Customer Phone",value:val("bphone")}];';
   html += 'if(S.gift){attrs.push({name:"Gift Message",value:val("gmsg")});attrs.push({name:"Gift Sender",value:val("gfrom")});attrs.push({name:"Gift Receiver",value:val("gto")});attrs.push({name:"Gift Wrap",value:"yes"})}';
   html += 'var addr=S.method==="pickup"?{name:val("bname"),phone:val("bphone")}:{name:val("rname"),address1:val("raddr1"),address2:val("raddr2"),city:val("rcity"),';
-  html += 'province:S.method==="local"?"FL":val("rstate").toUpperCase(),zip:S.method==="local"?val("zip"):val("rzip"),phone:val("rphone")||val("bphone")};';
+  html += 'province:S.method==="local"?"FL":val("rstate").toUpperCase(),zip:val("zip"),phone:val("rphone")||val("bphone")};';
   html += 'var noteLines=["Taken by staff on the dashboard.","Paying: "+val("bname")+" "+val("bphone")];';
   html += 'var payload={items:S.items,email:val("bemail"),note:noteLines.join("\\n"),attributes:attrs,shippingAddress:addr,';
   html += 'shipping:{title:S.method==="local"?"Local Delivery":(S.method==="ship"?"Shipping":""),price:shipPrice()>0?String(shipPrice()):""}};';
