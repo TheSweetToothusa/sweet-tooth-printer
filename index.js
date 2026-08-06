@@ -209,6 +209,7 @@ app.post('/webhook/orders/create', async (req, res) => {
     res.status(200).send('OK');
     await printOrder(order);
     await maybeAutoLabel(order);
+    tagIfStaffEntered(order);
   } catch (error) {
     console.error('Webhook error:', error.message);
     res.status(200).send('OK');
@@ -230,6 +231,7 @@ app.post('/webhook/orders/paid', async (req, res) => {
       console.log('Order already processed, skipping');
     }
     await maybeAutoLabel(order);
+    tagIfStaffEntered(order);
   } catch (error) {
     console.error('Webhook error:', error.message);
     res.status(200).send('OK');
@@ -1497,7 +1499,7 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
-  body += '<div class="notesbar"><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
+  body += '<div class="notesbar"><a href="/dashboard/this-is-the-store" title="Click once from each store computer">&#128205; This is the store computer</a><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
   body += '<div id="custom-notes"></div>';
   body += '<div id="supply-alerts"></div>';
   // Shared notes: stored in a Shopify shop metafield — same for every device, survive restarts.
@@ -1923,15 +1925,47 @@ app.get('/order-lookup', async (req, res) => {
     if (order.phone || c.phone) inner += '<div class="row"><span class="k">Phone</span><span class="v">' + escapeHtml(order.phone || c.phone) + '</span></div>';
     inner += '<div class="row"><span class="k">Payment</span><span class="v">' + escapeHtml((order.financial_status || '—').toUpperCase()) + ' &middot; $' + escapeHtml(order.total_price) + '</span></div>';
     if (method) inner += '<div class="row"><span class="k">Method</span><span class="v">' + escapeHtml(method) + '</span></div>';
+
+    // Who placed it: store-IP registered = staff typed it in; POS = rung up in store.
+    var storeIps = await getStoreIps();
+    var origin, originStyle = '';
+    if (order.source_name === 'pos') { origin = 'In-store POS sale'; }
+    else if (order.browser_ip && storeIps.indexOf(order.browser_ip) > -1) { origin = '&#9888;&#65039; STAFF ENTERED (placed from a store computer)'; originStyle = 'color:#B0521E'; }
+    else if (order.browser_ip && storeIps.length) { origin = 'Customer placed it online'; }
+    else { origin = storeIps.length ? '—' : 'Unknown (store computers not registered yet)'; }
+    inner += '<div class="row"><span class="k">Placed by</span><span class="v" style="' + originStyle + '">' + origin + '</span></div>';
+
+    inner += '<a class="trackbtn" href="https://admin.shopify.com/store/thesweettoothfl/orders/' + order.id + '" target="_blank" rel="noopener">Open in Shopify</a>';
     inner += '</div>';
 
-    // --- Items (tips never shown — same rule as invoices) ---
+    // --- Items with variant (Dairy/Parve/size) + special instructions ---
     inner += '<div class="card"><h2>Items</h2>';
     (order.line_items || []).forEach(function (li) {
       if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
-      inner += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
+      var vt = li.variant_title ? ' <span style="color:#9B8A92;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
+      inner += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + vt + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
+      (li.properties || []).forEach(function (pr) {
+        if (!pr || !pr.value || String(pr.name || '').charAt(0) === '_') return;
+        inner += '<div style="padding:2px 0 8px 26px;font-size:14px;color:#6B5B62;font-weight:600">&#8627; ' + escapeHtml(pr.name) + ': ' + escapeHtml(String(pr.value)) + '</div>';
+      });
     });
     inner += '</div>';
+
+    // --- Gift & order details: every checkout attribute + the order note ---
+    var attrs = (order.note_attributes || []).filter(function (na) { return na && na.value && String(na.value).trim(); });
+    if (attrs.length || order.note) {
+      inner += '<div class="card"><h2>Gift &amp; Order Details</h2>';
+      attrs.forEach(function (na) {
+        var val = String(na.value);
+        if (val.length > 60 || /message/i.test(na.name || '')) {
+          inner += '<div style="padding:7px 0"><span class="k" style="color:#9B8A92;font-size:15.5px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:15.5px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
+        } else {
+          inner += '<div class="row"><span class="k">' + escapeHtml(na.name) + '</span><span class="v">' + escapeHtml(val) + '</span></div>';
+        }
+      });
+      if (order.note) inner += '<div style="padding:7px 0"><span class="k" style="color:#9B8A92;font-size:15.5px">Order note</span><div style="font-weight:600;font-size:15.5px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
+      inner += '</div>';
+    }
 
     // --- Address ---
     var a = order.shipping_address;
@@ -2318,6 +2352,53 @@ function upgradeCharge(newAmount, customerPaid) {
   if (!(diff > 0.009)) return 0;
   return Math.round(diff * 1.10 * 100) / 100;
 }
+
+// ============ STAFF-ENTERED ORDER DETECTION (by store IP) ============
+// Store computers register their public IP once via /dashboard/this-is-the-store.
+// New orders placed from a registered IP get tagged st_staff_entered automatically.
+var storeIpsCache = { ips: null, at: 0 };
+async function getStoreIps() {
+  if (storeIpsCache.ips && Date.now() - storeIpsCache.at < 10 * 60 * 1000) return storeIpsCache.ips;
+  try {
+    var r = await shopJsonRead('store_ips');
+    storeIpsCache = { ips: Array.isArray(r.data) ? r.data : [], at: Date.now() };
+  } catch (e) { storeIpsCache = { ips: storeIpsCache.ips || [], at: Date.now() }; }
+  return storeIpsCache.ips;
+}
+
+async function tagIfStaffEntered(order) {
+  try {
+    if (!order || !order.browser_ip) return;
+    if ((order.tags || '').indexOf('st_staff_entered') > -1) return;
+    var ips = await getStoreIps();
+    if (ips.indexOf(order.browser_ip) === -1) return;
+    var tags = (order.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+    tags.push('st_staff_entered');
+    await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + order.id + '.json', {
+      method: 'PUT',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: { id: order.id, tags: tags.join(', ') } })
+    });
+    console.log('tagged st_staff_entered:', order.name);
+  } catch (e) { console.error('staff-tag error:', e.message); }
+}
+
+app.get('/dashboard/this-is-the-store', async function (req, res) {
+  try {
+    var ip = String(req.headers['x-forwarded-for'] || req.ip || '').split(',')[0].trim();
+    if (!ip) return res.send('Could not read this computer’s address — tell Mikey.');
+    var r = await shopJsonRead('store_ips');
+    var ips = Array.isArray(r.data) ? r.data : [];
+    var already = ips.indexOf(ip) > -1;
+    if (!already) { ips.push(ip); await shopJsonWrite('store_ips', ips, r.id); storeIpsCache = { ips: ips, at: Date.now() }; }
+    res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
+      '<body style="font-family:-apple-system,sans-serif;background:#FAF7F8;padding:80px 24px;text-align:center">' +
+      '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;padding:30px">' +
+      '<div style="font-size:44px">&#128205;</div><h2 style="margin:12px 0">' + (already ? 'Already registered' : 'Store computer registered!') + '</h2>' +
+      '<p style="color:#666;font-weight:600;line-height:1.6">Orders typed on this internet connection will now be automatically tagged <b>staff-entered</b> in Shopify.<br>Registered store addresses: ' + ips.length + '</p>' +
+      '<a href="/" style="display:inline-block;margin-top:14px;padding:12px 26px;background:#2A2A2A;color:#fff;border-radius:11px;text-decoration:none;font-weight:800">&#127968; HOME</a></div></body></html>');
+  } catch (e) { res.status(500).send('Error: ' + escapeHtml(e.message)); }
+});
 
 // Update the tracking number on an order's EXISTING fulfillment (order already fulfilled once).
 async function updateTrackingOnFulfillment(order, label) {
