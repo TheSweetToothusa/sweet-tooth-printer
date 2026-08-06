@@ -1410,10 +1410,16 @@ var DASH_ICONS = {
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
-var TOPBAR_HTML = '<header class="topbar"><a class="homebtn" href="/">&#127968; HOME</a><a href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
-var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;padding:0 22px;z-index:100}' +
+// Back steps to the page you came from; HOME jumps all the way out.
+var TOPBAR_HTML = '<header class="topbar"><a class="backbtn" href="/" onclick="if(history.length>1){history.back();return false}">&#8592; Back</a>' +
+  '<a class="homebtn" href="/">&#127968; HOME</a><a class="mark" href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
+var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;gap:14px;padding:0 22px;z-index:100}' +
   '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}' +
-  '.topbar a.homebtn{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 22px;border-radius:11px;padding-bottom:9px}';
+  '.topbar a.homebtn{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 22px;border-radius:11px;padding-bottom:9px}' +
+  '.topbar a.backbtn{flex-shrink:0;display:inline-flex;align-items:center;background:#fff;border:1.5px solid #E8E2E5;font-size:13.5px;padding:8px 18px;border-radius:11px;padding-bottom:8px}' +
+  '.topbar a.mark{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
+  // On a phone there is only room for the two buttons.
+  '@media (max-width:760px){.topbar a.mark{display:none}}';
 
 function dashTile(label, href, opts) {
   opts = opts || {};
@@ -2312,8 +2318,11 @@ app.get('/draft-order-new', (req, res) => {
   html += '.muted{color:#9B8A92;font-size:15px;line-height:1.5}';
   html += '.rev h3{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#9B8A92;margin:20px 0 9px}';
   html += '.rev h3:first-child{margin-top:0}';
+  // Long product names have to wrap here. If they can't, they push the whole page sideways.
   html += '.rev .l{display:flex;justify-content:space-between;gap:14px;padding:6px 0;font-size:16px;line-height:1.45}';
-  html += '.rev .l .k{color:#9B8A92;flex-shrink:0}.rev .l .v{font-weight:700;text-align:right}';
+  // The label side wraps however it has to; the value side only breaks at spaces so a
+  // price never splits down the middle.
+  html += '.rev .l .k{color:#9B8A92;min-width:0;overflow-wrap:anywhere}.rev .l .v{font-weight:700;text-align:right;min-width:0}';
   html += '.rev .edit{background:none;border:none;color:#9B8A92;font-size:13.5px;font-weight:800;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}';
   html += '.rev .msg{background:#FAF7F8;border-radius:12px;padding:14px 16px;font-size:15.5px;line-height:1.5;font-style:italic}';
   html += '.errbox{background:#fff;border:2px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:16px;font-weight:700;font-size:15.5px;display:none;line-height:1.45}';
