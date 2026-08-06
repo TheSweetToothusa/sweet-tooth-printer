@@ -1416,8 +1416,9 @@ var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;backgr
 function dashTile(label, href, opts) {
   opts = opts || {};
   var html = '<a class="tile" href="' + (href || '#') + '"';
-  // Every tile opens a new tab so the dashboard is never lost (staff kept getting stranded).
-  html += ' target="_blank" rel="noopener"';
+  // Internal pages open in the SAME tab (they all have the HOME button).
+  // Only external sites get a new tab - they have no way back to the dashboard.
+  if (opts.newTab) html += ' target="_blank" rel="noopener"';
   if (opts.kw) html += ' data-kw="' + escapeHtml((label + ' ' + opts.kw).toLowerCase()) + '"';
   html += '>';
   if (opts.emoji) {
@@ -1496,7 +1497,7 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
-  body += '<div class="notesbar"><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive" target="_blank" rel="noopener">&#128452;&#65039; Post-it Archive</a></div>';
+  body += '<div class="notesbar"><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
   body += '<div id="custom-notes"></div>';
   body += '<div id="supply-alerts"></div>';
   // Shared notes: stored in a Shopify shop metafield — same for every device, survive restarts.
@@ -1533,14 +1534,14 @@ app.get('/', (req, res) => {
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
   body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
-  body += '<a class="askai light" href="/order-lookup" target="_blank" rel="noopener" data-kw="order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund">&#128269; Order Lookup</a>';
+  body += '<a class="askai light" href="/order-lookup" data-kw="order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund">&#128269; Order Lookup</a>';
   body += '<a class="askai" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer">&#10024; Ask Shopify AI</a>';
   body += '</div>';
 
   body += '<h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2><div class="grid">';
-  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { emoji: '&#128424;&#65039;', newTab: true, kw: 'invoice receipt reprint print edit' });
-  body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', newTab: true, kw: 'gift card message edit reprint note' });
-  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', newTab: true, kw: 'gift card message new create note' });
+  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { emoji: '&#128424;&#65039;', kw: 'invoice receipt reprint print edit' });
+  body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', kw: 'gift card message edit reprint note' });
+  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', kw: 'gift card message new create note' });
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
   body += dashTile('Stickers &amp; Labels', '/stickers', { emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
   body += '</div>';
