@@ -2608,6 +2608,7 @@ var STICKERS = [
   { file: 'gluten-free-treats.png', name: 'Gluten-Free Treats', how: 'niimbot' },
   { file: 'pecan-pralines.png', name: 'Pecan Pralines', how: 'niimbot' },
   { file: 'frozen-hot-chocolate.png', name: 'Frozen Hot Chocolate', how: 'niimbot' },
+  { file: 'generic-round-logo.jpg', name: 'Generic Round Logo — goes on every product', how: 'order' },
   { file: 'dubai-zero-series.png', name: 'Dubai Chocolate Zero Series', how: 'order' },
   { file: 'dairy-rectangle.png', name: 'DAIRY (gold rectangle)', how: 'order' },
   { file: 'parve-oval.png', name: 'PARVE (oval)', how: 'order' },
