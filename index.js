@@ -2376,7 +2376,7 @@ async function tagIfStaffEntered(order) {
     tags.push('st_staff_entered');
     // Also surface it loudly in the "Additional details" panel on the Shopify order page.
     var attrs = (order.note_attributes || []).filter(function (na) { return na && na.name !== '⚠️ Order Source'; });
-    attrs.push({ name: '⚠️ Order Source', value: '🟠 STAFF ENTERED — placed on a store computer' });
+    attrs.unshift({ name: '⚠️ Order Source', value: '🟠 STAFF ENTERED — placed on a store computer' });
     await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + order.id + '.json', {
       method: 'PUT',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
