@@ -1476,6 +1476,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
   html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
+  html += '.setupbar{text-align:center;margin-top:26px}';
+  html += '.setupbar a{font-size:12.5px;font-weight:700;color:#C2B4BB;text-decoration:none}.setupbar a:hover{color:#2A2A2A}';
   html += '.actionbar{display:flex;gap:12px;margin-top:10px}';
   html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.askai.dim{opacity:.18}';
@@ -1509,7 +1511,7 @@ app.get('/', (req, res) => {
       'var today=new Date().toDateString();if(localStorage.getItem("postit-hidden")===today)p.style.display="none";' +
       'h.addEventListener("click",function(){localStorage.setItem("postit-hidden",today);p.style.display="none"});})();</script>';
   }
-  body += '<div class="notesbar"><a href="/dashboard/this-is-the-store" title="Click once from each store computer">&#128205; This is the store computer</a><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
+  body += '<div class="notesbar"><a href="#" id="addnote">&#10133; Add a post-it</a><a href="/dashboard/postit-archive">&#128452;&#65039; Post-it Archive</a></div>';
   // Post-its float over the corner of the page. They used to sit in the flow and push
   // every tile below the fold.
   body += '<div id="postit-layer"><div id="custom-notes"></div><div id="supply-alerts"></div></div>';
@@ -1593,6 +1595,9 @@ app.get('/', (req, res) => {
   body += 'r.onend=function(){mic.classList.remove("listening");mic.textContent="\\uD83C\\uDFA4"};';
   body += 'r.onerror=r.onend;r.start()})}';
   body += '})();</script>';
+
+  // Setup link, not a daily tool — it lives at the bottom, out of the way.
+  body += '<div class="setupbar"><a href="/dashboard/this-is-the-store" title="Click once from each store computer">&#128205; This is the store computer</a></div>';
 
   res.send(dashPage('The Sweet Tooth — Employee Dashboard', null, body, null, null, true, true));
 });
