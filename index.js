@@ -2289,14 +2289,19 @@ app.get('/draft-order-new', (req, res) => {
   html += '.feebox .l{font-size:14.5px;font-weight:700;color:#9B8A92;margin-top:4px}';
   html += '.feebox.miss{background:#FFF6F4;border-color:#E8A79A}';
   html += '.feebox.miss .n{font-size:20px;line-height:1.4}';
-  html += '.navrow{display:flex;gap:12px;margin-top:24px}';
+  // Back and Next ride along at the bottom of the screen, so a long list of search
+  // results can never bury them.
+  html += '.navrow{position:sticky;bottom:0;z-index:5;display:flex;gap:12px;margin-top:24px;padding:14px 0 4px;background:#fff;box-shadow:0 -10px 14px 6px #fff}';
   html += '.btn{padding:17px 22px;border:none;border-radius:14px;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;flex-shrink:0}';
   html += '.btn.next{flex:1;background:#2A2A2A;color:#fff}';
   html += '.btn.next:disabled{opacity:.35;cursor:default}';
   html += '.btn.back{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.btn.sm{padding:13px 20px;font-size:15px;border-radius:12px;background:#2A2A2A;color:#fff}';
-  html += '.searchrow{display:flex;gap:10px}.searchrow input{flex:1}';
+  html += '.searchrow{display:flex;gap:10px}.searchrow input{flex:1;min-width:0}';
+  // Long product lists scroll inside their own box instead of stretching the page.
+  html += '#presults{max-height:42vh;overflow-y:auto;margin-top:4px}';
   html += '.hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid #F5F1F3;font-size:15.5px;line-height:1.35}.hit:last-child{border-bottom:none}';
+  html += '.hit > span{min-width:0;overflow-wrap:anywhere}';
   html += '.hit .add{padding:9px 17px;font-size:14px;border-radius:10px;border:none;background:#2A2A2A;color:#fff;font-weight:800;cursor:pointer;flex-shrink:0;font-family:inherit}';
   html += '.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.row:last-child{border-bottom:none}';
   html += '.row .t{flex:1;font-weight:650;line-height:1.35}';
