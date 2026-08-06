@@ -2118,8 +2118,13 @@ app.post('/draft-order/create', async (req, res) => {
         amount: amount.toFixed(2)
       };
     }
-    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders.json', {
-      method: 'POST',
+    // With a draftId we rewrite the draft that's already in Shopify, so fixing a mistake
+    // doesn't leave a wrong order sitting there next to the right one.
+    var editId = String(req.body.draftId || '').replace(/\D/g, '');
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders' + (editId ? '/' + editId : '') + '.json';
+    if (editId) draft.id = parseInt(editId, 10);
+    var r = await fetch(url, {
+      method: editId ? 'PUT' : 'POST',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
       body: JSON.stringify({ draft_order: draft })
     });
@@ -2132,6 +2137,7 @@ app.post('/draft-order/create', async (req, res) => {
       name: d.name,
       total: d.total_price,
       hasEmail: !!d.email,
+      edited: !!editId,
       adminUrl: 'https://admin.shopify.com/store/' + CONFIG.shopify.store.replace('.myshopify.com', '') + '/draft_orders/' + d.id,
       invoiceUrl: d.invoice_url || null
     });
@@ -2146,6 +2152,15 @@ app.post('/draft-order/send-invoice', async (req, res) => {
   try {
     var id = String(req.body.id || '').replace(/\D/g, '');
     if (!id) return res.status(400).json({ error: 'Missing draft order id.' });
+    // Staff can type the email after the order is made, so put it on the draft first.
+    var newEmail = String(req.body.email || '').trim();
+    if (newEmail) {
+      await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + id + '.json', {
+        method: 'PUT',
+        headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_order: { id: parseInt(id, 10), email: newEmail } })
+      });
+    }
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/draft_orders/' + id + '/send_invoice.json', {
       method: 'POST',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
@@ -2304,12 +2319,6 @@ app.get('/draft-order-new', (req, res) => {
   html += '.btn.next:disabled{opacity:.35;cursor:default}';
   html += '.btn.back{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.btn.sm{padding:13px 20px;font-size:15px;border-radius:12px;background:#2A2A2A;color:#fff}';
-  html += '.searchrow{display:flex;gap:10px}.searchrow input{flex:1;min-width:0}';
-  // Long product lists scroll inside their own box instead of stretching the page.
-  html += '#presults{max-height:42vh;overflow-y:auto;margin-top:4px}';
-  html += '.hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 2px;border-bottom:1px solid #F5F1F3;font-size:15.5px;line-height:1.35}.hit:last-child{border-bottom:none}';
-  html += '.hit > span{min-width:0;overflow-wrap:anywhere}';
-  html += '.hit .add{padding:9px 17px;font-size:14px;border-radius:10px;border:none;background:#2A2A2A;color:#fff;font-weight:800;cursor:pointer;flex-shrink:0;font-family:inherit}';
   html += '.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.row:last-child{border-bottom:none}';
   html += '.row .t{flex:1;font-weight:650;line-height:1.35}';
   html += '.row input.q2{width:66px;padding:9px;text-align:center;font-size:15px}';
@@ -2333,6 +2342,12 @@ app.get('/draft-order-new', (req, res) => {
   html += '.done .path small{display:block;font-size:13.5px;font-weight:600;opacity:.75;margin-top:3px}';
   html += '.done .path.lite{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.done .path:disabled{opacity:.45;cursor:default}';
+  html += '.payhead{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#9B8A92;margin:26px 0 12px;text-align:left}';
+  html += '.pay{text-align:left;border:1.5px solid #EFEBED;border-radius:16px;padding:18px;margin-bottom:14px}';
+  html += '.pay .payt{font-size:18px;font-weight:800;margin-bottom:6px}';
+  html += '.pay .path{margin-top:0}';
+  html += 'ol.steps{margin:14px 0 0 20px;padding:0;font-size:15px;line-height:1.6;color:#3D3D3D}';
+  html += 'ol.steps li{margin-bottom:5px}';
   html += '@media (max-width:600px){body{padding:80px 14px 40px}.card{padding:22px 17px;border-radius:18px}.q{font-size:22px}.two{flex-direction:column;gap:0}.row .p{width:70px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
 
@@ -2381,12 +2396,9 @@ app.get('/draft-order-new', (req, res) => {
   // ---- Step 3: what are they getting ----
   html += '<div class="card step" id="s3" style="display:none">';
   html += '<div class="q">What are they getting?</div>';
-  html += '<div class="qs">Search the store, or type in anything that is not on the website.</div>';
+  html += '<div class="qs">Type each item, how many, and the price for one.</div>';
   html += '<div class="body">';
-  html += '<div class="field"><label>Search the store</label>';
-  html += '<div class="searchrow"><input type="text" id="psearch" placeholder="Type a product name, like pretzel"><button type="button" class="btn sm" onclick="searchProducts()">Search</button></div>';
-  html += '<div id="presults"></div></div>';
-  html += '<div class="field" style="margin-top:22px"><label>Or type it in yourself</label>';
+  html += '<div class="field"><label>Item</label>';
   html += '<input type="text" id="mtitle" placeholder="Item name">';
   html += '<div class="two" style="margin-top:10px"><input type="number" id="mqty" min="1" value="1" placeholder="How many"><input type="number" id="mprice" min="0" step="0.01" placeholder="Price each"></div>';
   html += '<button type="button" class="btn sm" style="margin-top:10px;width:100%" onclick="addManual()">Add this item</button>';
@@ -2442,14 +2454,22 @@ app.get('/draft-order-new', (req, res) => {
   // ---------------- script ----------------
   html += '<script>';
   html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
-  html += 'var S={method:"",fee:null,items:[],gift:null};';
+  html += 'var S={method:"",fee:null,items:[],gift:null,draftId:null};';
   html += 'var step=1;';
   html += 'function $(i){return document.getElementById(i)}';
   html += 'function esc(s){var d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML}';
   html += 'function val(i){return ($(i).value||"").trim()}';
   html += 'function showErr(m){var b=$("errbox");b.textContent=m||"";b.style.display=m?"block":"none";if(m)window.scrollTo(0,0)}';
-  html += 'function go(n){step=n;showErr("");for(var i=1;i<=6;i++)$("s"+i).style.display=(i===n?"block":"none");';
-  html += 'var d=$("dots").children;for(var j=0;j<6;j++){d[j].className=(j+1<n?"done":(j+1===n?"on":""))}window.scrollTo(0,0)}';
+  // Screen 7 is the "order is made" screen. Every screen gets its own browser history
+  // entry, so the Back button up top walks the questions instead of dumping you on the
+  // dashboard and losing everything typed.
+  html += 'function show(n){step=n;showErr("");for(var i=1;i<=6;i++)$("s"+i).style.display=(i===n?"block":"none");';
+  html += '$("dots").style.display=(n>6?"none":"flex");$("done").style.display=(n>6?"block":"none");';
+  html += 'var d=$("dots").children;for(var j=0;j<6;j++){d[j].className=(j+1<n?"done":(j+1===n?"on":""))}';
+  html += 'if(n===6){buildReview();$("createbtn").disabled=false;$("createbtn").textContent=S.draftId?"Save the changes":"Make the order"}';
+  html += 'window.scrollTo(0,0)}';
+  html += 'function go(n){history.pushState({step:n},"");show(n)}';
+  html += 'window.addEventListener("popstate",function(e){show(e.state&&e.state.step?e.state.step:1)});';
 
   // step 1
   html += 'function pickMethod(m){S.method=m;["pickup","local","ship"].forEach(function(k){$("m-"+k).className="pick"+(k===m?" on":"")});';
@@ -2494,7 +2514,7 @@ app.get('/draft-order-new', (req, res) => {
   html += 'go(5);return}';
   html += 'if(n===5){if(S.gift===null){showErr("Tell me if there is a gift message.");return}';
   html += 'if(S.gift&&!val("gmsg")){showErr("Type the gift message, or pick No gift message.");return}';
-  html += 'buildReview();go(6);return}}';
+  html += 'go(6);return}}';
 
   // step 5 gift
   html += 'function pickGift(y){S.gift=y;$("g-yes").className="pick"+(y?" on":"");$("g-no").className="pick"+(y?"":" on");';
@@ -2511,16 +2531,6 @@ app.get('/draft-order-new', (req, res) => {
   html += 'function addManual(){var t=val("mtitle");var q=Math.max(1,parseInt($("mqty").value,10)||1);var p=parseFloat($("mprice").value);';
   html += 'if(!t){showErr("Type a name for the item.");return}if(isNaN(p)||p<0){showErr("Type a price for the item.");return}showErr("");';
   html += 'S.items.push({title:t,qty:q,price:p});$("mtitle").value="";$("mqty").value=1;$("mprice").value="";renderCart()}';
-  html += 'async function searchProducts(){var q=val("psearch");var out=$("presults");';
-  html += 'if(q.length<2){out.innerHTML=\'<div class="muted" style="padding-top:10px">Type at least 2 letters.</div>\';return}';
-  html += 'out.innerHTML=\'<div class="muted" style="padding-top:10px">Looking&hellip;</div>\';';
-  html += 'try{var r=await fetch("/draft-order/products?q="+encodeURIComponent(q));var j=await r.json();if(j.error)throw new Error(j.error);';
-  html += 'if(!j.products.length){out.innerHTML=\'<div class="muted" style="padding-top:10px">Nothing matches that.</div>\';return}';
-  html += 'var h="";j.products.forEach(function(p){p.variants.forEach(function(v){var label=p.title+(v.title?" \\u2014 "+v.title:"");';
-  html += 'h+=\'<div class="hit"><span>\'+esc(label)+\' <span class="muted">$\'+esc(v.price)+\'</span></span><button type="button" class="add" onclick=\\\'addVariant(\'+JSON.stringify(JSON.stringify({id:v.id,label:label,price:v.price}))+\')\\\'>Add</button></div>\'})});';
-  html += 'out.innerHTML=h}catch(e){out.innerHTML="";showErr("The product search did not work: "+e.message)}}';
-  html += 'function addVariant(json){var v=JSON.parse(json);showErr("");S.items.push({title:v.label,qty:1,price:parseFloat(v.price)||0,variantId:v.id});renderCart()}';
-  html += '$("psearch").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();searchProducts()}});';
 
   // dates
   html += 'var MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];';
@@ -2562,24 +2572,51 @@ app.get('/draft-order-new', (req, res) => {
   html += 'var noteLines=["Taken by staff on the dashboard.","Paying: "+val("bname")+" "+val("bphone")];';
   html += 'var payload={items:S.items,email:val("bemail"),note:noteLines.join("\\n"),attributes:attrs,shippingAddress:addr,';
   html += 'shipping:{title:S.method==="local"?"Local Delivery":(S.method==="ship"?"Shipping":""),price:shipPrice()>0?String(shipPrice()):""}};';
+  html += 'if(S.draftId)payload.draftId=S.draftId;';
   html += 'try{var r=await fetch("/draft-order/create",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});';
   html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server problem");';
-  html += 'for(var i=1;i<=6;i++)$("s"+i).style.display="none";$("dots").style.display="none";';
-  html += 'var d=$("done");var h=\'<div class="card done"><div class="big">&#10004; Order \'+esc(j.name)+\' is made</div>\';';
+  html += 'S.draftId=j.id;S.res=j;buildDone(j);go(7)}';
+  html += 'catch(e){showErr("Could not make the order: "+e.message);b.disabled=false;b.textContent=S.draftId?"Save the changes":"Make the order"}}';
+
+  // The "order is made" screen: three plain ways to get paid, spelled out.
+  html += 'function buildDone(j){';
+  html += 'var h=\'<div class="card done"><div class="big">&#10004; Order \'+esc(j.name)+\' is \'+(j.edited?"updated":"made")+\'</div>\';';
   html += 'h+=\'<div class="muted">Total $\'+esc(j.total)+\'. Nothing is charged yet.</div>\';';
-  html += 'h+=\'<div style="font-size:15.5px;font-weight:800;margin-top:22px">How are they paying?</div>\';';
-  html += 'h+=\'<a class="path" href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">&#128222; They are on the phone<small>Opens Shopify so you can type the card in</small></a>\';';
-  html += 'if(j.hasEmail){h+=\'<button type="button" class="path lite" id="sendinv" onclick="sendInvoice(\'+j.id+\')">&#9993;&#65039; Email them a pay link<small>Sends the Shopify pay link to \'+esc(val("bemail"))+\'</small></button>\'}';
-  html += 'else{h+=\'<div class="muted" style="margin-top:14px">No email on this one, so there is no pay link to send.</div>\'}';
+  html += 'h+=\'<button type="button" class="path lite" onclick="go(6)">&#8592; Go back and fix the order<small>Change items, address or the gift message</small></button>\';';
+  html += 'h+=\'<div class="payhead">How are they paying?</div>\';';
+
+  html += 'h+=\'<div class="pay"><div class="payt">&#9993;&#65039; 1. Send them a link to pay</div>\';';
+  html += 'h+=\'<div class="muted" style="margin-bottom:10px">They open it on their phone and pay with their own card. Best for a customer standing in front of you.</div>\';';
+  html += 'h+=\'<input type="email" id="payemail" placeholder="their@email.com" value="\'+esc(val("bemail"))+\'">\';';
+  html += 'h+=\'<button type="button" class="path" id="sendinv" style="margin-top:10px" onclick="sendInvoice(\'+j.id+\')">Send the pay link</button>\';';
+  html += 'if(j.invoiceUrl){h+=\'<button type="button" class="path lite" id="copylink" onclick="copyPayLink()">&#128279; Copy the link instead<small>Paste it into a text message</small></button>\';';
+  html += 'h+=\'<input type="hidden" id="paylink" value="\'+esc(j.invoiceUrl)+\'">\'}';
+  html += 'h+=\'</div>\';';
+
+  html += 'h+=\'<div class="pay"><div class="payt">&#128179; 2. Type their card in yourself</div>\';';
+  html += 'h+=\'<div class="muted" style="margin-bottom:10px">For a customer on the phone reading you their card number.</div>\';';
+  html += 'h+=\'<a class="path" href="\'+esc(j.adminUrl)+\'" target="_blank" rel="noopener">Open this order in Shopify</a>\';';
+  html += 'h+=\'<ol class="steps"><li>On the Shopify page, click <b>Collect payment</b>.</li>';
+  html += '<li>Click <b>Credit card</b>.</li>';
+  html += '<li>Type the card number, the expiration date and the 3 digits on the back.</li>';
+  html += '<li>If it asks for a billing ZIP code, use the ZIP on the card&#39;s bill, not the delivery ZIP.</li>';
+  html += '<li>Click <b>Charge</b>.</li></ol></div>\';';
+
   html += 'h+=\'<a class="path lite" href="/draft-order-new">&#10133; Start another order</a></div>\';';
-  html += 'd.innerHTML=h;window.scrollTo(0,0)}';
-  html += 'catch(e){showErr("Could not make the order: "+e.message);b.disabled=false;b.textContent="Make the order"}}';
-  html += 'async function sendInvoice(id){var b=$("sendinv");b.disabled=true;b.innerHTML="Sending\\u2026";';
-  html += 'try{var r=await fetch("/draft-order/send-invoice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id})});';
+  html += '$("done").innerHTML=h}';
+
+  html += 'function copyPayLink(){var b=$("copylink");';
+  html += 'navigator.clipboard.writeText($("paylink").value).then(function(){b.innerHTML="&#10004; Link copied"}).catch(function(){';
+  html += '$("paylink").type="text";$("paylink").select();b.innerHTML="Copy it from the box above"})}';
+
+  html += 'async function sendInvoice(id){var b=$("sendinv");var to=($("payemail").value||"").trim();';
+  html += 'if(to.indexOf("@")<1){showErr("Type their email address first.");return}';
+  html += 'showErr("");b.disabled=true;b.innerHTML="Sending\\u2026";';
+  html += 'try{var r=await fetch("/draft-order/send-invoice",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:id,email:to})});';
   html += 'var j=await r.json();if(!r.ok||j.error)throw new Error(j.error||"Server problem");';
   html += 'b.innerHTML="&#10004; Pay link sent"+(j.to?"<small>to "+esc(j.to)+"</small>":"")}';
-  html += 'catch(e){b.disabled=false;b.innerHTML="&#9993;&#65039; Email them a pay link";showErr("Could not send the pay link: "+e.message)}}';
-  html += 'go(1);';
+  html += 'catch(e){b.disabled=false;b.innerHTML="Send the pay link";showErr("Could not send the pay link: "+e.message)}}';
+  html += 'history.replaceState({step:1},"");show(1);';
   html += '</script>';
   html += '</div></body></html>';
   res.send(html);
