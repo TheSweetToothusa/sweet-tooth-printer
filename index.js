@@ -1423,7 +1423,7 @@ var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;backgr
 
 function dashTile(label, href, opts) {
   opts = opts || {};
-  var html = '<a class="tile" href="' + (href || '#') + '"';
+  var html = '<a class="tile' + (opts.hero ? ' hero' : '') + (opts.row ? ' rowtile' : '') + '" href="' + (href || '#') + '"';
   // Internal pages open in the SAME tab (they all have the HOME button).
   // Only external sites get a new tab - they have no way back to the dashboard.
   if (opts.newTab) html += ' target="_blank" rel="noopener"';
@@ -1449,7 +1449,29 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
-  html += '.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:14px;margin-top:22px;justify-content:center}';
+  // Fixed 4 columns, NOT auto-fit. auto-fit stretched a 2-tile row into two giant
+  // tiles, which made size look like importance when it was just leftover space.
+  html += '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}';
+  html += '@media (max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}';
+  // The promoted row: the three things staff do all day, at roughly double the area.
+  html += '.herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px}';
+  html += '@media (max-width:900px){.herogrid{grid-template-columns:1fr}}';
+  html += '.tile.hero{min-height:158px;gap:14px;border-top:5px solid #F7B5CD;border-radius:20px}';
+  html += '.tile.hero .emoji{font-size:50px}';
+  html += '.tile.hero .label{font-size:21px}';
+  html += '.tile.hero .sublabel{font-size:13.5px}';
+  html += '.moretools{display:block;margin:18px auto 0;background:#fff;border:1.5px solid #E8E2E5;border-radius:14px;padding:12px 26px;font-size:15px;font-weight:800;font-family:inherit;color:#2A2A2A;cursor:pointer}';
+  html += '.moretools:hover{border-color:#F7B5CD}';
+  // Everything below the promoted row is a labelled list, not more squares. Three
+  // columns of short lists read in one glance and fit on one screen.
+  html += '.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:20px;align-items:start}';
+  html += '@media (max-width:900px){.cols{grid-template-columns:1fr;gap:14px}}';
+  html += '.col .sec{margin-top:0}';
+  html += '.tile.rowtile{flex-direction:row;justify-content:flex-start;align-items:center;gap:13px;min-height:0;padding:12px 15px;border-radius:14px;margin-top:10px;text-align:left}';
+  html += '.tile.rowtile:hover{transform:none;box-shadow:0 6px 16px rgba(0,0,0,.09)}';
+  html += '.tile.rowtile .emoji{font-size:26px;flex-shrink:0}';
+  html += '.tile.rowtile .label{font-size:15.5px;font-weight:750;line-height:1.3}';
+  html += '.tile.rowtile .sublabel{font-size:12px}';
   html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:102px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:14px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
   html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
   html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
@@ -1463,8 +1485,6 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:15px 0 0;padding-bottom:6px;border-bottom:2px solid #F3EDF0}';
   html += '.sec:first-of-type{margin-top:20px}';
   html += '.sec + .grid{margin-top:10px}';
-  html += '.duo{display:flex;gap:18px;align-items:flex-start}.duo .half{flex:1;min-width:0}';
-  html += '@media (max-width:760px){.duo{flex-direction:column;align-items:stretch}}';
   // Post-its hover over the corner instead of shoving every tile below the fold.
   html += '#postit-layer{position:fixed;bottom:16px;right:16px;width:296px;z-index:90;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none}';
   html += '#postit-layer > div > *{pointer-events:auto}';
@@ -1479,15 +1499,11 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.setupbar{text-align:center;margin-top:26px}';
   html += '.setupbar a{font-size:12.5px;font-weight:700;color:#C2B4BB;text-decoration:none}.setupbar a:hover{color:#2A2A2A}';
   html += '.actionbar{display:flex;gap:12px;margin-top:10px}';
-  html += '.askai.light{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
-  html += '.askai.dim{opacity:.18}';
   html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
   html += '.searchwrap:focus-within{border-color:#C9BFC4}';
   html += '.searchwrap .mag{font-size:19px}';
   html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
   html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#F7B5CD}';
-  html += '.askai{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:16px;padding:0 24px;font-weight:800;font-size:15.5px;text-decoration:none}';
-  html += '@media (max-width:760px){.actionbar{flex-direction:column}.askai{padding:15px;justify-content:center}}';
   html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
@@ -1549,33 +1565,43 @@ app.get('/', (req, res) => {
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
   body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
-  body += '<a class="askai light" href="/order-lookup" data-kw="order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund">&#128269; Order Lookup</a>';
-  body += '<a class="askai" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer">&#10024; Ask Shopify AI</a>';
   body += '</div>';
 
-  body += '<h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2><div class="grid">';
-  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { emoji: '&#128424;&#65039;', kw: 'invoice receipt reprint print edit' });
-  body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { emoji: '&#128140;', kw: 'gift card message edit reprint note' });
-  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { emoji: '&#127873;', kw: 'gift card message new create note' });
-  body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
-  body += dashTile('Stickers &amp; Labels', '/stickers', { emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
+  // Top tier: the three things staff do all day, big and always in the same spot.
+  body += '<h2 class="sec">&#11088; Most Used</h2><div class="herogrid">';
+  body += dashTile('Look Up an Order', '/order-lookup', { hero: true, emoji: '&#128269;', sub: 'Status, tracking, delivery, phone', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
+  body += dashTile('Edit or Reprint an Invoice', '/dashboard/invoices', { hero: true, emoji: '&#128424;&#65039;', sub: 'The paper that goes in the box', kw: 'invoice receipt reprint print edit paperwork' });
+  body += dashTile('Edit or Reprint a Gift Card', '/dashboard', { hero: true, emoji: '&#128140;', sub: 'Change the message and print again', kw: 'gift card message edit reprint note change' });
   body += '</div>';
 
-  body += '<div class="duo"><div class="half">';
-  body += '<h2 class="sec">&#127978; Shop</h2><div class="grid">';
-  body += dashTile('Supplies', '/supplies', { emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
-  body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
-  body += '</div></div><div class="half">';
-  body += '<h2 class="sec">&#128666; Shipping</h2><div class="grid">';
-  body += dashTile('Reprint Shipping Label', '/reprint-label', { emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
-  body += dashTile('Change Shipping Speed', '/switch-shipping', { emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
-  body += dashTile('Create New Shipping Label', 'https://ship.shipstation.com/rates', { emoji: '&#128178;', newTab: true, sub: 'ShipStation', kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
-  body += '</div></div></div>';
+  body += '<div class="cols">';
 
-  body += '<h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2><div class="grid">';
+  body += '<div class="col"><h2 class="sec">&#127873; Gift Cards, Stickers &amp; Art</h2>';
+  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { row: true, emoji: '&#127873;', kw: 'gift card message new create note' });
+  body += dashTile('Stickers &amp; Labels', '/stickers', { row: true, emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
+  body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { row: true, emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
+  body += '</div>';
+
+  body += '<div class="col"><h2 class="sec">&#128666; Getting It Out the Door</h2>';
+  body += dashTile('Reprint Shipping Label', '/reprint-label', { row: true, emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
+  body += dashTile('Change Shipping Speed', '/switch-shipping', { row: true, emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
+  body += dashTile('Create New Shipping Label', 'https://ship.shipstation.com/rates', { row: true, emoji: '&#128178;', newTab: true, sub: 'ShipStation', kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
+  body += '</div>';
+
+  body += '<div class="col"><h2 class="sec">&#128179; Taking Money</h2>';
   // The old all-on-one-page version still lives at /draft-order if we ever need it back.
-  body += dashTile('Create a Draft Order', '/draft-order-new', { emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
-  body += dashTile('Create a Discount Code', '/create-discount', { emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  body += dashTile('Create a Discount Code', '/create-discount', { row: true, emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += '</div>';
+
+  body += '</div>';
+
+  // Rarely used, so it stays folded away instead of eating a screen.
+  body += '<button class="moretools" id="moretools" type="button">&#43; More tools</button>';
+  body += '<div class="cols" id="moregrid" style="display:none">';
+  body += '<div class="col">' + dashTile('Supplies', '/supplies', { row: true, emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' }) + '</div>';
+  body += '<div class="col">' + dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' }) + '</div>';
+  body += '<div class="col">' + dashTile('Ask Shopify AI', 'https://admin.shopify.com/store/thesweettoothfl', { row: true, emoji: '&#10024;', newTab: true, sub: 'Sidekick', kw: 'ask shopify ai sidekick help question how expert answer admin' }) + '</div>';
   body += '</div>';
 
   body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
@@ -1583,9 +1609,15 @@ app.get('/', (req, res) => {
   body += '<script>(function(){var q=document.getElementById("dashq"),miss=document.getElementById("dashmiss");';
   body += 'var tiles=[].slice.call(document.querySelectorAll("[data-kw]"));';
   body += 'var secs=[].slice.call(document.querySelectorAll(".sec"));';
+  // Tiles dim rather than disappear, so nothing ever moves. Staff learn where things are.
+  body += 'var moreg=document.getElementById("moregrid"),moreb=document.getElementById("moretools");';
+  body += 'moreb.addEventListener("click",function(){var open=moreg.style.display!=="none";';
+  body += 'moreg.style.display=open?"none":"grid";moreb.innerHTML=open?"&#43; More tools":"&#8722; Hide extra tools"});';
   body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
   body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
   body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
+  // A search has to be able to reach the folded-away tools.
+  body += 'if(v&&moreg.querySelector("[data-kw]:not(.dim)")){moreg.style.display="grid";moreb.innerHTML="&#8722; Hide extra tools"}';
   body += 'miss.style.display=(v&&!any)?"block":"none"});';
   // Voice search: Chrome's built-in speech recognition. Mic button hides if unsupported.
   body += 'var mic=document.getElementById("dashmic");var SR=window.SpeechRecognition||window.webkitSpeechRecognition;';
