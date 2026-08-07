@@ -73,6 +73,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/sticker-files', express.static(__dirname + '/sticker-files'));
 
+// Staff kept getting stranded on the older hand-built pages, which had no HOME or Back
+// button at all. Anything on this list gets the shared bar bolted on as it's sent.
+// Print and preview pages are deliberately NOT here — a fixed bar would print.
+var NEEDS_TOPBAR = ['/dashboard', '/dashboard/invoices', '/dashboard/gift-card-new', '/dashboard/search'];
+app.use(function (req, res, next) {
+  if (NEEDS_TOPBAR.indexOf(req.path) === -1) return next();
+  var send = res.send;
+  res.send = function (body) {
+    if (typeof body === 'string' && body.indexOf('<!DOCTYPE html') === 0) body = withTopbar(body);
+    return send.call(res, body);
+  };
+  next();
+});
+
 function verifyShopifyWebhook(req) {
   var hmac = req.get('X-Shopify-Hmac-Sha256');
   var hash = crypto.createHmac('sha256', CONFIG.shopify.webhookSecret).update(req.body, 'utf8').digest('base64');
@@ -467,23 +481,29 @@ app.get('/dashboard/supply-alerts/ack', async function (req, res) {
   try {
     var id = String(req.query.id || '').replace(/\D/g, '');
     if (!id) return res.status(400).json({ error: 'missing id' });
+    // Somebody has to put their name to a produce run, so we know who to ask.
+    var who = String(req.query.who || '').trim().slice(0, 40);
+    if (who.length < 2) return res.status(400).json({ error: 'missing name' });
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,name,tags,line_items,note_attributes',
       { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
     var o = ((await r.json()) || {}).order;
     if (!o) return res.status(404).json({ error: 'order not found' });
     var tags = (o.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
     if (tags.indexOf('st_supplies_ok') === -1) tags.push('st_supplies_ok');
+    // Name goes on the order itself, visible in Shopify, not just in our archive.
+    var attrs = (o.note_attributes || []).filter(function (na) { return na && na.name !== '🛒 Supplies bought by'; });
+    attrs.push({ name: '🛒 Supplies bought by', value: who });
     var pr = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json', {
       method: 'PUT',
       headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order: { id: parseInt(id, 10), tags: tags.join(', ') } })
+      body: JSON.stringify({ order: { id: parseInt(id, 10), tags: tags.join(', '), note_attributes: attrs } })
     });
     if (!pr.ok) throw new Error('Shopify ' + pr.status);
     try {
       var needs = supplyNeedsForOrder(o).map(function (x) { return x.what + ': ' + x.item + ' ×' + x.qty; }).join(' · ');
       var dd = null;
       (o.note_attributes || []).forEach(function (na) { if (/delivery date/i.test(na.name || '')) dd = na.value; });
-      await archivePush({ type: 'supply', text: (o.name || '#' + id) + ' — ' + needs + (dd ? ' (for ' + dd + ')' : ''), doneAt: new Date().toISOString() });
+      await archivePush({ type: 'supply', text: (o.name || '#' + id) + ' — ' + needs + (dd ? ' (for ' + dd + ')' : '') + ' — bought by ' + who, doneAt: new Date().toISOString() });
     } catch (ae) { console.error('archive push failed:', ae.message); }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1421,6 +1441,15 @@ var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;backgr
   // On a phone there is only room for the two buttons.
   '@media (max-width:760px){.topbar a.mark{display:none}}';
 
+// Bolts the shared Back/HOME bar onto the older hand-built pages. Staff were landing
+// on the invoice and gift-card lists with no way back to the dashboard at all.
+function withTopbar(html) {
+  if (html.indexOf('class="topbar"') > -1) return html;
+  return html
+    .replace('</style>', TOPBAR_CSS + 'body{padding-top:76px}</style>')
+    .replace('<body>', '<body>' + TOPBAR_HTML);
+}
+
 function dashTile(label, href, opts) {
   opts = opts || {};
   var html = '<a class="tile' + (opts.hero ? ' hero' : '') + (opts.row ? ' rowtile' : '') + '" href="' + (href || '#') + '"';
@@ -1447,7 +1476,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.wrap{width:100%;max-width:1080px;margin:auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
   // Fixed 4 columns, NOT auto-fit. auto-fit stretched a 2-tile row into two giant
   // tiles, which made size look like importance when it was just leftover space.
@@ -1456,24 +1485,32 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   // The promoted row: the three things staff do all day, at roughly double the area.
   html += '.herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px}';
   html += '@media (max-width:900px){.herogrid{grid-template-columns:1fr}}';
-  html += '.tile.hero{min-height:158px;gap:14px;border-top:5px solid #F7B5CD;border-radius:20px}';
+  html += '.tile.hero{min-height:158px;gap:14px;border-top:5px solid #C8A02C;border-radius:20px}';
   html += '.tile.hero .emoji{font-size:50px}';
   html += '.tile.hero .label{font-size:21px}';
   html += '.tile.hero .sublabel{font-size:13.5px}';
-  html += '.moretools{display:block;margin:18px auto 0;background:#fff;border:1.5px solid #E8E2E5;border-radius:14px;padding:12px 26px;font-size:15px;font-weight:800;font-family:inherit;color:#2A2A2A;cursor:pointer}';
-  html += '.moretools:hover{border-color:#F7B5CD}';
+  html += '.bubble{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:999px;padding:0 26px;font-weight:800;font-size:15.5px;text-decoration:none;white-space:nowrap}';
+  html += '.zipquick{flex-shrink:0;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:0 16px;height:56px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.zipquick .zl{font-size:13px;font-weight:800;color:#9B8A92;white-space:nowrap}';
+  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:10px;padding:9px 10px;font-size:16px;font-weight:800;text-align:center}';
+  html += '.zipquick input:focus{outline:2px solid #C8A02C}';
+  html += '.zipquick .zout{font-size:19px;font-weight:800;min-width:56px;color:#C2B4BB}';
+  html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
+  html += '@media (max-width:1100px){.actionbar{flex-wrap:wrap}.searchwrap{flex:1 1 100%}}';
   // Everything below the promoted row is a labelled list, not more squares. Three
   // columns of short lists read in one glance and fit on one screen.
   html += '.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:20px;align-items:start}';
+  html += '.cols.four{grid-template-columns:repeat(4,1fr);gap:20px}';
+  html += '@media (max-width:1150px){.cols.four{grid-template-columns:repeat(2,1fr)}}';
   html += '@media (max-width:900px){.cols{grid-template-columns:1fr;gap:14px}}';
-  html += '.col .sec{margin-top:0}';
+  html += '.col .sec{margin-top:0;min-height:34px;display:flex;align-items:flex-end}';
   html += '.tile.rowtile{flex-direction:row;justify-content:flex-start;align-items:center;gap:13px;min-height:0;padding:12px 15px;border-radius:14px;margin-top:10px;text-align:left}';
   html += '.tile.rowtile:hover{transform:none;box-shadow:0 6px 16px rgba(0,0,0,.09)}';
   html += '.tile.rowtile .emoji{font-size:26px;flex-shrink:0}';
   html += '.tile.rowtile .label{font-size:15.5px;font-weight:750;line-height:1.3}';
   html += '.tile.rowtile .sublabel{font-size:12px}';
   html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:102px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:14px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
-  html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#F7B5CD;opacity:0;transition:opacity .12s}';
+  html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#C8A02C;opacity:0;transition:opacity .12s}';
   html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
   html += '.tile:hover:before{opacity:1}';
   html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
@@ -1486,14 +1523,20 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.sec:first-of-type{margin-top:20px}';
   html += '.sec + .grid{margin-top:10px}';
   // Post-its hover over the corner instead of shoving every tile below the fold.
-  html += '#postit-layer{position:fixed;bottom:16px;right:16px;width:296px;z-index:90;max-height:calc(100vh - 80px);overflow-y:auto;pointer-events:none}';
-  html += '#postit-layer > div > *{pointer-events:auto}';
-  html += '@media (max-width:1100px){#postit-layer{position:static;width:auto;max-height:none;overflow:visible;margin-bottom:10px}}';
-  html += '.postit{position:relative;max-width:430px;margin:6px auto 0;background:#FEF3B4;border-radius:3px 16px 3px 16px;box-shadow:0 4px 14px rgba(0,0,0,.10);padding:20px 16px 11px;font-size:13.5px;font-weight:600;line-height:1.45;transform:rotate(-1.2deg);color:#5C5335}';
-  html += '.postit .hide{position:absolute;top:7px;right:11px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
-  html += '.postit.supply{background:#FFE1C9;color:#5C4326;transform:rotate(.8deg);margin-top:12px}';
-  html += '.postit.supply .got{display:inline-block;margin-top:10px;padding:9px 16px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13.5px;cursor:pointer}';
+  // Notes run full width across the middle of the page. In the corner they got ignored.
+  html += '#postit-layer{margin:16px 0 6px}';
+  html += '.postit{position:relative;width:100%;margin:0 0 12px;background:#FEF3B4;border:2px solid #E3C43A;border-radius:16px;box-shadow:0 5px 18px rgba(0,0,0,.10);padding:17px 20px;font-size:16.5px;font-weight:700;line-height:1.45;color:#4A4227;display:flex;align-items:center;gap:18px;flex-wrap:wrap}';
+  html += '.postit .txt{flex:1;min-width:240px}';
+  html += '.postit .hide{position:absolute;top:6px;right:12px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
+  html += '.postit.supply{background:#FFE1C9;border-color:#E39A5B;color:#5C4326}';
   html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
+  html += '.postit .got{flex-shrink:0;padding:13px 20px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}';
+  html += '.postit .got:disabled{opacity:.4;cursor:not-allowed}';
+  // Produce runs need a name on them, so we know who to ask.
+  html += '.postit .who{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #E39A5B;border-radius:12px;padding:0 12px}';
+  html += '.postit .who label{font-size:13px;font-weight:800;color:#8A6A3F;white-space:nowrap}';
+  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:800;width:132px;font-family:inherit;color:#2A2A2A}';
+  html += '.postit .who input:focus{outline:none}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
   html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
   html += '.setupbar{text-align:center;margin-top:26px}';
@@ -1503,13 +1546,13 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.searchwrap:focus-within{border-color:#C9BFC4}';
   html += '.searchwrap .mag{font-size:19px}';
   html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
-  html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#F7B5CD}';
+  html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#C8A02C}';
   html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   if (!noH1) html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
-  if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
+  if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
   html += rawBody ? tilesHtml : '<div class="grid">' + tilesHtml + '</div>';
   html += '</div></body></html>';
   return html;
@@ -1535,10 +1578,11 @@ app.get('/', (req, res) => {
   body += '<script>(function(){var nbox=document.getElementById("custom-notes");';
   body += 'function renderNotes(d){nbox.innerHTML="";(d.notes||[]).slice(0,8).forEach(function(a){';
   body += 'var n=document.createElement("div");n.className="postit";n.style.marginTop="12px";';
-  body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;n.appendChild(t);';
+  body += 'var w=document.createElement("div");w.className="txt";';
+  body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;w.appendChild(t);';
   body += 'var m=document.createElement("div");m.style.cssText="font-size:12px;color:#A89B66;margin-top:4px;font-weight:700";';
-  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});n.appendChild(m);';
-  body += 'var g=document.createElement("button");g.className="got";g.style.cssText="display:inline-block;margin-top:8px;padding:8px 15px;border:none;border-radius:10px;background:#2A2A2A;color:#fff;font-weight:800;font-size:13px;cursor:pointer";g.textContent="\\u2713 Done";';
+  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});w.appendChild(m);n.appendChild(w);';
+  body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Done";';
   body += 'g.addEventListener("click",function(){if(!confirm("Mark this note done? It moves to the archive."))return;g.disabled=true;';
   body += 'fetch("/dashboard/notes/done?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else g.disabled=false}).catch(function(){g.disabled=false})});';
   body += 'n.appendChild(g);nbox.appendChild(n)})}';
@@ -1551,12 +1595,19 @@ app.get('/', (req, res) => {
   body += '<script>(function(){var box=document.getElementById("supply-alerts");';
   body += 'function render(d){box.innerHTML="";(d.alerts||[]).slice(0,6).forEach(function(a){';
   body += 'var n=document.createElement("div");n.className="postit supply";';
+  body += 'var w=document.createElement("div");w.className="txt";';
   body += 'var h=document.createElement("div");var b=document.createElement("b");b.textContent="\\uD83D\\uDED2 "+a.name+" needs a store run";h.appendChild(b);';
-  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="  \\u2014 for "+a.deliveryDate;h.appendChild(s)}n.appendChild(h);';
-  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;n.appendChild(l)});';
-  body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Got it \\u2014 items are covered";';
-  body += 'g.addEventListener("click",function(){if(!confirm("Confirm: the items for "+a.name+" are bought / picked up?"))return;';
-  body += 'g.disabled=true;fetch("/dashboard/supply-alerts/ack?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else{g.disabled=false;alert("Could not save \\u2014 try again")}}).catch(function(){g.disabled=false;alert("Could not save \\u2014 try again")})});';
+  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="  \\u2014 for "+a.deliveryDate;h.appendChild(s)}w.appendChild(h);';
+  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;w.appendChild(l)});n.appendChild(w);';
+  // Fresh produce has to have a name on it. No name, no clearing the note.
+  body += 'var who=document.createElement("div");who.className="who";';
+  body += 'var wl=document.createElement("label");wl.textContent="Who is buying it?";who.appendChild(wl);';
+  body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="Your name";wi.maxLength=40;who.appendChild(wi);n.appendChild(who);';
+  body += 'var g=document.createElement("button");g.className="got";g.disabled=true;g.textContent="\\u2713 Got it \\u2014 items are covered";';
+  body += 'wi.addEventListener("input",function(){g.disabled=wi.value.trim().length<2});';
+  body += 'g.addEventListener("click",function(){var nm=wi.value.trim();if(nm.length<2){wi.focus();return}';
+  body += 'if(!confirm(nm+" is buying the items for "+a.name+"? Your name gets saved on the order."))return;';
+  body += 'g.disabled=true;fetch("/dashboard/supply-alerts/ack?id="+a.id+"&who="+encodeURIComponent(nm)).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else{g.disabled=false;alert("Could not save \\u2014 try again")}}).catch(function(){g.disabled=false;alert("Could not save \\u2014 try again")})});';
   body += 'n.appendChild(g);box.appendChild(n)})}';
   body += 'function load(){fetch("/dashboard/supply-alerts").then(function(r){return r.json()}).then(render).catch(function(){})}';
   body += 'load();setInterval(load,60000)})();</script>';
@@ -1565,7 +1616,16 @@ app.get('/', (req, res) => {
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
   body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
+  // Quick ZIP price check, right where they can see it. Same table the driver app uses.
+  body += '<div class="zipquick"><span class="zl">&#128663; Delivery price</span>';
+  body += '<input type="text" id="dashzip" inputmode="numeric" maxlength="5" placeholder="ZIP">';
+  body += '<span class="zout" id="dashzipout">&mdash;</span></div>';
+  body += '<a class="bubble" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer admin">&#128172; Ask Shopify AI</a>';
   body += '</div>';
+  body += '<script>(function(){var F=' + JSON.stringify(DELIVERY_FEES) + ';var i=document.getElementById("dashzip"),o=document.getElementById("dashzipout");';
+  body += 'i.addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,5);var z=this.value;';
+  body += 'if(z.length<5){o.textContent="\\u2014";o.className="zout";return}';
+  body += 'if(F[z]!=null){o.textContent="$"+F[z];o.className="zout hit"}else{o.textContent="Not our area";o.className="zout miss"}})})();</script>';
 
   // Top tier: the three things staff do all day, big and always in the same spot.
   body += '<h2 class="sec">&#11088; Most Used</h2><div class="herogrid">';
@@ -1574,9 +1634,9 @@ app.get('/', (req, res) => {
   body += dashTile('Edit or Reprint a Gift Card', '/dashboard', { hero: true, emoji: '&#128140;', sub: 'Change the message and print again', kw: 'gift card message edit reprint note change' });
   body += '</div>';
 
-  body += '<div class="cols">';
+  body += '<div class="cols four">';
 
-  body += '<div class="col"><h2 class="sec">&#127873; Gift Cards, Stickers &amp; Art</h2>';
+  body += '<div class="col"><h2 class="sec">&#127873; Gift Cards &amp; Stickers</h2>';
   body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { row: true, emoji: '&#127873;', kw: 'gift card message new create note' });
   body += dashTile('Stickers &amp; Labels', '/stickers', { row: true, emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { row: true, emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
@@ -1594,14 +1654,12 @@ app.get('/', (req, res) => {
   body += dashTile('Create a Discount Code', '/create-discount', { row: true, emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
   body += '</div>';
 
+  // Every tile stays on the page. Nothing is ever hidden behind a "more" button.
+  body += '<div class="col"><h2 class="sec">&#128722; Store &amp; Email</h2>';
+  body += dashTile('Supplies', '/supplies', { row: true, emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
+  body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
   body += '</div>';
 
-  // Rarely used, so it stays folded away instead of eating a screen.
-  body += '<button class="moretools" id="moretools" type="button">&#43; More tools</button>';
-  body += '<div class="cols" id="moregrid" style="display:none">';
-  body += '<div class="col">' + dashTile('Supplies', '/supplies', { row: true, emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' }) + '</div>';
-  body += '<div class="col">' + dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' }) + '</div>';
-  body += '<div class="col">' + dashTile('Ask Shopify AI', 'https://admin.shopify.com/store/thesweettoothfl', { row: true, emoji: '&#10024;', newTab: true, sub: 'Sidekick', kw: 'ask shopify ai sidekick help question how expert answer admin' }) + '</div>';
   body += '</div>';
 
   body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
@@ -1610,14 +1668,9 @@ app.get('/', (req, res) => {
   body += 'var tiles=[].slice.call(document.querySelectorAll("[data-kw]"));';
   body += 'var secs=[].slice.call(document.querySelectorAll(".sec"));';
   // Tiles dim rather than disappear, so nothing ever moves. Staff learn where things are.
-  body += 'var moreg=document.getElementById("moregrid"),moreb=document.getElementById("moretools");';
-  body += 'moreb.addEventListener("click",function(){var open=moreg.style.display!=="none";';
-  body += 'moreg.style.display=open?"none":"grid";moreb.innerHTML=open?"&#43; More tools":"&#8722; Hide extra tools"});';
   body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
   body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
   body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
-  // A search has to be able to reach the folded-away tools.
-  body += 'if(v&&moreg.querySelector("[data-kw]:not(.dim)")){moreg.style.display="grid";moreb.innerHTML="&#8722; Hide extra tools"}';
   body += 'miss.style.display=(v&&!any)?"block":"none"});';
   // Voice search: Chrome's built-in speech recognition. Mic button hides if unsupported.
   body += 'var mic=document.getElementById("dashmic");var SR=window.SpeechRecognition||window.webkitSpeechRecognition;';
@@ -1694,7 +1747,7 @@ app.get('/supplies', (req, res) => {
 app.get('/supplies/buy', (req, res) => {
   var body = '';
   body += '<style>.searchbar{display:flex;gap:10px;margin-top:26px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}';
-  body += '.whr{background:#fff;border:1px solid #EFEBED;border-left:5px solid #F7B5CD;border-radius:14px;padding:14px 18px;font-size:15.5px;font-weight:600;margin-top:12px}.whr b{font-size:16px}';
+  body += '.whr{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:14px;padding:14px 18px;font-size:15.5px;font-weight:600;margin-top:12px}.whr b{font-size:16px}';
   body += '.whr-miss{display:none;background:#fff;border:1px dashed #D9CFD4;border-radius:14px;padding:14px 18px;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:12px}</style>';
   body += '<div class="searchbar"><input type="text" id="whereq" placeholder="What do you need? Type it: strawberries, ribbon, ice packs&hellip;"></div>';
   body += '<div id="where-results"></div>';
@@ -1833,16 +1886,16 @@ function lookupShell(inner, q) {
   html += '.wrap{max-width:760px;margin:0 auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.searchbar{display:flex;gap:10px;margin:30px 0}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
   html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
   html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
   html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15.5px}.row .k{color:#9B8A92;flex-shrink:0}.row .v{font-weight:600;text-align:right}';
   html += '.status-banner{border-radius:20px;padding:20px 24px;margin-bottom:18px;font-size:19px;font-weight:800;text-align:center;background:#fff;border:1px solid #EFEBED;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
   html += '.status-banner .sub{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:6px}';
-  html += '.status-banner.delivered{border-top:5px solid #F7B5CD}';
+  html += '.status-banner.delivered{border-top:5px solid #C8A02C}';
   html += '.item{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.item:last-child{border-bottom:none}.item .qty{font-weight:800}';
   html += '.trackbtn{display:inline-block;margin-top:10px;padding:13px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
   html += '.muted{color:#9B8A92;font-size:15px}';
@@ -1851,18 +1904,22 @@ function lookupShell(inner, q) {
   html += '.toolout .miss{font-size:15px;font-weight:600;color:#9B8A92}';
   html += '.phone-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.phone-row:last-child{border-bottom:none}';
   html += '.phone-row a{font-weight:800;color:#2A2A2A;text-decoration:none}';
+  html += '.doact{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}';
+  html += '@media (max-width:620px){.doact{grid-template-columns:1fr}}';
+  html += '.doact a{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:750;color:#2A2A2A;text-decoration:none;line-height:1.3}';
+  html += '.doact a:hover{border-color:#C8A02C;box-shadow:0 4px 12px rgba(0,0,0,.07)}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Order Lookup</h1>';
+  // Staff use this constantly, so it goes above the fold, not buried at the bottom.
+  html += '<div class="card"><h2>Local Delivery Price by ZIP</h2>';
+  html += '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div>';
+  html += '<div class="toolout" id="zipout"></div></div>';
   html += '<form class="searchbar" action="/order-lookup" method="get">';
   html += '<input type="text" name="q" placeholder="Order number, customer name, email, or phone" value="' + escapeHtml(q || '') + '" autofocus>';
   html += '<button type="submit">Look Up</button></form>';
   html += inner;
 
   // --- Quick tools: zip fee, UPS tracking, phones ---
-  html += '<div class="card"><h2>Local Delivery Price by ZIP</h2>';
-  html += '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div>';
-  html += '<div class="toolout" id="zipout"></div></div>';
-
   html += '<div class="card"><h2>UPS Tracking</h2>';
   html += '<div class="searchbar" style="margin:0"><input type="text" id="upsin" placeholder="Paste a UPS tracking number"><button type="button" onclick="upsTrack()">Track on UPS</button></div></div>';
 
@@ -1963,6 +2020,16 @@ app.get('/order-lookup', async (req, res) => {
       sub = method ? escapeHtml(method) : 'No shipping method on this order';
     }
     inner += '<div class="status-banner' + (delivered ? ' delivered' : '') + '">' + banner + '<span class="sub">' + sub + '</span></div>';
+
+    // One click straight to the paperwork, so nobody has to go back to the dashboard.
+    inner += '<div class="card"><h2>Print or Fix This Order</h2><div class="doact">';
+    inner += '<a href="/dashboard/invoice-edit/' + order.id + '">&#128424;&#65039; Edit &amp; Print Invoice</a>';
+    // This one goes straight to the printer, so a stray click has to be confirmed.
+    inner += '<a href="/dashboard/reprint-invoice/' + order.id + '" onclick="return confirm(\'Print the invoice for ' + escapeHtml(order.name) + ' right now?\')">&#128438; Reprint Invoice &mdash; prints now</a>';
+    inner += '<a href="/dashboard/print-custom/' + order.id + '">&#128140; Edit &amp; Print Gift Card</a>';
+    inner += '<a href="/reprint-label?order=' + encodeURIComponent(String(order.order_number)) + '">&#128230; Reprint Shipping Label</a>';
+    inner += '<a href="/switch-shipping?order=' + encodeURIComponent(String(order.order_number)) + '">&#9889; Change Shipping Speed</a>';
+    inner += '</div></div>';
 
     // --- Order details ---
     var c = order.customer || {};
@@ -2226,10 +2293,10 @@ app.get('/draft-order', (req, res) => {
   html += '.wrap{max-width:760px;margin:0 auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 30px}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 30px}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
   html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:14px}';
-  html += 'input{padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:16px;background:#fff;width:100%}input:focus{outline:none;border-color:#F7B5CD}';
+  html += 'input{padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:16px;background:#fff;width:100%}input:focus{outline:none;border-color:#C8A02C}';
   html += '.inline{display:flex;gap:10px}.inline input.qty{width:86px;flex-shrink:0}.inline input.price{width:120px;flex-shrink:0}';
   html += '.btn{padding:13px 22px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;flex-shrink:0}';
   html += '.btn:disabled{opacity:.4;cursor:default}';
@@ -2242,7 +2309,7 @@ app.get('/draft-order', (req, res) => {
   html += '.cart-row .x{background:none;border:none;color:#C94F7C;font-size:20px;font-weight:800;cursor:pointer;padding:4px 8px}';
   html += '.total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:800;padding-top:14px}';
   html += '.muted{color:#9B8A92;font-size:14.5px}';
-  html += '.success{border-top:5px solid #F7B5CD;text-align:center;padding:30px 24px}';
+  html += '.success{border-top:5px solid #C8A02C;text-align:center;padding:30px 24px}';
   html += '.success .big{font-size:22px;font-weight:800;margin-bottom:6px}';
   html += '.success a{display:inline-block;margin:14px 6px 0;padding:14px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
   html += '.errbox{background:#fff;border:1.5px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:18px;font-weight:600;display:none}';
@@ -2329,14 +2396,14 @@ app.get('/draft-order-new', (req, res) => {
   html += TOPBAR_CSS;
   html += '.dots{display:flex;gap:7px;justify-content:center;margin-bottom:24px}';
   html += '.dots i{width:34px;height:7px;border-radius:7px;background:#EDE4E8}';
-  html += '.dots i.done{background:#2A2A2A}.dots i.on{background:#F7B5CD}';
+  html += '.dots i.done{background:#2A2A2A}.dots i.on{background:#C8A02C}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:22px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:26px 24px}';
   html += '.q{font-size:25px;font-weight:800;letter-spacing:-.5px;text-align:center;line-height:1.25}';
   html += '.qs{font-size:15.5px;color:#9B8A92;text-align:center;margin-top:8px;line-height:1.45}';
   html += '.body{margin-top:22px}';
   html += '.pick{display:flex;align-items:center;gap:16px;width:100%;background:#fff;border:2px solid #EFEBED;border-radius:18px;padding:18px 20px;margin-bottom:13px;cursor:pointer;text-align:left;color:#2A2A2A;font-family:inherit}';
-  html += '.pick:hover{border-color:#F7B5CD;background:#FFFCFD}';
-  html += '.pick.on{border-color:#F7B5CD;background:#FFF7FA}';
+  html += '.pick:hover{border-color:#C8A02C;background:#FEFBF2}';
+  html += '.pick.on{border-color:#C8A02C;background:#FDF8E8}';
   html += '.pick .e{font-size:34px;line-height:1;flex-shrink:0}';
   html += '.pick .t{display:block;font-size:20px;font-weight:800;letter-spacing:-.2px}';
   html += '.pick .s{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:3px;line-height:1.35}';
@@ -2344,7 +2411,7 @@ app.get('/draft-order-new', (req, res) => {
   html += '.field label{display:block;font-size:15.5px;font-weight:800;margin-bottom:7px}';
   html += '.field .hint{font-size:14px;color:#9B8A92;font-weight:600;margin-top:6px;line-height:1.45}';
   html += 'input,select,textarea{width:100%;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:13px;font-size:17px;font-family:inherit;background:#fff;color:#2A2A2A}';
-  html += 'input:focus,select:focus,textarea:focus{outline:none;border-color:#F7B5CD}';
+  html += 'input:focus,select:focus,textarea:focus{outline:none;border-color:#C8A02C}';
   html += 'textarea{min-height:110px;resize:vertical;line-height:1.5}';
   html += '.two{display:flex;gap:12px}.two > *{flex:1;min-width:0}';
   html += '.eyebrow{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;text-align:center;margin-bottom:9px}';
@@ -2354,15 +2421,15 @@ app.get('/draft-order-new', (req, res) => {
   html += '.pricerow{display:flex;gap:14px;align-items:flex-end;margin-bottom:15px}';
   html += '.pricerow .grow{flex:1;min-width:0}.pricerow .field{margin-bottom:0}';
   html += '.money{display:flex;align-items:center;border:1.5px solid #E8E2E5;border-radius:13px;background:#fff;padding-left:15px}';
-  html += '.money:focus-within{border-color:#F7B5CD}';
+  html += '.money:focus-within{border-color:#C8A02C}';
   html += '.money span{font-size:19px;font-weight:800;color:#9B8A92}';
   html += '.money input{border:none;border-radius:0;padding-left:7px}.money input:focus{outline:none}';
-  html += '.counter{display:inline-flex;align-items:center;border:2px solid #F7B5CD;border-radius:999px;background:#fff;overflow:hidden}';
+  html += '.counter{display:inline-flex;align-items:center;border:2px solid #C8A02C;border-radius:999px;background:#fff;overflow:hidden}';
   html += '.counter button{border:none;background:none;width:46px;height:50px;font-size:24px;font-weight:800;color:#2A2A2A;cursor:pointer;line-height:1;font-family:inherit;padding:0}';
-  html += '.counter button:active{background:#FFF0F6}';
+  html += '.counter button:active{background:#FAF0D2}';
   html += '.counter input{width:52px;border:none;border-radius:0;text-align:center;font-size:19px;font-weight:800;padding:0}';
   html += '.counter input:focus{outline:none}';
-  html += '.feebox{margin-top:14px;border-radius:16px;padding:20px;text-align:center;background:#FFF7FA;border:2px solid #F7B5CD;display:none}';
+  html += '.feebox{margin-top:14px;border-radius:16px;padding:20px;text-align:center;background:#FDF8E8;border:2px solid #C8A02C;display:none}';
   html += '.feebox .n{font-size:36px;font-weight:800;letter-spacing:-1px}';
   html += '.feebox .l{font-size:14.5px;font-weight:700;color:#9B8A92;margin-top:4px}';
   html += '.feebox.miss{background:#FFF6F4;border-color:#E8A79A}';
@@ -2392,7 +2459,7 @@ app.get('/draft-order-new', (req, res) => {
   html += '.rev .edit{background:none;border:none;color:#9B8A92;font-size:13.5px;font-weight:800;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}';
   html += '.rev .msg{background:#FAF7F8;border-radius:12px;padding:14px 16px;font-size:15.5px;line-height:1.5;font-style:italic}';
   html += '.errbox{background:#fff;border:2px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:16px;font-weight:700;font-size:15.5px;display:none;line-height:1.45}';
-  html += '.done{text-align:center;border-top:5px solid #F7B5CD}';
+  html += '.done{text-align:center;border-top:5px solid #C8A02C}';
   html += '.done .big{font-size:24px;font-weight:800;margin-bottom:4px}';
   html += '.done .path{display:block;margin-top:14px;padding:18px;border-radius:14px;background:#2A2A2A;color:#fff;text-decoration:none;font-weight:800;font-size:17px;border:none;width:100%;cursor:pointer;font-family:inherit}';
   html += '.done .path small{display:block;font-size:13.5px;font-weight:600;opacity:.75;margin-top:3px}';
@@ -2705,14 +2772,14 @@ function reprintShell(inner, q, pstate) {
   html += '.wrap{max-width:640px;margin:0 auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.pill{display:flex;align-items:center;justify-content:center;gap:9px;font-size:14.5px;font-weight:700;background:#fff;border:1px solid #EFEBED;border-radius:14px;padding:12px 16px;margin:28px 0 0}';
   html += '.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}.dot.ok{background:#2E9E5B}.dot.bad{background:#C4423A}';
   html += '.searchbar{display:flex;gap:10px;margin:16px 0 18px}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
   html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
   html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
-  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note.good{border-top:5px solid #C8A02C}';
   html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
   html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
   html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
@@ -2786,9 +2853,9 @@ function switchShell(inner, q) {
   html += '.wrap{max-width:640px;margin:0 auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.searchbar{display:flex;gap:10px;margin:28px 0 18px}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#F7B5CD}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
   html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
   html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
@@ -2796,7 +2863,7 @@ function switchShell(inner, q) {
   html += '.rate-row .svc{font-weight:700}.rate-row .eta{color:#9B8A92;font-size:13.5px;font-weight:600}';
   html += '.rate-row a{flex-shrink:0;padding:10px 18px;background:#2A2A2A;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;font-size:14.5px}';
   html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
-  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note.good{border-top:5px solid #C8A02C}';
   html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
   html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
   html += '.steps{text-align:left;font-size:15px;font-weight:600;line-height:2}';
@@ -2869,7 +2936,7 @@ app.get('/dashboard/this-is-the-store', async function (req, res) {
     if (!already) { ips.push(ip); await shopJsonWrite('store_ips', ips, r.id); storeIpsCache = { ips: ips, at: Date.now() }; }
     res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
       '<body style="font-family:-apple-system,sans-serif;background:#FAF7F8;padding:80px 24px;text-align:center">' +
-      '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #EFEBED;border-top:5px solid #F7B5CD;border-radius:20px;padding:30px">' +
+      '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:20px;padding:30px">' +
       '<div style="font-size:44px">&#128205;</div><h2 style="margin:12px 0">' + (already ? 'Already registered' : 'Store computer registered!') + '</h2>' +
       '<p style="color:#666;font-weight:600;line-height:1.6">Orders typed on this internet connection will now be automatically tagged <b>staff-entered</b> in Shopify.<br>Registered store addresses: ' + ips.length + '</p>' +
       '<a href="/" style="display:inline-block;margin-top:14px;padding:12px 26px;background:#2A2A2A;color:#fff;border-radius:11px;text-decoration:none;font-weight:800">&#127968; HOME</a></div></body></html>');
@@ -3070,14 +3137,14 @@ function discountShell(inner, vals) {
   html += '.wrap{max-width:640px;margin:0 auto}';
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
-  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#F7B5CD;margin:14px auto 0}';
+  html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:24px;margin:28px 0 18px}';
   html += '.field{margin-bottom:16px}.field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:6px}';
-  html += '.field input,.field select{width:100%;padding:14px 16px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.field input:focus,.field select:focus{outline:none;border-color:#F7B5CD}';
+  html += '.field input,.field select{width:100%;padding:14px 16px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.field input:focus,.field select:focus{outline:none;border-color:#C8A02C}';
   html += '.row2{display:flex;gap:12px}.row2 .field{flex:1}';
   html += '.gobtn{width:100%;padding:16px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16.5px;font-weight:800;cursor:pointer}';
   html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
-  html += '.note.good{border-top:5px solid #F7B5CD}';
+  html += '.note.good{border-top:5px solid #C8A02C}';
   html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
   html += '.note .code{font-size:34px;font-weight:800;letter-spacing:2px;background:#FAF7F8;border:1.5px dashed #E8C7D3;border-radius:12px;padding:14px;margin:12px 0}';
   html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
@@ -3182,7 +3249,7 @@ app.get('/stickers', function (req, res) {
   html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:8px}';
   html += '.sub{text-align:center;color:#9B8A92;font-size:14.5px;font-weight:600;margin-bottom:26px}';
   html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
-  html += '.howto{background:#fff;border:1px solid #EFEBED;border-left:5px solid #F7B5CD;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;line-height:1.7;margin-bottom:16px}';
+  html += '.howto{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;line-height:1.7;margin-bottom:16px}';
   html += '.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}';
   html += '.scard{background:#fff;border:1px solid #EFEBED;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:14px;text-align:center}';
   html += '.scard img{width:100%;height:150px;object-fit:contain;background:#FAF7F8;border-radius:10px}';
