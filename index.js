@@ -1715,33 +1715,33 @@ app.get('/', (req, res) => {
 
   // Top tier: the three things staff do all day. Size says "most used"; no label needed.
   body += '<div class="herogrid">';
-  body += dashTile('Look Up an Order', '/order-lookup', { hero: true, icon: 'search', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
-  body += dashTile('Edit or Reprint an Invoice', '/dashboard/invoices', { hero: true, icon: 'printer', kw: 'invoice receipt reprint print edit paperwork paper box' });
-  body += dashTile('Edit or Reprint a Gift Card', '/dashboard', { hero: true, icon: 'heart', kw: 'gift card message edit reprint note change' });
+  body += dashTile('Order Lookup', '/order-lookup', { hero: true, icon: 'search', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
+  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { hero: true, icon: 'printer', kw: 'invoice receipt reprint print edit paperwork paper box' });
+  body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { hero: true, icon: 'heart', kw: 'gift card message edit reprint note change' });
   body += '</div>';
 
   // Quiet sentence-case group labels. Proximity does the grouping; the label just confirms it.
   body += '<div class="cols four">';
 
-  body += '<div class="col"><h2 class="sec">Gift cards &amp; stickers</h2>';
-  body += dashTile('New Message', '/dashboard/gift-card-new', { row: true, icon: 'gift', kw: 'gift card message new create note' });
+  body += '<div class="col"><h2 class="sec">&#128424;&#65039; Invoices &amp; Gift Cards</h2>';
+  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { row: true, icon: 'gift', kw: 'gift card message new create note' });
   body += dashTile('Stickers &amp; Labels', '/stickers', { row: true, icon: 'tag', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
   body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { row: true, icon: 'penTool', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo art' });
   body += '</div>';
 
-  body += '<div class="col"><h2 class="sec">Shipping</h2>';
-  body += dashTile('Reprint Label', '/reprint-label', { row: true, icon: 'box', kw: 'label reprint print shipping ups didnt print again' });
-  body += dashTile('Change Speed', '/switch-shipping', { row: true, icon: 'zap', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
-  body += dashTile('New Label', 'https://ship.shipstation.com/rates', { row: true, icon: 'truck', newTab: true, kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
+  body += '<div class="col"><h2 class="sec">&#128666; Shipping</h2>';
+  body += dashTile('Reprint Shipping Label', '/reprint-label', { row: true, icon: 'box', kw: 'label reprint print shipping ups didnt print again' });
+  body += dashTile('Change Shipping Speed', '/switch-shipping', { row: true, icon: 'zap', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
+  body += dashTile('Create New Shipping Label', 'https://ship.shipstation.com/rates', { row: true, icon: 'truck', newTab: true, sub: 'ShipStation', kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
   body += '</div>';
 
-  body += '<div class="col"><h2 class="sec">Payments</h2>';
+  body += '<div class="col"><h2 class="sec">&#128717;&#65039; Orders &amp; Customers</h2>';
   // The old all-on-one-page version still lives at /draft-order if we ever need it back.
-  body += dashTile('Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
-  body += dashTile('Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
+  body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  body += dashTile('Create a Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
   body += '</div>';
 
-  body += '<div class="col"><h2 class="sec">Store</h2>';
+  body += '<div class="col"><h2 class="sec">&#127978; Shop</h2>';
   body += dashTile('Supplies', '/supplies', { row: true, icon: 'cart', kw: 'supplies buy boxes restock amazon uline order request vendor' });
   body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, icon: 'mail', newTab: true, kw: 'email mail inbox gmail check' });
   body += '</div>';
