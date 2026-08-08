@@ -1561,19 +1561,19 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:800;width:158px;font-family:inherit;color:#2A2A2A}';
   html += '.postit .who input:focus{outline:none}';
   // The wall: a rule nobody has signed for today takes over the whole screen.
-  html += '.ackwall{position:fixed;inset:0;background:rgba(28,22,10,.86);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}';
-  html += '.ackcard{width:100%;max-width:560px;background:#fff;border-radius:20px;padding:26px 26px 24px;text-align:left;box-shadow:0 24px 60px rgba(0,0,0,.4)}';
-  html += '.ackhd{font-size:13px;font-weight:800;letter-spacing:1.2px;color:#9B8A92;text-transform:uppercase;text-align:center;margin-bottom:16px}';
-  // The note is shown as the post-it it is. Left aligned, sane measure, no orphan words.
-  html += '.ackpostit{background:#FEF3B4;border-radius:3px 16px 3px 16px;padding:20px 22px;font-size:19px;font-weight:700;line-height:1.55;color:#3A3316;text-align:left;text-wrap:pretty;overflow-wrap:break-word}';
-  html += '.ackcount{font-size:12.5px;font-weight:800;color:#9B8A92;margin-top:10px;text-align:center}';
-  html += '.ackcb{display:flex;align-items:flex-start;gap:12px;margin:20px 0 16px;padding:14px 16px;border:2px solid #E8E2E5;border-radius:14px;cursor:pointer;font-size:17px;font-weight:800;color:#2A2A2A;line-height:1.35}';
-  html += '.ackcb:hover{border-color:#C8A02C}';
-  html += '.ackcb input{width:26px;height:26px;flex-shrink:0;accent-color:#C8A02C;cursor:pointer;margin:0}';
-  html += '.acklb{display:block;font-size:14px;font-weight:800;color:#9B8A92;margin-bottom:7px;text-transform:uppercase;letter-spacing:.6px}';
-  html += '.ackin{width:100%;padding:15px 16px;border:2px solid #E8E2E5;border-radius:14px;font-size:19px;font-weight:700;background:#fff;font-family:inherit;color:#2A2A2A}';
+  html += '.ackwall{position:fixed;inset:0;background:rgba(20,18,16,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}';
+  html += '.ackcard{width:100%;max-width:520px;background:#fff;border-radius:16px;border-top:4px solid #C8A02C;padding:28px 30px 24px;text-align:left;box-shadow:0 24px 60px rgba(0,0,0,.38)}';
+  html += '.ackhd{font-size:11.5px;font-weight:800;letter-spacing:1.4px;color:#9B8A92;text-transform:uppercase;margin-bottom:14px}';
+  // Plain, readable, and the same size a printed memo would be. No shouting.
+  html += '.ackpostit{font-size:17px;font-weight:600;line-height:1.6;color:#2A2A2A;text-wrap:pretty;overflow-wrap:break-word;white-space:pre-wrap}';
+  html += '.ackcount{font-size:12px;font-weight:700;color:#9B8A92;margin-top:12px}';
+  html += '.ackrule{height:1px;background:#EFEBED;margin:22px 0 18px}';
+  html += '.ackcb{display:flex;align-items:center;gap:11px;margin-bottom:18px;cursor:pointer;font-size:15.5px;font-weight:700;color:#2A2A2A;line-height:1.4}';
+  html += '.ackcb input{width:21px;height:21px;flex-shrink:0;accent-color:#C8A02C;cursor:pointer;margin:0}';
+  html += '.acklb{display:block;font-size:11.5px;font-weight:800;color:#9B8A92;margin-bottom:6px;text-transform:uppercase;letter-spacing:1.4px}';
+  html += '.ackin{width:100%;padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:11px;font-size:16px;font-weight:600;background:#fff;font-family:inherit;color:#2A2A2A}';
   html += '.ackin:focus{outline:none;border-color:#C8A02C}';
-  html += '.ackbtn{display:block;width:100%;margin-top:16px;padding:17px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:18px;font-weight:800;font-family:inherit;cursor:pointer}';
+  html += '.ackbtn{display:block;width:100%;margin-top:18px;padding:15px;border:none;border-radius:11px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer}';
   html += '.ackbtn:disabled{opacity:.35;cursor:not-allowed}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
   html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
@@ -1639,7 +1639,7 @@ app.get('/', (req, res) => {
   body += 'var o=document.createElement("div");o.id="ackwall";o.className="ackwall";document.body.appendChild(o);';
   body += 'function draw(){var a=list[i];if(!a){o.remove();document.body.style.overflow="";return}';
   body += 'o.innerHTML="";var c=document.createElement("div");c.className="ackcard";';
-  body += 'var hd=document.createElement("div");hd.className="ackhd";hd.textContent="\\u26A0\\uFE0F Read this before you start";c.appendChild(hd);';
+  body += 'var hd=document.createElement("div");hd.className="ackhd";hd.textContent="Shop notice \\u2014 please read";c.appendChild(hd);';
   // Show the actual post-it, exactly as it looks on the dashboard. No rewording.
   body += 'var pit=document.createElement("div");pit.className="ackpostit";pit.textContent=a.text;c.appendChild(pit);';
   body += 'var cnt=document.createElement("div");cnt.className="ackcount";';
@@ -1648,7 +1648,7 @@ app.get('/', (req, res) => {
   body += 'var cbw=document.createElement("label");cbw.className="ackcb";';
   body += 'var cb=document.createElement("input");cb.type="checkbox";cbw.appendChild(cb);';
   body += 'var cbt=document.createElement("span");cbt.textContent="I read this and I understand it";cbw.appendChild(cbt);';
-  body += 'c.appendChild(cbw);';
+  body += 'var rl=document.createElement("div");rl.className="ackrule";c.appendChild(rl);c.appendChild(cbw);';
   body += 'var lb=document.createElement("label");lb.className="acklb";lb.textContent="Your name";c.appendChild(lb);';
   body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=40;ip.placeholder="First and last name";ip.autocapitalize="words";c.appendChild(ip);';
   body += 'var bt=document.createElement("button");bt.className="ackbtn";bt.disabled=true;bt.textContent="Continue";c.appendChild(bt);';
