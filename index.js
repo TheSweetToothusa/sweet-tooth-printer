@@ -451,11 +451,11 @@ app.get('/dashboard/notes/ack', async function (req, res) {
     var list = Array.isArray(n.data) ? n.data : [];
     var note = list.filter(function (x) { return x.id === id; })[0];
     if (!note) return res.json({ ok: true });
-    note.acks = (note.acks || []).filter(function (a) { return a.who !== who; });
-    note.acks.push({ who: who, at: new Date().toISOString() });
-    if (note.acks.length > 30) note.acks = note.acks.slice(-30);
-    await shopJsonWrite('postit_notes', list, n.id);
-    res.json({ ok: true, acks: note.acks });
+    // Signing IS taking it down. The note leaves the dashboard and lands in the
+    // archive with the name attached, which is the record Mikey reads.
+    await shopJsonWrite('postit_notes', list.filter(function (x) { return x.id !== id; }), n.id);
+    await archivePush({ type: 'note', text: note.text, created: note.created, doneAt: new Date().toISOString(), signedBy: who });
+    res.json({ ok: true, signedBy: who });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -483,13 +483,15 @@ app.get('/dashboard/postit-archive', async function (req, res) {
     html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:24px}';
     html += '.entry{background:#fff;border:1px solid #EFEBED;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:14px 18px;margin-bottom:10px;font-size:15px;font-weight:600}';
     html += '.entry .meta{color:#9B8A92;font-size:12.5px;font-weight:700;margin-top:5px}';
+    html += '.entry .by{color:#3D6B3D;background:#E8F3E4;border-radius:7px;padding:2px 8px;font-weight:800}';
     html += '.empty{text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:40px}';
     html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap"><h1>&#128452;&#65039; Post-it Archive</h1>';
-    if (!list.length) html += '<div class="empty">Nothing archived yet. Post-its land here when someone clicks Got It / Done.</div>';
+    if (!list.length) html += '<div class="empty">Nothing archived yet. Post-its land here once somebody signs for them.</div>';
     list.slice(0, 100).forEach(function (e) {
       var icon = e.type === 'supply' ? '&#128722;' : '&#128221;';
       var when = e.doneAt ? new Date(e.doneAt).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
-      html += '<div class="entry">' + icon + ' ' + escapeHtml(e.text) + '<div class="meta">done ' + escapeHtml(when) + ' ET</div></div>';
+      var by = e.signedBy ? '<span class="by">&#10003; ' + escapeHtml(e.signedBy) + '</span> read it ' : 'cleared ';
+      html += '<div class="entry">' + icon + ' ' + escapeHtml(e.text) + '<div class="meta">' + by + escapeHtml(when) + ' ET</div></div>';
     });
     html += '</div></body></html>';
     res.send(html);
