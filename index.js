@@ -445,8 +445,8 @@ app.get('/dashboard/notes/add', async function (req, res) {
 app.get('/dashboard/notes/ack', async function (req, res) {
   try {
     var id = String(req.query.id || '');
-    var who = String(req.query.who || '').trim().toUpperCase().slice(0, 6);
-    if (!id || who.length < 2) return res.status(400).json({ error: 'need a note id and initials' });
+    var who = String(req.query.who || '').trim().replace(/[^A-Za-z .\-]/g, '').slice(0, 40);
+    if (!id || who.length < 3) return res.status(400).json({ error: 'need a note id and a name' });
     var n = await shopJsonRead('postit_notes');
     var list = Array.isArray(n.data) ? n.data : [];
     var note = list.filter(function (x) { return x.id === id; })[0];
@@ -500,9 +500,9 @@ app.get('/dashboard/supply-alerts/ack', async function (req, res) {
   try {
     var id = String(req.query.id || '').replace(/\D/g, '');
     if (!id) return res.status(400).json({ error: 'missing id' });
-    // Somebody has to initial a produce run, so we know who to ask.
-    var who = String(req.query.who || '').trim().toUpperCase().slice(0, 6);
-    if (who.length < 2) return res.status(400).json({ error: 'missing initials' });
+    // Somebody has to put their name to a produce run, so we know who to ask.
+    var who = String(req.query.who || '').trim().replace(/[^A-Za-z .\-]/g, '').slice(0, 40);
+    if (who.length < 3) return res.status(400).json({ error: 'missing name' });
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,name,tags,line_items,note_attributes',
       { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
     var o = ((await r.json()) || {}).order;
@@ -1546,6 +1546,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '#postit-layer{margin:16px 0 6px}';
   html += '.postit{position:relative;width:100%;margin:0 0 12px;background:#FEF3B4;border:2px solid #E3C43A;border-radius:16px;box-shadow:0 5px 18px rgba(0,0,0,.10);padding:17px 20px;font-size:16.5px;font-weight:700;line-height:1.45;color:#4A4227;display:flex;align-items:center;gap:18px;flex-wrap:wrap}';
   html += '.postit .txt{flex:1;min-width:240px}';
+  html += '.postit .signed{margin-top:8px;font-size:13.5px;font-weight:800;color:#3D6B3D;background:#E8F3E4;border-radius:9px;padding:7px 11px;display:inline-block;line-height:1.4}';
+  html += '.postit .signed.none{color:#9A3412;background:#FDE3D3;letter-spacing:.5px}';
   html += '.postit .hide{position:absolute;top:6px;right:12px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.postit.supply{background:#FFE1C9;border-color:#E39A5B;color:#5C4326}';
   html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
@@ -1554,7 +1556,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   // Produce runs need a name on them, so we know who to ask.
   html += '.postit .who{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #E39A5B;border-radius:12px;padding:0 12px}';
   html += '.postit .who label{font-size:13px;font-weight:800;color:#8A6A3F;white-space:nowrap}';
-  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:19px;font-weight:800;width:82px;letter-spacing:3px;text-align:center;font-family:inherit;color:#2A2A2A}';
+  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:800;width:158px;font-family:inherit;color:#2A2A2A}';
   html += '.postit .who input:focus{outline:none}';
   // The wall: a rule nobody has signed for today takes over the whole screen.
   html += '.ackwall{position:fixed;inset:0;background:rgba(28,22,10,.86);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}';
@@ -1563,7 +1565,7 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.ackbody{font-size:27px;font-weight:800;line-height:1.35;color:#3A3316;margin:20px 0 6px}';
   html += '.ackcount{font-size:13px;font-weight:800;color:#A89B66;margin-bottom:20px}';
   html += '.acklb{display:block;font-size:15.5px;font-weight:800;color:#5C5335;margin-bottom:10px}';
-  html += '.ackin{width:190px;padding:16px;border:3px solid #C8A02C;border-radius:14px;font-size:30px;font-weight:800;text-align:center;letter-spacing:7px;text-transform:uppercase;background:#fff;font-family:inherit;color:#2A2A2A}';
+  html += '.ackin{width:100%;max-width:420px;padding:16px;border:3px solid #C8A02C;border-radius:14px;font-size:24px;font-weight:800;text-align:center;background:#fff;font-family:inherit;color:#2A2A2A}';
   html += '.ackin:focus{outline:none;border-color:#8A6A00}';
   html += '.ackbtn{display:block;width:100%;margin-top:18px;padding:18px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:19px;font-weight:800;font-family:inherit;cursor:pointer}';
   html += '.ackbtn:disabled{opacity:.35;cursor:not-allowed}';
@@ -1613,9 +1615,12 @@ app.get('/', (req, res) => {
   body += 'var w=document.createElement("div");w.className="txt";';
   body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;w.appendChild(t);';
   body += 'var m=document.createElement("div");m.style.cssText="font-size:12px;color:#A89B66;margin-top:4px;font-weight:700";';
-  body += 'var sig=(a.acks||[]).map(function(x){return x.who}).join(", ");';
-  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"})+(sig?"  \\u2713 read by "+sig:"  \\u2014 nobody has signed for this yet");';
-  body += 'w.appendChild(m);n.appendChild(w);';
+  body += 'var sig=(a.acks||[]).map(function(x){return x.who+" ("+new Date(x.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+")"}).join("  \\u00b7  ");';
+  body += 'm.textContent="Put up "+new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});w.appendChild(m);';
+  // Who has signed, spelled out. This is what Mikey checks before taking a note down.
+  body += 'var sg=document.createElement("div");sg.className=sig?"signed":"signed none";';
+  body += 'sg.textContent=sig?("\\u2713 Signed by: "+sig):"\\u26A0\\uFE0F NOBODY HAS SIGNED THIS YET";';
+  body += 'w.appendChild(sg);n.appendChild(w);';
   body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Done";';
   body += 'g.addEventListener("click",function(){if(!confirm("Mark this note done? It moves to the archive."))return;g.disabled=true;';
   body += 'fetch("/dashboard/notes/done?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else g.disabled=false}).catch(function(){g.disabled=false})});';
@@ -1632,12 +1637,12 @@ app.get('/', (req, res) => {
   body += 'var bd=document.createElement("div");bd.className="ackbody";bd.textContent=a.text;c.appendChild(bd);';
   body += 'var cnt=document.createElement("div");cnt.className="ackcount";';
   body += 'cnt.textContent=list.length>1?("Note "+(i+1)+" of "+list.length):"";c.appendChild(cnt);';
-  body += 'var lb=document.createElement("label");lb.className="acklb";lb.textContent="Type your initials to say you read it";c.appendChild(lb);';
-  body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=6;ip.placeholder="ABC";ip.autocapitalize="characters";c.appendChild(ip);';
+  body += 'var lb=document.createElement("label");lb.className="acklb";lb.textContent="Type your name to say you read it";c.appendChild(lb);';
+  body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=40;ip.placeholder="Your first and last name";ip.autocapitalize="words";c.appendChild(ip);';
   body += 'var bt=document.createElement("button");bt.className="ackbtn";bt.disabled=true;bt.textContent="I read it";c.appendChild(bt);';
-  body += 'ip.addEventListener("input",function(){ip.value=ip.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,6);bt.disabled=ip.value.length<2});';
+  body += 'ip.addEventListener("input",function(){ip.value=ip.value.replace(/[^A-Za-z .\\-]/g,"").slice(0,40);bt.disabled=ip.value.trim().length<3});';
   body += 'ip.addEventListener("keydown",function(e){if(e.key==="Enter"&&!bt.disabled)bt.click()});';
-  body += 'bt.addEventListener("click",function(){var who=ip.value.trim();if(who.length<2)return;bt.disabled=true;bt.textContent="Saving\\u2026";';
+  body += 'bt.addEventListener("click",function(){var who=ip.value.trim();if(who.length<3)return;bt.disabled=true;bt.textContent="Saving\\u2026";';
   body += 'fetch("/dashboard/notes/ack?id="+encodeURIComponent(a.id)+"&who="+encodeURIComponent(who)).then(function(r){return r.json()}).then(function(){';
   body += 'localStorage.setItem("ack-"+a.id,today());i++;draw();loadNotes()}).catch(function(){bt.disabled=false;bt.textContent="I read it"})});';
   body += 'o.appendChild(c);document.body.style.overflow="hidden";ip.focus()}';
@@ -1657,12 +1662,12 @@ app.get('/', (req, res) => {
   body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;w.appendChild(l)});n.appendChild(w);';
   // Fresh produce has to have a name on it. No name, no clearing the note.
   body += 'var who=document.createElement("div");who.className="who";';
-  body += 'var wl=document.createElement("label");wl.textContent="Your initials";who.appendChild(wl);';
-  body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="ABC";wi.maxLength=6;who.appendChild(wi);n.appendChild(who);';
+  body += 'var wl=document.createElement("label");wl.textContent="Your name";who.appendChild(wl);';
+  body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="Your name";wi.maxLength=40;who.appendChild(wi);n.appendChild(who);';
   body += 'var g=document.createElement("button");g.className="got";g.disabled=true;g.textContent="\\u2713 Got it \\u2014 items are covered";';
-  body += 'wi.addEventListener("input",function(){wi.value=wi.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,6);g.disabled=wi.value.trim().length<2});';
-  body += 'g.addEventListener("click",function(){var nm=wi.value.trim();if(nm.length<2){wi.focus();return}';
-  body += 'if(!confirm(nm+" is buying the items for "+a.name+"? Your initials get saved on the order."))return;';
+  body += 'wi.addEventListener("input",function(){wi.value=wi.value.replace(/[^A-Za-z .\\-]/g,"").slice(0,40);g.disabled=wi.value.trim().length<3});';
+  body += 'g.addEventListener("click",function(){var nm=wi.value.trim();if(nm.length<3){wi.focus();return}';
+  body += 'if(!confirm(nm+" is buying the items for "+a.name+"? Your name gets saved on the order."))return;';
   body += 'g.disabled=true;fetch("/dashboard/supply-alerts/ack?id="+a.id+"&who="+encodeURIComponent(nm)).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else{g.disabled=false;alert("Could not save \\u2014 try again")}}).catch(function(){g.disabled=false;alert("Could not save \\u2014 try again")})});';
   body += 'n.appendChild(g);box.appendChild(n)})}';
   body += 'function load(){fetch("/dashboard/supply-alerts").then(function(r){return r.json()}).then(render).catch(function(){})}';
