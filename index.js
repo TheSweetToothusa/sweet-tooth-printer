@@ -1659,7 +1659,7 @@ app.get('/', (req, res) => {
   body += 'var cbt=document.createElement("span");cbt.textContent="I read this and I understand it";cbw.appendChild(cbt);';
   body += 'var rl=document.createElement("div");rl.className="ackrule";c.appendChild(rl);c.appendChild(cbw);';
   body += 'var lb=document.createElement("label");lb.className="acklb";lb.textContent="Your name";c.appendChild(lb);';
-  body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=40;ip.placeholder="First and last name";ip.autocapitalize="words";c.appendChild(ip);';
+  body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=40;ip.autocapitalize="words";c.appendChild(ip);';
   body += 'var bt=document.createElement("button");bt.className="ackbtn";bt.disabled=true;bt.textContent="Continue";c.appendChild(bt);';
   body += 'function recheck(){bt.disabled=!(cb.checked&&ip.value.trim().length>=3)}';
   body += 'cb.addEventListener("change",recheck);';
