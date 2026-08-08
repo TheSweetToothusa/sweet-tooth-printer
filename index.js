@@ -440,6 +440,25 @@ app.get('/dashboard/notes/add', async function (req, res) {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Initials against a note. Blocks the whole dashboard until somebody signs for it,
+// once a day per computer, so nobody can claim they never saw it.
+app.get('/dashboard/notes/ack', async function (req, res) {
+  try {
+    var id = String(req.query.id || '');
+    var who = String(req.query.who || '').trim().toUpperCase().slice(0, 6);
+    if (!id || who.length < 2) return res.status(400).json({ error: 'need a note id and initials' });
+    var n = await shopJsonRead('postit_notes');
+    var list = Array.isArray(n.data) ? n.data : [];
+    var note = list.filter(function (x) { return x.id === id; })[0];
+    if (!note) return res.json({ ok: true });
+    note.acks = (note.acks || []).filter(function (a) { return a.who !== who; });
+    note.acks.push({ who: who, at: new Date().toISOString() });
+    if (note.acks.length > 30) note.acks = note.acks.slice(-30);
+    await shopJsonWrite('postit_notes', list, n.id);
+    res.json({ ok: true, acks: note.acks });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.get('/dashboard/notes/done', async function (req, res) {
   try {
     var id = String(req.query.id || '');
@@ -481,9 +500,9 @@ app.get('/dashboard/supply-alerts/ack', async function (req, res) {
   try {
     var id = String(req.query.id || '').replace(/\D/g, '');
     if (!id) return res.status(400).json({ error: 'missing id' });
-    // Somebody has to put their name to a produce run, so we know who to ask.
-    var who = String(req.query.who || '').trim().slice(0, 40);
-    if (who.length < 2) return res.status(400).json({ error: 'missing name' });
+    // Somebody has to initial a produce run, so we know who to ask.
+    var who = String(req.query.who || '').trim().toUpperCase().slice(0, 6);
+    if (who.length < 2) return res.status(400).json({ error: 'missing initials' });
     var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + id + '.json?fields=id,name,tags,line_items,note_attributes',
       { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
     var o = ((await r.json()) || {}).order;
@@ -1535,8 +1554,19 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   // Produce runs need a name on them, so we know who to ask.
   html += '.postit .who{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #E39A5B;border-radius:12px;padding:0 12px}';
   html += '.postit .who label{font-size:13px;font-weight:800;color:#8A6A3F;white-space:nowrap}';
-  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:800;width:132px;font-family:inherit;color:#2A2A2A}';
+  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:19px;font-weight:800;width:82px;letter-spacing:3px;text-align:center;font-family:inherit;color:#2A2A2A}';
   html += '.postit .who input:focus{outline:none}';
+  // The wall: a rule nobody has signed for today takes over the whole screen.
+  html += '.ackwall{position:fixed;inset:0;background:rgba(28,22,10,.86);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}';
+  html += '.ackcard{width:100%;max-width:620px;background:#FEF3B4;border:4px solid #C8A02C;border-radius:22px;padding:34px 32px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4)}';
+  html += '.ackhd{font-size:19px;font-weight:800;letter-spacing:1.2px;color:#8A6A00;text-transform:uppercase}';
+  html += '.ackbody{font-size:27px;font-weight:800;line-height:1.35;color:#3A3316;margin:20px 0 6px}';
+  html += '.ackcount{font-size:13px;font-weight:800;color:#A89B66;margin-bottom:20px}';
+  html += '.acklb{display:block;font-size:15.5px;font-weight:800;color:#5C5335;margin-bottom:10px}';
+  html += '.ackin{width:190px;padding:16px;border:3px solid #C8A02C;border-radius:14px;font-size:30px;font-weight:800;text-align:center;letter-spacing:7px;text-transform:uppercase;background:#fff;font-family:inherit;color:#2A2A2A}';
+  html += '.ackin:focus{outline:none;border-color:#8A6A00}';
+  html += '.ackbtn{display:block;width:100%;margin-top:18px;padding:18px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:19px;font-weight:800;font-family:inherit;cursor:pointer}';
+  html += '.ackbtn:disabled{opacity:.35;cursor:not-allowed}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
   html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
   html += '.setupbar{text-align:center;margin-top:26px}';
@@ -1576,16 +1606,42 @@ app.get('/', (req, res) => {
   body += '<div id="postit-layer"><div id="custom-notes"></div><div id="supply-alerts"></div></div>';
   // Shared notes: stored in a Shopify shop metafield — same for every device, survive restarts.
   body += '<script>(function(){var nbox=document.getElementById("custom-notes");';
-  body += 'function renderNotes(d){nbox.innerHTML="";(d.notes||[]).slice(0,8).forEach(function(a){';
-  body += 'var n=document.createElement("div");n.className="postit";n.style.marginTop="12px";';
+  body += 'function today(){return new Date().toDateString()}';
+  body += 'function signedToday(id){return localStorage.getItem("ack-"+id)===today()}';
+  body += 'function renderNotes(d){nbox.innerHTML="";var pending=[];(d.notes||[]).slice(0,8).forEach(function(a){';
+  body += 'var n=document.createElement("div");n.className="postit";';
   body += 'var w=document.createElement("div");w.className="txt";';
   body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;w.appendChild(t);';
   body += 'var m=document.createElement("div");m.style.cssText="font-size:12px;color:#A89B66;margin-top:4px;font-weight:700";';
-  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});w.appendChild(m);n.appendChild(w);';
+  body += 'var sig=(a.acks||[]).map(function(x){return x.who}).join(", ");';
+  body += 'm.textContent=new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"})+(sig?"  \\u2713 read by "+sig:"  \\u2014 nobody has signed for this yet");';
+  body += 'w.appendChild(m);n.appendChild(w);';
   body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Done";';
   body += 'g.addEventListener("click",function(){if(!confirm("Mark this note done? It moves to the archive."))return;g.disabled=true;';
   body += 'fetch("/dashboard/notes/done?id="+a.id).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else g.disabled=false}).catch(function(){g.disabled=false})});';
-  body += 'n.appendChild(g);nbox.appendChild(n)})}';
+  body += 'n.appendChild(g);nbox.appendChild(n);if(!signedToday(a.id))pending.push(a)});';
+  body += 'if(pending.length)blockUntilSigned(pending)}';
+
+  // A rule nobody signed for takes over the screen. Initials only, once a day per
+  // computer — block it on every single load and they just learn to click it away.
+  body += 'function blockUntilSigned(list){if(document.getElementById("ackwall"))return;var i=0;';
+  body += 'var o=document.createElement("div");o.id="ackwall";o.className="ackwall";document.body.appendChild(o);';
+  body += 'function draw(){var a=list[i];if(!a){o.remove();document.body.style.overflow="";return}';
+  body += 'o.innerHTML="";var c=document.createElement("div");c.className="ackcard";';
+  body += 'var hd=document.createElement("div");hd.className="ackhd";hd.textContent="\\u26A0\\uFE0F READ THIS BEFORE YOU START";c.appendChild(hd);';
+  body += 'var bd=document.createElement("div");bd.className="ackbody";bd.textContent=a.text;c.appendChild(bd);';
+  body += 'var cnt=document.createElement("div");cnt.className="ackcount";';
+  body += 'cnt.textContent=list.length>1?("Note "+(i+1)+" of "+list.length):"";c.appendChild(cnt);';
+  body += 'var lb=document.createElement("label");lb.className="acklb";lb.textContent="Type your initials to say you read it";c.appendChild(lb);';
+  body += 'var ip=document.createElement("input");ip.className="ackin";ip.maxLength=6;ip.placeholder="ABC";ip.autocapitalize="characters";c.appendChild(ip);';
+  body += 'var bt=document.createElement("button");bt.className="ackbtn";bt.disabled=true;bt.textContent="I read it";c.appendChild(bt);';
+  body += 'ip.addEventListener("input",function(){ip.value=ip.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,6);bt.disabled=ip.value.length<2});';
+  body += 'ip.addEventListener("keydown",function(e){if(e.key==="Enter"&&!bt.disabled)bt.click()});';
+  body += 'bt.addEventListener("click",function(){var who=ip.value.trim();if(who.length<2)return;bt.disabled=true;bt.textContent="Saving\\u2026";';
+  body += 'fetch("/dashboard/notes/ack?id="+encodeURIComponent(a.id)+"&who="+encodeURIComponent(who)).then(function(r){return r.json()}).then(function(){';
+  body += 'localStorage.setItem("ack-"+a.id,today());i++;draw();loadNotes()}).catch(function(){bt.disabled=false;bt.textContent="I read it"})});';
+  body += 'o.appendChild(c);document.body.style.overflow="hidden";ip.focus()}';
+  body += 'draw()}';
   body += 'function loadNotes(){fetch("/dashboard/notes").then(function(r){return r.json()}).then(renderNotes).catch(function(){})}';
   body += 'document.getElementById("addnote").addEventListener("click",function(e){e.preventDefault();';
   body += 'var t=prompt("What should the post-it say? (everyone will see it)");if(!t||!t.trim())return;';
@@ -1601,12 +1657,12 @@ app.get('/', (req, res) => {
   body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;w.appendChild(l)});n.appendChild(w);';
   // Fresh produce has to have a name on it. No name, no clearing the note.
   body += 'var who=document.createElement("div");who.className="who";';
-  body += 'var wl=document.createElement("label");wl.textContent="Who is buying it?";who.appendChild(wl);';
-  body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="Your name";wi.maxLength=40;who.appendChild(wi);n.appendChild(who);';
+  body += 'var wl=document.createElement("label");wl.textContent="Your initials";who.appendChild(wl);';
+  body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="ABC";wi.maxLength=6;who.appendChild(wi);n.appendChild(who);';
   body += 'var g=document.createElement("button");g.className="got";g.disabled=true;g.textContent="\\u2713 Got it \\u2014 items are covered";';
-  body += 'wi.addEventListener("input",function(){g.disabled=wi.value.trim().length<2});';
+  body += 'wi.addEventListener("input",function(){wi.value=wi.value.toUpperCase().replace(/[^A-Z]/g,"").slice(0,6);g.disabled=wi.value.trim().length<2});';
   body += 'g.addEventListener("click",function(){var nm=wi.value.trim();if(nm.length<2){wi.focus();return}';
-  body += 'if(!confirm(nm+" is buying the items for "+a.name+"? Your name gets saved on the order."))return;';
+  body += 'if(!confirm(nm+" is buying the items for "+a.name+"? Your initials get saved on the order."))return;';
   body += 'g.disabled=true;fetch("/dashboard/supply-alerts/ack?id="+a.id+"&who="+encodeURIComponent(nm)).then(function(r){return r.json()}).then(function(j){if(j.ok)n.remove();else{g.disabled=false;alert("Could not save \\u2014 try again")}}).catch(function(){g.disabled=false;alert("Could not save \\u2014 try again")})});';
   body += 'n.appendChild(g);box.appendChild(n)})}';
   body += 'function load(){fetch("/dashboard/supply-alerts").then(function(r){return r.json()}).then(render).catch(function(){})}';
