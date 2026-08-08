@@ -348,10 +348,10 @@ async function writeTrackingToShopify(order, label) {
 // Alerts live until someone clicks Got It, which tags the order st_supplies_ok in Shopify —
 // so the ack is shared by every device and survives restarts. \bapples?\b avoids matching "pineapple".
 var SUPPLY_RULES = [
-  { re: /strawberr/i, emoji: '🍓', what: 'Buy FRESH STRAWBERRIES' },
-  { re: /\bapples?\b/i, emoji: '🍎', what: 'Buy FRESH APPLES' },
-  { re: /black\s*(and|&|'?n'?)\s*white/i, emoji: '🍪', what: "Pick up from SONNY'S BAKERY" },
-  { re: /rug[aeu]la/i, emoji: '🥯', what: "Pick up from SONNY'S BAKERY" }
+  { re: /strawberr/i, emoji: '🍓', what: 'Buy fresh strawberries' },
+  { re: /\bapples?\b/i, emoji: '🍎', what: 'Buy fresh apples' },
+  { re: /black\s*(and|&|'?n'?)\s*white/i, emoji: '🍪', what: "Pick up from Sonny's Bakery" },
+  { re: /rug[aeu]la/i, emoji: '🥯', what: "Pick up from Sonny's Bakery" }
 ];
 
 function supplyNeedsForOrder(order) {
@@ -521,10 +521,10 @@ app.get('/dashboard/supply-alerts/ack', async function (req, res) {
     });
     if (!pr.ok) throw new Error('Shopify ' + pr.status);
     try {
-      var needs = supplyNeedsForOrder(o).map(function (x) { return x.what + ': ' + x.item + ' ×' + x.qty; }).join(' · ');
+      var needs = supplyNeedsForOrder(o).map(function (x) { return x.what + ' for ' + x.qty + ' × ' + x.item; }).join(' · ');
       var dd = null;
       (o.note_attributes || []).forEach(function (na) { if (/delivery date/i.test(na.name || '')) dd = na.value; });
-      await archivePush({ type: 'supply', text: (o.name || '#' + id) + ' — ' + needs + (dd ? ' (for ' + dd + ')' : '') + ' — bought by ' + who, doneAt: new Date().toISOString() });
+      await archivePush({ type: 'supply', text: 'Order ' + (o.name || '#' + id) + ' — ' + needs + (dd ? ', goes out ' + dd : ''), doneAt: new Date().toISOString(), signedBy: who });
     } catch (ae) { console.error('archive push failed:', ae.message); }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1552,7 +1552,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.postit .signed.none{color:#9A3412;background:#FDE3D3;letter-spacing:.5px}';
   html += '.postit .hide{position:absolute;top:6px;right:12px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.postit.supply{background:#FFE1C9;border-color:#E39A5B;color:#5C4326}';
-  html += '.postit.supply .dd{font-weight:800;color:#B0521E}';
+  html += '.postit.supply .dd{display:block;font-weight:800;color:#B0521E;margin-top:2px}';
+  html += '.postit.supply .need{margin-top:7px;line-height:1.45}';
   html += '.postit .got{flex-shrink:0;padding:13px 20px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}';
   html += '.postit .got:disabled{opacity:.4;cursor:not-allowed}';
   // Produce runs need a name on them, so we know who to ask.
@@ -1671,9 +1672,9 @@ app.get('/', (req, res) => {
   body += 'function render(d){box.innerHTML="";(d.alerts||[]).slice(0,6).forEach(function(a){';
   body += 'var n=document.createElement("div");n.className="postit supply";';
   body += 'var w=document.createElement("div");w.className="txt";';
-  body += 'var h=document.createElement("div");var b=document.createElement("b");b.textContent="\\uD83D\\uDED2 "+a.name+" needs a store run";h.appendChild(b);';
-  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="  \\u2014 for "+a.deliveryDate;h.appendChild(s)}w.appendChild(h);';
-  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.textContent=x.emoji+" "+x.what+" \\u2014 "+x.item+" \\u00d7"+x.qty;w.appendChild(l)});n.appendChild(w);';
+  body += 'var h=document.createElement("div");var b=document.createElement("b");b.textContent="Someone has to go shopping for order "+a.name;h.appendChild(b);';
+  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="Goes out "+a.deliveryDate;h.appendChild(s)}w.appendChild(h);';
+  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.className="need";l.textContent=x.emoji+" "+x.what+"  \\u2014  for "+x.qty+" \\u00d7 "+x.item;w.appendChild(l)});n.appendChild(w);';
   // Fresh produce has to have a name on it. No name, no clearing the note.
   body += 'var who=document.createElement("div");who.className="who";';
   body += 'var wl=document.createElement("label");wl.textContent="Your name";who.appendChild(wl);';
