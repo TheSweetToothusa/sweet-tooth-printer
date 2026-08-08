@@ -50,7 +50,7 @@ async function maybeAutoLabel(order) {
     try {
       var orderName = order.name || ('#' + order.order_number);
       var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
-        '<div style="font-size:34px;font-weight:800">&#9888; LABEL FAILED &mdash; BUY MANUALLY</div>' +
+        '<div style="font-size:34px;font-weight:600">&#9888; LABEL FAILED &mdash; BUY MANUALLY</div>' +
         '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
         '<div style="font-size:20px;margin-top:18px">' + labelErr.message + '</div></div>';
       var pdf = await htmlToPdfBase64(html);
@@ -286,7 +286,7 @@ async function printShippingLabel(order) {
     if (label.needsManual) {
       try {
         var alertHtml = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
-          '<div style="font-size:34px;font-weight:800">&#9888; BUY LABEL MANUALLY</div>' +
+          '<div style="font-size:34px;font-weight:600">&#9888; BUY LABEL MANUALLY</div>' +
           '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
           '<div style="font-size:20px;margin-top:18px;line-height:1.5">' + label.reason + '<br>' +
           'Service: ' + (label.chosenTitle || '') + '<br>' +
@@ -313,7 +313,7 @@ async function printShippingLabel(order) {
     console.error('  tracking write failed for', orderName, '-', twErr.message);
     try {
       var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
-        '<div style="font-size:32px;font-weight:800">&#9888; ADD TRACKING IN SHOPIFY</div>' +
+        '<div style="font-size:32px;font-weight:600">&#9888; ADD TRACKING IN SHOPIFY</div>' +
         '<div style="font-size:26px;margin-top:14px">Order ' + orderName + '</div>' +
         '<div style="font-size:22px;margin-top:16px">Tracking: ' + label.tracking + ' (' + label.carrier + ')<br>' +
         'Label printed OK — but Shopify wasn\'t updated. Mark fulfilled with this tracking.</div></div>';
@@ -481,10 +481,10 @@ app.get('/dashboard/postit-archive', async function (req, res) {
     html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:72px 24px 36px}';
     html += '.wrap{max-width:720px;margin:0 auto}' + TOPBAR_CSS;
     html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:24px}';
-    html += '.entry{background:#fff;border:1px solid #EFEBED;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.04);padding:14px 18px;margin-bottom:10px;font-size:15px;font-weight:600}';
-    html += '.entry .meta{color:#9B8A92;font-size:12.5px;font-weight:700;margin-top:5px}';
-    html += '.entry .by{color:#3D6B3D;background:#E8F3E4;border-radius:7px;padding:2px 8px;font-weight:800}';
-    html += '.empty{text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:40px}';
+    html += '.entry{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:14px 18px;margin-bottom:10px;font-size:15px;font-weight:600}';
+    html += '.entry .meta{color:#6B5F65;font-size:13px;font-weight:700;margin-top:5px}';
+    html += '.entry .by{color:#3D6B3D;background:#E8F3E4;border-radius:7px;padding:2px 8px;font-weight:600}';
+    html += '.empty{text-align:center;color:#6B5F65;font-size:15px;font-weight:600;margin-top:40px}';
     html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap"><h1>&#128452;&#65039; Post-it Archive</h1>';
     if (!list.length) html += '<div class="empty">Nothing archived yet. Post-its land here once somebody signs for them.</div>';
     list.slice(0, 100).forEach(function (e) {
@@ -660,7 +660,7 @@ app.get('/dashboard', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No gift card orders found. New orders with gift messages will appear here.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px;align-items:center}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}.btn-new{margin-left:auto;padding:10px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a><a href="/dashboard/gift-card-new" class="btn-new">✨ Create New Card</a><a href="/dashboard/test-card" class="btn-new" style="background:#6366f1;margin-left:8px">🧪 Test Card</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Gift Card Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:600;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-msg{font-size:12px;font-style:italic;margin:8px 0;padding:8px;background:#f9f9f9;border-radius:6px;color:#555}.order-actions{margin-top:12px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px;align-items:center}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}.btn-new{margin-left:auto;padding:10px 20px;background:#f59e0b;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:700}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-inactive">📋 Invoices</a><a href="/dashboard" class="tab tab-active">🎁 Gift Cards</a><a href="/dashboard/gift-card-new" class="btn-new">✨ Create New Card</a><a href="/dashboard/test-card" class="btn-new" style="background:#6366f1;margin-left:8px">🧪 Test Card</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error loading dashboard: ' + error.message);
   }
@@ -681,7 +681,7 @@ app.get('/dashboard/invoices', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No orders found. Orders will appear here as they come in.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Invoice Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-edit{background:#22c55e;color:#fff;border:none}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-active">📋 Invoices</a><a href="/dashboard" class="tab tab-inactive">🎁 Gift Cards</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Invoice Dashboard</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:600;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-edit{background:#22c55e;color:#fff;border:none}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}</style></head><body><div class="tab-nav"><a href="/dashboard/invoices" class="tab tab-active">📋 Invoices</a><a href="/dashboard" class="tab tab-inactive">🎁 Gift Cards</a></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" id="search" placeholder="Search orders..." oninput="filterOrders()"></form></div><div class="order-grid" id="orderGrid">' + orderCards + '</div><script>function filterOrders(){var q=document.getElementById("search").value.toLowerCase();if(!q){document.querySelectorAll(".order-card").forEach(function(c){c.style.display=""});return}var cards=document.querySelectorAll(".order-card");cards.forEach(function(c){c.style.display=c.textContent.toLowerCase().indexOf(q)>-1?"":"none"})}</script></body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
@@ -728,7 +728,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
     res.send('<!DOCTYPE html><html><head><title>Edit Invoice ' + orderData.orderNumber + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}@media print{.no-print{display:none!important}body{display:block;background:white}.editor-panel{display:none}.preview-wrap{padding:0}}' +
       '.editor-panel{width:360px;min-width:360px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto;flex-shrink:0}' +
       '.preview-wrap{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;align-items:center}' +
-      '.editor-panel h2{font-size:18px;font-weight:800;margin-bottom:4px}.order-sub{font-size:12px;color:#888;margin-bottom:16px}' +
+      '.editor-panel h2{font-size:18px;font-weight:600;margin-bottom:4px}.order-sub{font-size:12px;color:#888;margin-bottom:16px}' +
       '.field{margin-bottom:12px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#555}' +
       '.field input,.field textarea,.field select{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff}.field textarea{height:80px;resize:vertical}.field select{cursor:pointer;font-weight:700}' +
       '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
@@ -1123,12 +1123,12 @@ app.get('/dashboard/gift-card-new', async (req, res) => {
   html += '<style>';
   html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f0f1f3;display:flex;height:100vh;color:#111}';
   html += '.editor-panel{width:430px;background:#fff;border-right:1px solid #e5e7eb;padding:24px;overflow-y:auto}.preview-panel{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}';
-  html += 'h2{font-size:21px;margin-bottom:3px;letter-spacing:-.3px}.sub{font-size:12.5px;color:#9ca3af;margin-bottom:20px}';
-  html += '.group{background:#fafbfc;border:1px solid #ebedf0;border-radius:12px;padding:16px;margin-bottom:16px}.group-title{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}.badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#111;color:#fff;font-size:11px;font-weight:700}.zone{margin-left:auto;font-size:10px;font-weight:600;text-transform:none;letter-spacing:.2px;color:#16a34a;background:#ecfdf3;padding:2px 9px;border-radius:20px}';
-  html += '.field{margin-bottom:12px}.field label{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;color:#374151}.field input,.field textarea,.fmt-select{width:100%;padding:10px 11px;border:1.5px solid #e2e5ea;border-radius:8px;font-size:13.5px;font-family:inherit;background:#fff;transition:border-color .15s}.field input:focus,.field textarea:focus,.fmt-select:focus{outline:none;border-color:#111}.field textarea{height:84px;resize:vertical}.fmt-select{cursor:pointer}.opt{font-size:10px;font-weight:600;color:#b6bcc6;text-transform:none;letter-spacing:0}.char-count{font-size:11px;font-weight:600;color:#9ca3af}.char-count.warn{color:#ef4444}';
-  html += '.sub-label{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.7px;color:#9ca3af;margin:14px 0 9px}.ctrl{display:flex;align-items:center;gap:12px;margin-bottom:11px}.ctrl-label{font-size:12.5px;font-weight:600;color:#374151;width:96px;flex-shrink:0}.ctrl input[type=range]{flex:1;accent-color:#111;height:4px}.ctrl-val{font-size:12px;font-weight:700;width:56px;text-align:right;color:#111;flex-shrink:0}';
+  html += 'h2{font-size:21px;margin-bottom:3px;letter-spacing:-.3px}.sub{font-size:13px;color:#9ca3af;margin-bottom:20px}';
+  html += '.group{background:#fafbfc;border:1px solid #ebedf0;border-radius:12px;padding:16px;margin-bottom:16px}.group-title{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}.badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#111;color:#fff;font-size:11px;font-weight:700}.zone{margin-left:auto;font-size:10px;font-weight:600;text-transform:none;letter-spacing:.2px;color:#16a34a;background:#ecfdf3;padding:2px 9px;border-radius:12px}';
+  html += '.field{margin-bottom:12px}.field label{display:flex;justify-content:space-between;align-items:center;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;color:#374151}.field input,.field textarea,.fmt-select{width:100%;padding:10px 11px;border:1.5px solid #e2e5ea;border-radius:8px;font-size:13px;font-family:inherit;background:#fff;transition:border-color .15s}.field input:focus,.field textarea:focus,.fmt-select:focus{outline:none;border-color:#111}.field textarea{height:84px;resize:vertical}.fmt-select{cursor:pointer}.opt{font-size:10px;font-weight:600;color:#b6bcc6;text-transform:none;letter-spacing:0}.char-count{font-size:11px;font-weight:600;color:#9ca3af}.char-count.warn{color:#ef4444}';
+  html += '.sub-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.7px;color:#9ca3af;margin:14px 0 9px}.ctrl{display:flex;align-items:center;gap:12px;margin-bottom:11px}.ctrl-label{font-size:13px;font-weight:600;color:#374151;width:96px;flex-shrink:0}.ctrl input[type=range]{flex:1;accent-color:#111;height:4px}.ctrl-val{font-size:12px;font-weight:700;width:56px;text-align:right;color:#111;flex-shrink:0}';
   html += '.toggles{display:flex;gap:5px}.tg{width:34px;height:32px;display:flex;align-items:center;justify-content:center;border:1.5px solid #e2e5ea;border-radius:7px;font-size:14px;font-weight:700;cursor:pointer;background:#fff;color:#6b7280;transition:all .12s}.tg.active{background:#111;color:#fff;border-color:#111}.tg:hover:not(.active){border-color:#9ca3af;color:#111}.hint{font-size:11px;color:#9ca3af;margin-top:2px;line-height:1.45}';
-  html += '.btn-row{display:flex;gap:8px;margin-top:14px}.btn{padding:12px 16px;border-radius:9px;font-size:13.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-green{background:#22c55e;color:#fff}.btn-primary{background:#111;color:#fff}.btn-secondary{background:#fff;color:#111;border:1.5px solid #d1d5db}';
+  html += '.btn-row{display:flex;gap:8px;margin-top:14px}.btn{padding:12px 16px;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;border:none;cursor:pointer;text-align:center;flex:1;display:flex;align-items:center;justify-content:center}.btn-green{background:#22c55e;color:#fff}.btn-primary{background:#111;color:#fff}.btn-secondary{background:#fff;color:#111;border:1.5px solid #d1d5db}';
   html += '.pv-label{font-size:11px;color:#9ca3af;margin-bottom:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px}.card-preview{width:299px;height:612px;background:#fff;border:1px solid #d1d5db;box-shadow:0 8px 30px rgba(0,0,0,.12);position:relative;overflow:hidden}.top-section-preview,.msg-section-preview{position:absolute;left:0;right:0;text-align:center;padding:0 40px}.fold-line{position:absolute;top:50%;left:0;right:0;border-top:1px dashed #d1d5db;pointer-events:none}.fold-tag{position:absolute;top:50%;right:6px;transform:translateY(-50%);font-size:8px;font-weight:700;letter-spacing:.5px;color:#cbd0d8;background:#fff;padding:0 4px;text-transform:uppercase}';
   html += '@media print{.no-print{display:none!important}body{margin:0;padding:0;background:white;display:block}.preview-panel{display:block;padding:0}.card-preview{border:none;box-shadow:none;width:4.15in;height:8.5in;margin:0;padding:0}.fold-line,.fold-tag{display:none}@page{size:4.15in 8.5in;margin:0}}';
   html += '</style></head><body>';
@@ -1272,7 +1272,7 @@ app.get('/dashboard/test-card', function (req, res) {
   html += 'h2{font-size:21px;margin-bottom:4px}.sub{font-size:13px;color:#888;margin-bottom:22px;line-height:1.5}';
   html += 'label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin:14px 0 5px;color:#374151}';
   html += 'input,textarea{width:100%;padding:10px 11px;border:1.5px solid #e2e5ea;border-radius:8px;font-size:14px;font-family:inherit}textarea{height:80px;resize:vertical}';
-  html += '.btn{display:inline-block;margin-top:18px;padding:13px 20px;border-radius:9px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:#22c55e;color:#fff}';
+  html += '.btn{display:inline-block;margin-top:18px;padding:13px 20px;border-radius:8px;font-size:14px;font-weight:700;border:none;cursor:pointer;background:#22c55e;color:#fff}';
   html += '.btn.secondary{background:#fff;color:#111;border:1.5px solid #d1d5db;margin-left:8px}a{color:#111}</style></head><body>';
   html += '<h2>🧪 Print a Test Card</h2>';
   html += '<div class="sub">This prints a sample gift card through the <strong>exact same path a real order uses</strong> — same automatic font sizing, message position, and top-left order code. Use it to check the layout without waiting for an order.</div>';
@@ -1381,7 +1381,7 @@ app.get('/dashboard/search', async (req, res) => {
 
     if (!orderCards) orderCards = '<p style="text-align:center;color:#999;padding:40px;">No results found for "' + q + '". Try an order number or customer name.</p>';
 
-    res.send('<!DOCTYPE html><html><head><title>Search: ' + q + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:800;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-edit{background:#22c55e;color:#fff;border:none}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}</style></head><body><div class="header"><h1>🔍 Search: "' + q + '" (' + allResults.length + ' results)</h1><div class="nav-links"><a href="/dashboard/invoices" class="secondary">← Back to Invoices</a><a href="/dashboard" class="secondary">Gift Cards</a></div></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" placeholder="Search orders..." value="' + q.replace(/"/g, '&quot;') + '"></form></div><div class="order-grid">' + orderCards + '</div></body></html>');
+    res.send('<!DOCTYPE html><html><head><title>Search: ' + q + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;padding:20px}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}.header h1{font-size:24px}.nav-links a{margin-left:12px;padding:8px 16px;background:#000;color:#fff;text-decoration:none;border-radius:6px;font-size:14px;font-weight:600}.nav-links a.secondary{background:#fff;color:#000;border:2px solid #000}.search-bar{margin-bottom:20px}.search-bar form{display:flex;gap:8px}.search-bar input{flex:1;padding:12px 16px;border:2px solid #ddd;border-radius:8px;font-size:16px}.search-bar input:focus{outline:none;border-color:#000}.order-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}.order-card{background:#fff;border:2px solid #eee;border-radius:12px;padding:16px;transition:border-color 0.2s}.order-card:hover{border-color:#000}.order-num{font-size:18px;font-weight:600;margin-bottom:8px}.order-detail{font-size:13px;margin-bottom:4px;color:#333}.order-actions{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap}.btn{display:inline-block;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:600}.btn-edit{background:#22c55e;color:#fff;border:none}.btn-view{background:#fff;color:#000;border:2px solid #000}.btn-print{background:#000;color:#fff}.tab-nav{display:flex;gap:0;margin-bottom:20px}.tab{padding:10px 24px;text-decoration:none;font-size:15px;font-weight:700;border-radius:0}.tab:first-child{border-radius:8px 0 0 8px}.tab:last-child{border-radius:0 8px 8px 0}.tab-active{background:#22c55e;color:#fff;border:2px solid #22c55e}.tab-inactive{background:#fff;color:#999;border:2px solid #ddd}</style></head><body><div class="header"><h1>🔍 Search: "' + q + '" (' + allResults.length + ' results)</h1><div class="nav-links"><a href="/dashboard/invoices" class="secondary">← Back to Invoices</a><a href="/dashboard" class="secondary">Gift Cards</a></div></div><div class="search-bar"><form action="/dashboard/search" method="get"><input type="text" name="q" placeholder="Search orders..." value="' + q.replace(/"/g, '&quot;') + '"></form></div><div class="order-grid">' + orderCards + '</div></body></html>');
   } catch (error) {
     res.status(500).send('Error: ' + error.message);
   }
@@ -1447,7 +1447,11 @@ var DASH_ICONS = {
   hand: '<path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
   truck: '<rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-  percent: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>'
+  percent: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  tag: '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  message: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'
 };
 
 // Sticky top bar shown on every dashboard page — wordmark always goes home.
@@ -1455,9 +1459,9 @@ var DASH_ICONS = {
 var TOPBAR_HTML = '<header class="topbar"><a class="backbtn" href="/" onclick="if(history.length>1){history.back();return false}">&#8592; Back</a>' +
   '<a class="homebtn" href="/">&#127968; HOME</a><a class="mark" href="/">The Sweet Tooth &mdash; Employee Dashboard</a></header>';
 var TOPBAR_CSS = '.topbar{position:fixed;top:0;left:0;right:0;height:52px;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.07);display:flex;align-items:center;gap:14px;padding:0 22px;z-index:100}' +
-  '.topbar a{font-size:16.5px;font-weight:800;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}' +
-  '.topbar a.homebtn{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13.5px;font-weight:800;padding:9px 22px;border-radius:11px;padding-bottom:9px}' +
-  '.topbar a.backbtn{flex-shrink:0;display:inline-flex;align-items:center;background:#fff;border:1.5px solid #E8E2E5;font-size:13.5px;padding:8px 18px;border-radius:11px;padding-bottom:8px}' +
+  '.topbar a{font-size:17px;font-weight:600;letter-spacing:-.3px;color:#2A2A2A;text-decoration:none;padding-bottom:1px}' +
+  '.topbar a.homebtn{position:absolute;left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:7px;background:#2A2A2A;color:#fff;font-size:13px;font-weight:600;padding:9px 22px;border-radius:8px;padding-bottom:9px}' +
+  '.topbar a.backbtn{flex-shrink:0;display:inline-flex;align-items:center;background:#fff;border:1.5px solid #E8E2E5;font-size:13px;padding:8px 18px;border-radius:8px;padding-bottom:8px}' +
   '.topbar a.mark{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}' +
   // On a phone there is only room for the two buttons.
   '@media (max-width:760px){.topbar a.mark{display:none}}';
@@ -1498,100 +1502,104 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += TOPBAR_CSS;
   html += 'h1{font-size:31px;letter-spacing:-.5px;text-align:center;color:#3D3D3D}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
-  html += '.subtitle{color:#9B8A92;font-size:15px;text-align:center;margin-top:10px}';
+  html += '.subtitle{color:#6B5F65;font-size:15px;text-align:center;margin-top:10px}';
   // Fixed 4 columns, NOT auto-fit. auto-fit stretched a 2-tile row into two giant
   // tiles, which made size look like importance when it was just leftover space.
   html += '.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px}';
   html += '@media (max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}';
   // The promoted row: the three things staff do all day, at roughly double the area.
-  html += '.herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:14px}';
+  html += '.herogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px}';
   html += '@media (max-width:900px){.herogrid{grid-template-columns:1fr}}';
-  html += '.tile.hero{min-height:158px;gap:14px;border-top:5px solid #C8A02C;border-radius:20px}';
+  html += '.tile.hero{min-height:112px;gap:10px;border-top:3px solid #C8A02C;border-radius:12px}';
   html += '.tile.hero .emoji{font-size:50px}';
-  html += '.tile.hero .label{font-size:21px}';
-  html += '.tile.hero .sublabel{font-size:13.5px}';
-  html += '.bubble{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:999px;padding:0 26px;font-weight:800;font-size:15.5px;text-decoration:none;white-space:nowrap}';
-  html += '.zipquick{flex-shrink:0;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:0 16px;height:56px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
-  html += '.zipquick .zl{font-size:13px;font-weight:800;color:#9B8A92;white-space:nowrap}';
-  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:10px;padding:9px 10px;font-size:16px;font-weight:800;text-align:center}';
+  html += '.tile.hero .label{font-size:19px}';
+  html += '.tile.hero .sublabel{font-size:13px}';
+  html += '.bubble{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:999px;padding:0 26px;font-weight:600;font-size:15px;text-decoration:none;white-space:nowrap}';
+  html += '.zipquick{flex-shrink:0;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:12px;padding:0 16px;height:56px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
+  html += '.zipquick .zl{font-size:13px;font-weight:600;color:#6B5F65;white-space:nowrap}';
+  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:8px;padding:9px 10px;font-size:16px;font-weight:600;text-align:center}';
   html += '.zipquick input:focus{outline:2px solid #C8A02C}';
-  html += '.zipquick .zout{font-size:19px;font-weight:800;min-width:56px;color:#C2B4BB}';
+  html += '.zipquick .zout{font-size:19px;font-weight:600;min-width:56px;color:#6B5F65}';
   html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
   html += '@media (max-width:1100px){.actionbar{flex-wrap:wrap}.searchwrap{flex:1 1 100%}}';
   // Everything below the promoted row is a labelled list, not more squares. Three
   // columns of short lists read in one glance and fit on one screen.
-  html += '.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;margin-top:20px;align-items:start}';
+  html += '.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;margin-top:18px;align-items:start}';
   html += '.cols.four{grid-template-columns:repeat(4,1fr);gap:20px}';
   html += '@media (max-width:1150px){.cols.four{grid-template-columns:repeat(2,1fr)}}';
-  html += '@media (max-width:900px){.cols{grid-template-columns:1fr;gap:14px}}';
+  html += '.cols.four{grid-template-columns:repeat(4,1fr)}';
+  html += '@media (max-width:900px){.cols,.cols.four{grid-template-columns:1fr;gap:14px}}';
   html += '.col .sec{margin-top:0;min-height:34px;display:flex;align-items:flex-end}';
-  html += '.tile.rowtile{flex-direction:row;justify-content:flex-start;align-items:center;gap:13px;min-height:0;padding:12px 15px;border-radius:14px;margin-top:10px;text-align:left}';
-  html += '.tile.rowtile:hover{transform:none;box-shadow:0 6px 16px rgba(0,0,0,.09)}';
+  html += '.tile.rowtile{flex-direction:row;justify-content:flex-start;align-items:center;gap:12px;min-height:0;padding:11px 14px;border-radius:12px;margin-top:8px;text-align:left}';
+  html += '.tile.rowtile:hover{transform:none;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
   html += '.tile.rowtile .emoji{font-size:26px;flex-shrink:0}';
-  html += '.tile.rowtile .label{font-size:15.5px;font-weight:750;line-height:1.3}';
+  html += '.tile.rowtile .label{font-size:15px;font-weight:600;line-height:1.3}';
   html += '.tile.rowtile .sublabel{font-size:12px}';
-  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:102px;background:#fff;border:1px solid #EFEBED;border-radius:18px;padding:14px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05);transition:transform .12s,box-shadow .12s}';
+  html += '.tile{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;min-height:102px;background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:14px 16px;text-decoration:none;color:#2A2A2A;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.06);transition:transform .12s,box-shadow .12s}';
   html += '.tile:before{content:"";position:absolute;top:0;left:0;right:0;height:4px;background:#C8A02C;opacity:0;transition:opacity .12s}';
-  html += '.tile:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.12)}';
+  html += '.tile:hover{border-color:#2A2A2A}';
   html += '.tile:hover:before{opacity:1}';
   html += '.icon-badge{color:#2A2A2A;display:flex;align-items:center;justify-content:center;flex-shrink:0}';
-  html += '.icon-badge svg{width:34px;height:34px}';
-  html += '.tile .label{font-weight:750;font-size:17.5px;letter-spacing:-.2px;line-height:1.35}';
+  html += '.icon-badge svg{width:26px;height:26px;stroke-width:1.7}';
+  html += '.tile.hero .icon-badge svg{width:34px;height:34px}';
+  html += '.tile.rowtile .icon-badge svg{width:21px;height:21px}';
+  html += '.tile .icon-badge{color:#6E6169}';
+  html += '.tile:hover .icon-badge{color:#2A2A2A}';
+  html += '.tile .label{font-weight:600;font-size:17px;letter-spacing:-.2px;line-height:1.35}';
   html += '.tile .emoji{font-size:36px;line-height:1}';
-  html += '.tile .sublabel{font-size:12.5px;font-weight:700;color:#9B8A92;letter-spacing:0}';
+  html += '.tile .sublabel{font-size:13px;font-weight:700;color:#6B5F65;letter-spacing:0}';
   html += '.tile.dim{opacity:.18}';
-  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:15px 0 0;padding-bottom:6px;border-bottom:2px solid #F3EDF0}';
+  html += '.sec{font-size:13px;font-weight:700;color:#6B5F65;margin:0 0 2px;padding-bottom:0;border:none}';
   html += '.sec:first-of-type{margin-top:20px}';
   html += '.sec + .grid{margin-top:10px}';
   // Post-its hover over the corner instead of shoving every tile below the fold.
   // Notes run full width across the middle of the page. In the corner they got ignored.
-  html += '#postit-layer{margin:16px 0 6px}';
-  html += '.postit{position:relative;width:100%;margin:0 0 12px;background:#FEF3B4;border:2px solid #E3C43A;border-radius:16px;box-shadow:0 5px 18px rgba(0,0,0,.10);padding:17px 20px;font-size:16.5px;font-weight:700;line-height:1.45;color:#4A4227;display:flex;align-items:center;gap:18px;flex-wrap:wrap}';
-  html += '.postit .txt{flex:1;min-width:240px}';
-  html += '.postit .signed{margin-top:8px;font-size:13.5px;font-weight:800;color:#3D6B3D;background:#E8F3E4;border-radius:9px;padding:7px 11px;display:inline-block;line-height:1.4}';
+  html += '#postit-layer{margin:12px 0 6px;display:flex;flex-direction:column;gap:8px}';
+  html += '.postit{display:flex;align-items:center;gap:14px;width:100%;background:#FEF7D6;border:1px solid #E3C43A;border-radius:12px;padding:11px 16px;font-size:15px;font-weight:600;line-height:1.45;color:#4A4326}';
+  html += '.postit .txt{flex:1;min-width:240px;white-space:pre-wrap}';
+  html += '.postit .signed{margin-top:8px;font-size:13px;font-weight:600;color:#3D6B3D;background:#E8F3E4;border-radius:8px;padding:7px 11px;display:inline-block;line-height:1.4}';
   html += '.postit .signed.none{color:#9A3412;background:#FDE3D3;letter-spacing:.5px}';
   html += '.postit .hide{position:absolute;top:6px;right:12px;font-size:12px;font-weight:700;color:#A89B66;text-decoration:none;cursor:pointer}';
   html += '.postit.supply{background:#FFE1C9;border-color:#E39A5B;color:#5C4326}';
-  html += '.postit.supply .dd{display:block;font-weight:800;color:#B0521E;margin-top:2px}';
-  html += '.postit.supply .need{margin-top:7px;line-height:1.45}';
-  html += '.postit .got{flex-shrink:0;padding:13px 20px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-weight:800;font-size:15px;cursor:pointer;font-family:inherit}';
+  html += '.postit.supply .dd{font-weight:700;color:#9A5A2E;margin-left:9px;white-space:nowrap}';
+  html += '.postit .got{flex-shrink:0;padding:13px 20px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-weight:600;font-size:15px;cursor:pointer;font-family:inherit}';
   html += '.postit .got:disabled{opacity:.4;cursor:not-allowed}';
   // Produce runs need a name on them, so we know who to ask.
   html += '.postit .who{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#fff;border:2px solid #E39A5B;border-radius:12px;padding:0 12px}';
-  html += '.postit .who label{font-size:13px;font-weight:800;color:#8A6A3F;white-space:nowrap}';
-  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:800;width:158px;font-family:inherit;color:#2A2A2A}';
+  html += '.postit .who label{font-size:13px;font-weight:600;color:#8A6A3F;white-space:nowrap}';
+  html += '.postit .who input{border:none;background:transparent;padding:12px 0;font-size:16px;font-weight:600;width:158px;font-family:inherit;color:#2A2A2A}';
   html += '.postit .who input:focus{outline:none}';
   // The wall: a rule nobody has signed for today takes over the whole screen.
   html += '.ackwall{position:fixed;inset:0;background:rgba(20,18,16,.72);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}';
-  html += '.ackcard{width:100%;max-width:520px;background:#fff;border-radius:16px;border-top:4px solid #C8A02C;padding:28px 30px 24px;text-align:left;box-shadow:0 24px 60px rgba(0,0,0,.38)}';
-  html += '.ackhd{font-size:11.5px;font-weight:800;letter-spacing:1.4px;color:#9B8A92;text-transform:uppercase;margin-bottom:14px}';
+  html += '.ackcard{width:100%;max-width:520px;background:#fff;border-radius:12px;border-top:4px solid #C8A02C;padding:28px 30px 24px;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.30)}';
+  html += '.ackhd{font-size:11px;font-weight:600;letter-spacing:1.4px;color:#6B5F65;text-transform:uppercase;margin-bottom:14px}';
   // Plain, readable, and the same size a printed memo would be. No shouting.
   html += '.ackpostit{font-size:17px;font-weight:600;line-height:1.6;color:#2A2A2A;text-wrap:pretty;overflow-wrap:break-word;white-space:pre-wrap}';
-  html += '.ackcount{font-size:12px;font-weight:700;color:#9B8A92;margin-top:12px}';
+  html += '.ackcount{font-size:12px;font-weight:700;color:#6B5F65;margin-top:12px}';
   html += '.ackrule{height:1px;background:#EFEBED;margin:22px 0 18px}';
-  html += '.ackcb{display:flex;align-items:center;gap:11px;margin-bottom:18px;cursor:pointer;font-size:15.5px;font-weight:700;color:#2A2A2A;line-height:1.4}';
+  html += '.ackcb{display:flex;align-items:center;gap:11px;margin-bottom:18px;cursor:pointer;font-size:15px;font-weight:700;color:#2A2A2A;line-height:1.4}';
   html += '.ackcb input{width:21px;height:21px;flex-shrink:0;accent-color:#C8A02C;cursor:pointer;margin:0}';
-  html += '.acklb{display:block;font-size:11.5px;font-weight:800;color:#9B8A92;margin-bottom:6px;text-transform:uppercase;letter-spacing:1.4px}';
-  html += '.ackin{width:100%;padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:11px;font-size:16px;font-weight:600;background:#fff;font-family:inherit;color:#2A2A2A}';
+  html += '.acklb{display:block;font-size:11px;font-weight:600;color:#6B5F65;margin-bottom:6px;text-transform:uppercase;letter-spacing:1.4px}';
+  html += '.ackin{width:100%;padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:16px;font-weight:600;background:#fff;font-family:inherit;color:#2A2A2A}';
   html += '.ackin:focus{outline:none;border-color:#C8A02C}';
-  html += '.ackbtn{display:block;width:100%;margin-top:18px;padding:15px;border:none;border-radius:11px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:800;font-family:inherit;cursor:pointer}';
+  html += '.ackbtn{display:block;width:100%;margin-top:16px;padding:14px;border:none;border-radius:8px;background:#2A2A2A;color:#fff;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer}';
   html += '.ackbtn:disabled{opacity:.35;cursor:not-allowed}';
   html += '.notesbar{display:flex;justify-content:flex-end;gap:18px;margin-top:8px}';
-  html += '.notesbar a{font-size:13px;font-weight:800;color:#9B8A92;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
-  html += '.setupbar{text-align:center;margin-top:26px}';
-  html += '.setupbar a{font-size:12.5px;font-weight:700;color:#C2B4BB;text-decoration:none}.setupbar a:hover{color:#2A2A2A}';
+  html += '.notesbar a{font-size:13px;font-weight:600;color:#6B5F65;text-decoration:none}.notesbar a:hover{color:#2A2A2A}';
+  html += '.setupbar{text-align:center;margin-top:18px;clear:both}';
+  html += '.setupbar a{font-size:13px;font-weight:700;color:#6B5F65;text-decoration:none}.setupbar a:hover{color:#2A2A2A}';
   html += '.actionbar{display:flex;gap:12px;margin-top:10px}';
-  html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:16px;padding:4px 8px 4px 18px;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
+  html += '.searchwrap{flex:1;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:12px;padding:4px 8px 4px 18px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
   html += '.searchwrap:focus-within{border-color:#C9BFC4}';
   html += '.searchwrap .mag{font-size:19px}';
-  html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17.5px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
+  html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
   html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#C8A02C}';
-  html += '.search-miss{display:none;text-align:center;color:#9B8A92;font-size:15px;font-weight:600;margin-top:26px}';
+  html += '.search-miss{display:none;text-align:center;color:#6B5F65;font-size:15px;font-weight:600;margin-top:26px}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   if (!noH1) html += '<h1>' + title + '</h1>';
   if (subtitle) html += '<p class="subtitle">' + subtitle + '</p>';
-  if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:20px 24px;text-align:center;font-size:16.5px;font-weight:700;line-height:1.55">' + notice + '</div>';
+  if (notice) html += '<div style="margin-top:28px;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:20px 24px;text-align:center;font-size:17px;font-weight:700;line-height:1.55">' + notice + '</div>';
   html += rawBody ? tilesHtml : '<div class="grid">' + tilesHtml + '</div>';
   html += '</div></body></html>';
   return html;
@@ -1623,10 +1631,10 @@ app.get('/', (req, res) => {
   body += 'var t=document.createElement("div");t.textContent="\\uD83D\\uDCDD "+a.text;w.appendChild(t);';
   body += 'var m=document.createElement("div");m.style.cssText="font-size:12px;color:#A89B66;margin-top:4px;font-weight:700";';
   body += 'var sig=(a.acks||[]).map(function(x){return x.who+" ("+new Date(x.at).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"})+")"}).join("  \\u00b7  ");';
-  body += 'm.textContent="Put up "+new Date(a.created).toLocaleDateString("en-US",{month:"short",day:"numeric"});w.appendChild(m);';
+  body += 'm.style.display="none";w.appendChild(m);';
   // Who has signed, spelled out. This is what Mikey checks before taking a note down.
   body += 'var sg=document.createElement("div");sg.className=sig?"signed":"signed none";';
-  body += 'sg.textContent=sig?("\\u2713 Signed by: "+sig):"\\u26A0\\uFE0F NOBODY HAS SIGNED THIS YET";';
+  body += 'if(!sig){sg.style.display="none"}else{sg.textContent="\\u2713 Signed by: "+sig}';
   body += 'w.appendChild(sg);n.appendChild(w);';
   body += 'var g=document.createElement("button");g.className="got";g.textContent="\\u2713 Done";';
   body += 'g.addEventListener("click",function(){if(!confirm("Mark this note done? It moves to the archive."))return;g.disabled=true;';
@@ -1672,12 +1680,14 @@ app.get('/', (req, res) => {
   body += 'function render(d){box.innerHTML="";(d.alerts||[]).slice(0,6).forEach(function(a){';
   body += 'var n=document.createElement("div");n.className="postit supply";';
   body += 'var w=document.createElement("div");w.className="txt";';
-  body += 'var h=document.createElement("div");var b=document.createElement("b");b.textContent="Someone has to go shopping for order "+a.name;h.appendChild(b);';
-  body += 'if(a.deliveryDate){var s=document.createElement("span");s.className="dd";s.textContent="Goes out "+a.deliveryDate;h.appendChild(s)}w.appendChild(h);';
-  body += 'a.needs.forEach(function(x){var l=document.createElement("div");l.className="need";l.textContent=x.emoji+" "+x.what+"  \\u2014  for "+x.qty+" \\u00d7 "+x.item;w.appendChild(l)});n.appendChild(w);';
+  // One line per store run. It was a four-line block that ate the top of the page.
+  body += 'var jobs=a.needs.map(function(x){return x.what.toLowerCase()}).join(" + ");';
+  body += 'var b=document.createElement("b");b.textContent=jobs.charAt(0).toUpperCase()+jobs.slice(1);w.appendChild(b);';
+  body += 'var s=document.createElement("span");s.className="dd";';
+  body += 's.textContent=a.name+(a.deliveryDate?", goes out "+a.deliveryDate:"");w.appendChild(s);n.appendChild(w);';
   // Fresh produce has to have a name on it. No name, no clearing the note.
   body += 'var who=document.createElement("div");who.className="who";';
-  body += 'var wl=document.createElement("label");wl.textContent="Your name";who.appendChild(wl);';
+  
   body += 'var wi=document.createElement("input");wi.type="text";wi.placeholder="Your name";wi.maxLength=40;who.appendChild(wi);n.appendChild(who);';
   body += 'var g=document.createElement("button");g.className="got";g.disabled=true;g.textContent="\\u2713 Got it \\u2014 items are covered";';
   body += 'wi.addEventListener("input",function(){wi.value=wi.value.replace(/[^A-Za-z .\\-]/g,"").slice(0,40);g.disabled=wi.value.trim().length<3});';
@@ -1690,7 +1700,7 @@ app.get('/', (req, res) => {
 
   body += '<div class="actionbar">';
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
-  body += '<input id="dashq" type="text" placeholder="Search &mdash; type here (order, label, gift&hellip;)">';
+  body += '<input id="dashq" type="text" placeholder="Search">';
   body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
   // Quick ZIP price check, right where they can see it. Same table the driver app uses.
   body += '<div class="zipquick"><span class="zl">&#128663; Delivery price</span>';
@@ -1703,42 +1713,42 @@ app.get('/', (req, res) => {
   body += 'if(z.length<5){o.textContent="\\u2014";o.className="zout";return}';
   body += 'if(F[z]!=null){o.textContent="$"+F[z];o.className="zout hit"}else{o.textContent="Not our area";o.className="zout miss"}})})();</script>';
 
-  // Top tier: the three things staff do all day, big and always in the same spot.
-  body += '<h2 class="sec">&#11088; Most Used</h2><div class="herogrid">';
-  body += dashTile('Look Up an Order', '/order-lookup', { hero: true, emoji: '&#128269;', sub: 'Status, tracking, delivery, phone', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
-  body += dashTile('Edit or Reprint an Invoice', '/dashboard/invoices', { hero: true, emoji: '&#128424;&#65039;', sub: 'The paper that goes in the box', kw: 'invoice receipt reprint print edit paperwork' });
-  body += dashTile('Edit or Reprint a Gift Card', '/dashboard', { hero: true, emoji: '&#128140;', sub: 'Change the message and print again', kw: 'gift card message edit reprint note change' });
+  // Top tier: the three things staff do all day. Size says "most used"; no label needed.
+  body += '<div class="herogrid">';
+  body += dashTile('Look Up an Order', '/order-lookup', { hero: true, icon: 'search', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
+  body += dashTile('Edit or Reprint an Invoice', '/dashboard/invoices', { hero: true, icon: 'printer', kw: 'invoice receipt reprint print edit paperwork paper box' });
+  body += dashTile('Edit or Reprint a Gift Card', '/dashboard', { hero: true, icon: 'heart', kw: 'gift card message edit reprint note change' });
   body += '</div>';
 
+  // Quiet sentence-case group labels. Proximity does the grouping; the label just confirms it.
   body += '<div class="cols four">';
 
-  body += '<div class="col"><h2 class="sec">&#127873; Gift Cards &amp; Stickers</h2>';
-  body += dashTile('Create New Gift Card Message', '/dashboard/gift-card-new', { row: true, emoji: '&#127873;', kw: 'gift card message new create note' });
-  body += dashTile('Stickers &amp; Labels', '/stickers', { row: true, emoji: '&#128278;', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
-  body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { row: true, emoji: '&#127912;', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo' });
+  body += '<div class="col"><h2 class="sec">Gift cards &amp; stickers</h2>';
+  body += dashTile('New Message', '/dashboard/gift-card-new', { row: true, icon: 'gift', kw: 'gift card message new create note' });
+  body += dashTile('Stickers &amp; Labels', '/stickers', { row: true, icon: 'tag', kw: 'sticker stickers label labels niimbot munbyn print gluten free dairy parve frozen hot chocolate pralines dubai hang tag mucho gusto munch circle pink basket guide making printable' });
+  body += dashTile('Sugar Paper Designer', 'https://sweet-tooth-layout-studio.netlify.app/', { row: true, icon: 'penTool', newTab: true, kw: 'sugar paper designer design edible image photo picture oreo art' });
   body += '</div>';
 
-  body += '<div class="col"><h2 class="sec">&#128666; Getting It Out the Door</h2>';
-  body += dashTile('Reprint Shipping Label', '/reprint-label', { row: true, emoji: '&#128230;', kw: 'label reprint print shipping ups didnt print again' });
-  body += dashTile('Change Shipping Speed', '/switch-shipping', { row: true, emoji: '&#9889;', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
-  body += dashTile('Create New Shipping Label', 'https://ship.shipstation.com/rates', { row: true, emoji: '&#128178;', newTab: true, sub: 'ShipStation', kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
+  body += '<div class="col"><h2 class="sec">Shipping</h2>';
+  body += dashTile('Reprint Label', '/reprint-label', { row: true, icon: 'box', kw: 'label reprint print shipping ups didnt print again' });
+  body += dashTile('Change Speed', '/switch-shipping', { row: true, icon: 'zap', kw: 'shipping speed overnight faster upgrade next day second air switch express change slower' });
+  body += dashTile('New Label', 'https://ship.shipstation.com/rates', { row: true, icon: 'truck', newTab: true, kw: 'shipping rates rate quote cost shipstation calculator how much price estimate create new label' });
   body += '</div>';
 
-  body += '<div class="col"><h2 class="sec">&#128179; Taking Money</h2>';
+  body += '<div class="col"><h2 class="sec">Payments</h2>';
   // The old all-on-one-page version still lives at /draft-order if we ever need it back.
-  body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, emoji: '&#129534;', kw: 'draft order phone charge pay payment custom quick sell collect money' });
-  body += dashTile('Create a Discount Code', '/create-discount', { row: true, emoji: '&#127991;&#65039;', kw: 'discount code coupon promo percent off sorry deal' });
+  body += dashTile('Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
+  body += dashTile('Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
   body += '</div>';
 
-  // Every tile stays on the page. Nothing is ever hidden behind a "more" button.
-  body += '<div class="col"><h2 class="sec">&#128722; Store &amp; Email</h2>';
-  body += dashTile('Supplies', '/supplies', { row: true, emoji: '&#128722;', kw: 'supplies buy boxes restock amazon uline order request vendor' });
-  body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, emoji: '&#128231;', newTab: true, kw: 'email mail inbox gmail check' });
+  body += '<div class="col"><h2 class="sec">Store</h2>';
+  body += dashTile('Supplies', '/supplies', { row: true, icon: 'cart', kw: 'supplies buy boxes restock amazon uline order request vendor' });
+  body += dashTile('Check Email', 'https://mail.google.com/mail/u/0/#inbox', { row: true, icon: 'mail', newTab: true, kw: 'email mail inbox gmail check' });
   body += '</div>';
 
   body += '</div>';
 
-  body += '<div class="search-miss" id="dashmiss">No tile for that &mdash; for Shopify questions, use Sidekick (the &#10024; icon) inside Shopify admin, or ask Mikey.</div>';
+  body += '<div class="search-miss" id="dashmiss">Nothing matches.</div>';
 
   body += '<script>(function(){var q=document.getElementById("dashq"),miss=document.getElementById("dashmiss");';
   body += 'var tiles=[].slice.call(document.querySelectorAll("[data-kw]"));';
@@ -1816,15 +1826,15 @@ app.get('/supplies', (req, res) => {
   body += dashTile('Request Supplies', 'https://script.google.com/macros/s/AKfycbxsgmwcpeCHOQE4XahyyMly3OyJ0qD506j0N3jyrZrJyOjuKQuLUrJn8oOXL-wrh4U3/exec', { newTab: true, icon: 'hand' });
   body += '</div>';
   // searchbar CSS lives in lookupShell pages; add minimal here
-  body += '<style>.searchbar{display:flex;gap:10px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}.searchbar button{padding:16px 24px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:15.5px;font-weight:700;cursor:pointer}</style>';
+  body += '<style>.searchbar{display:flex;gap:10px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}.searchbar button{padding:16px 24px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:15px;font-weight:700;cursor:pointer}</style>';
   res.send(dashPage('Supplies', null, body, '/', null, true));
 });
 
 app.get('/supplies/buy', (req, res) => {
   var body = '';
-  body += '<style>.searchbar{display:flex;gap:10px;margin-top:26px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}';
-  body += '.whr{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:14px;padding:14px 18px;font-size:15.5px;font-weight:600;margin-top:12px}.whr b{font-size:16px}';
-  body += '.whr-miss{display:none;background:#fff;border:1px dashed #D9CFD4;border-radius:14px;padding:14px 18px;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:12px}</style>';
+  body += '<style>.searchbar{display:flex;gap:10px;margin-top:26px}.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.searchbar input:focus{outline:none;border-color:#C9BFC4}';
+  body += '.whr{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:12px;padding:14px 18px;font-size:15px;font-weight:600;margin-top:12px}.whr b{font-size:16px}';
+  body += '.whr-miss{display:none;background:#fff;border:1px dashed #D9CFD4;border-radius:12px;padding:14px 18px;font-size:15px;font-weight:600;color:#6B5F65;margin-top:12px}</style>';
   body += '<div class="searchbar"><input type="text" id="whereq" placeholder="What do you need? Type it: strawberries, ribbon, ice packs&hellip;"></div>';
   body += '<div id="where-results"></div>';
   body += '<div class="whr-miss" id="where-miss">Not in the list yet &mdash; ask Mikey where it comes from, then tell Claude to add it here.</div>';
@@ -1964,25 +1974,25 @@ function lookupShell(inner, q) {
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.searchbar{display:flex;gap:10px;margin:30px 0}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
-  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
-  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
-  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
-  html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15.5px}.row .k{color:#9B8A92;flex-shrink:0}.row .v{font-weight:600;text-align:right}';
-  html += '.status-banner{border-radius:20px;padding:20px 24px;margin-bottom:18px;font-size:19px;font-weight:800;text-align:center;background:#fff;border:1px solid #EFEBED;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
-  html += '.status-banner .sub{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:6px}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:12px}';
+  html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15px}.row .k{color:#6B5F65;flex-shrink:0}.row .v{font-weight:600;text-align:right}';
+  html += '.status-banner{border-radius:12px;padding:20px 24px;margin-bottom:18px;font-size:19px;font-weight:600;text-align:center;background:#fff;border:1px solid #EFEBED;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
+  html += '.status-banner .sub{display:block;font-size:15px;font-weight:600;color:#6B5F65;margin-top:6px}';
   html += '.status-banner.delivered{border-top:5px solid #C8A02C}';
-  html += '.item{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.item:last-child{border-bottom:none}.item .qty{font-weight:800}';
+  html += '.item{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.item:last-child{border-bottom:none}.item .qty{font-weight:600}';
   html += '.trackbtn{display:inline-block;margin-top:10px;padding:13px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
-  html += '.muted{color:#9B8A92;font-size:15px}';
-  html += '.err{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:26px;text-align:center;font-size:16.5px;font-weight:600}';
-  html += '.toolout{margin-top:12px;font-size:22px;font-weight:800;text-align:center}';
-  html += '.toolout .miss{font-size:15px;font-weight:600;color:#9B8A92}';
-  html += '.phone-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.phone-row:last-child{border-bottom:none}';
-  html += '.phone-row a{font-weight:800;color:#2A2A2A;text-decoration:none}';
+  html += '.muted{color:#6B5F65;font-size:15px}';
+  html += '.err{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:26px;text-align:center;font-size:17px;font-weight:600}';
+  html += '.toolout{margin-top:12px;font-size:22px;font-weight:600;text-align:center}';
+  html += '.toolout .miss{font-size:15px;font-weight:600;color:#6B5F65}';
+  html += '.phone-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.phone-row:last-child{border-bottom:none}';
+  html += '.phone-row a{font-weight:600;color:#2A2A2A;text-decoration:none}';
   html += '.doact{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}';
   html += '@media (max-width:620px){.doact{grid-template-columns:1fr}}';
-  html += '.doact a{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:13px;padding:15px 16px;font-size:15.5px;font-weight:750;color:#2A2A2A;text-decoration:none;line-height:1.3}';
+  html += '.doact a{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:8px;padding:15px 16px;font-size:15px;font-weight:600;color:#2A2A2A;text-decoration:none;line-height:1.3}';
   html += '.doact a:hover{border-color:#C8A02C;box-shadow:0 4px 12px rgba(0,0,0,.07)}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Order Lookup</h1>';
@@ -2134,7 +2144,7 @@ app.get('/order-lookup', async (req, res) => {
     inner += '<div class="card"><h2>Items</h2>';
     (order.line_items || []).forEach(function (li) {
       if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
-      var vt = li.variant_title ? ' <span style="color:#9B8A92;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
+      var vt = li.variant_title ? ' <span style="color:#6B5F65;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
       inner += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + vt + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
       (li.properties || []).forEach(function (pr) {
         if (!pr || !pr.value || String(pr.name || '').charAt(0) === '_') return;
@@ -2150,12 +2160,12 @@ app.get('/order-lookup', async (req, res) => {
       attrs.forEach(function (na) {
         var val = String(na.value);
         if (val.length > 60 || /message/i.test(na.name || '')) {
-          inner += '<div style="padding:7px 0"><span class="k" style="color:#9B8A92;font-size:15.5px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:15.5px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
+          inner += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:15px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
         } else {
           inner += '<div class="row"><span class="k">' + escapeHtml(na.name) + '</span><span class="v">' + escapeHtml(val) + '</span></div>';
         }
       });
-      if (order.note) inner += '<div style="padding:7px 0"><span class="k" style="color:#9B8A92;font-size:15.5px">Order note</span><div style="font-weight:600;font-size:15.5px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
+      if (order.note) inner += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">Order note</span><div style="font-weight:600;font-size:15px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
       inner += '</div>';
     }
 
@@ -2163,7 +2173,7 @@ app.get('/order-lookup', async (req, res) => {
     var a = order.shipping_address;
     if (a) {
       inner += '<div class="card"><h2>' + (isLocal ? 'Deliver To' : (isPickup ? 'Customer' : 'Ship To')) + '</h2>';
-      inner += '<div style="font-size:15.5px;line-height:1.65">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
+      inner += '<div style="font-size:15px;line-height:1.65">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
       if (a.address2) inner += ', ' + escapeHtml(a.address2);
       inner += '<br>' + escapeHtml(a.city || '') + ', ' + escapeHtml(a.province_code || '') + ' ' + escapeHtml(a.zip || '');
       if (a.phone) inner += '<br>&#9742; ' + escapeHtml(a.phone);
@@ -2370,25 +2380,25 @@ app.get('/draft-order', (req, res) => {
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 30px}';
-  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
-  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:14px}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:14px}';
   html += 'input{padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:16px;background:#fff;width:100%}input:focus{outline:none;border-color:#C8A02C}';
   html += '.inline{display:flex;gap:10px}.inline input.qty{width:86px;flex-shrink:0}.inline input.price{width:120px;flex-shrink:0}';
   html += '.btn{padding:13px 22px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:15px;font-weight:700;cursor:pointer;flex-shrink:0}';
   html += '.btn:disabled{opacity:.4;cursor:default}';
-  html += '.btn-big{width:100%;padding:18px;font-size:18px;border-radius:14px;margin-top:4px}';
+  html += '.btn-big{width:100%;padding:18px;font-size:18px;border-radius:12px;margin-top:4px}';
   html += '.result{margin-top:10px}';
   html += '.hit{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid #F5F1F3;font-size:15px}.hit:last-child{border-bottom:none}';
-  html += '.hit .add{padding:8px 16px;font-size:13.5px;border-radius:9px}';
-  html += '.cart-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.cart-row:last-child{border-bottom:none}';
+  html += '.hit .add{padding:8px 16px;font-size:13px;border-radius:8px}';
+  html += '.cart-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.cart-row:last-child{border-bottom:none}';
   html += '.cart-row .t{flex:1;font-weight:600}.cart-row input.q{width:70px;padding:8px;text-align:center}.cart-row .p{width:90px;text-align:right;font-weight:700}';
-  html += '.cart-row .x{background:none;border:none;color:#C94F7C;font-size:20px;font-weight:800;cursor:pointer;padding:4px 8px}';
-  html += '.total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:800;padding-top:14px}';
-  html += '.muted{color:#9B8A92;font-size:14.5px}';
+  html += '.cart-row .x{background:none;border:none;color:#C94F7C;font-size:20px;font-weight:600;cursor:pointer;padding:4px 8px}';
+  html += '.total-row{display:flex;justify-content:space-between;font-size:17px;font-weight:600;padding-top:14px}';
+  html += '.muted{color:#6B5F65;font-size:15px}';
   html += '.success{border-top:5px solid #C8A02C;text-align:center;padding:30px 24px}';
-  html += '.success .big{font-size:22px;font-weight:800;margin-bottom:6px}';
+  html += '.success .big{font-size:22px;font-weight:600;margin-bottom:6px}';
   html += '.success a{display:inline-block;margin:14px 6px 0;padding:14px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
-  html += '.errbox{background:#fff;border:1.5px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:18px;font-weight:600;display:none}';
+  html += '.errbox{background:#fff;border:1.5px solid #C94F7C;border-radius:12px;padding:14px 18px;margin-bottom:18px;font-weight:600;display:none}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Create a Draft Order</h1>';
   html += '<div id="errbox" class="errbox"></div>';
@@ -2473,81 +2483,81 @@ app.get('/draft-order-new', (req, res) => {
   html += '.dots{display:flex;gap:7px;justify-content:center;margin-bottom:24px}';
   html += '.dots i{width:34px;height:7px;border-radius:7px;background:#EDE4E8}';
   html += '.dots i.done{background:#2A2A2A}.dots i.on{background:#C8A02C}';
-  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:22px;box-shadow:0 2px 12px rgba(0,0,0,.06);padding:26px 24px}';
-  html += '.q{font-size:25px;font-weight:800;letter-spacing:-.5px;text-align:center;line-height:1.25}';
-  html += '.qs{font-size:15.5px;color:#9B8A92;text-align:center;margin-top:8px;line-height:1.45}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:22px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:26px 24px}';
+  html += '.q{font-size:25px;font-weight:600;letter-spacing:-.5px;text-align:center;line-height:1.25}';
+  html += '.qs{font-size:15px;color:#6B5F65;text-align:center;margin-top:8px;line-height:1.45}';
   html += '.body{margin-top:22px}';
-  html += '.pick{display:flex;align-items:center;gap:16px;width:100%;background:#fff;border:2px solid #EFEBED;border-radius:18px;padding:18px 20px;margin-bottom:13px;cursor:pointer;text-align:left;color:#2A2A2A;font-family:inherit}';
+  html += '.pick{display:flex;align-items:center;gap:16px;width:100%;background:#fff;border:2px solid #EFEBED;border-radius:12px;padding:18px 20px;margin-bottom:13px;cursor:pointer;text-align:left;color:#2A2A2A;font-family:inherit}';
   html += '.pick:hover{border-color:#C8A02C;background:#FEFBF2}';
   html += '.pick.on{border-color:#C8A02C;background:#FDF8E8}';
   html += '.pick .e{font-size:34px;line-height:1;flex-shrink:0}';
-  html += '.pick .t{display:block;font-size:20px;font-weight:800;letter-spacing:-.2px}';
-  html += '.pick .s{display:block;font-size:14.5px;font-weight:600;color:#9B8A92;margin-top:3px;line-height:1.35}';
+  html += '.pick .t{display:block;font-size:20px;font-weight:600;letter-spacing:-.2px}';
+  html += '.pick .s{display:block;font-size:15px;font-weight:600;color:#6B5F65;margin-top:3px;line-height:1.35}';
   html += '.field{margin-bottom:15px}';
-  html += '.field label{display:block;font-size:15.5px;font-weight:800;margin-bottom:7px}';
-  html += '.field .hint{font-size:14px;color:#9B8A92;font-weight:600;margin-top:6px;line-height:1.45}';
-  html += 'input,select,textarea{width:100%;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:13px;font-size:17px;font-family:inherit;background:#fff;color:#2A2A2A}';
+  html += '.field label{display:block;font-size:15px;font-weight:600;margin-bottom:7px}';
+  html += '.field .hint{font-size:14px;color:#6B5F65;font-weight:600;margin-top:6px;line-height:1.45}';
+  html += 'input,select,textarea{width:100%;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:17px;font-family:inherit;background:#fff;color:#2A2A2A}';
   html += 'input:focus,select:focus,textarea:focus{outline:none;border-color:#C8A02C}';
   html += 'textarea{min-height:110px;resize:vertical;line-height:1.5}';
   html += '.two{display:flex;gap:12px}.two > *{flex:1;min-width:0}';
-  html += '.eyebrow{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;text-align:center;margin-bottom:9px}';
+  html += '.eyebrow{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:#6B5F65;text-align:center;margin-bottom:9px}';
   // No little up/down arrows anywhere — staff hit them by accident.
   html += 'input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}';
   html += 'input[type=number]{-moz-appearance:textfield}';
   html += '.pricerow{display:flex;gap:14px;align-items:flex-end;margin-bottom:15px}';
   html += '.pricerow .grow{flex:1;min-width:0}.pricerow .field{margin-bottom:0}';
-  html += '.money{display:flex;align-items:center;border:1.5px solid #E8E2E5;border-radius:13px;background:#fff;padding-left:15px}';
+  html += '.money{display:flex;align-items:center;border:1.5px solid #E8E2E5;border-radius:8px;background:#fff;padding-left:15px}';
   html += '.money:focus-within{border-color:#C8A02C}';
-  html += '.money span{font-size:19px;font-weight:800;color:#9B8A92}';
+  html += '.money span{font-size:19px;font-weight:600;color:#6B5F65}';
   html += '.money input{border:none;border-radius:0;padding-left:7px}.money input:focus{outline:none}';
   html += '.counter{display:inline-flex;align-items:center;border:2px solid #C8A02C;border-radius:999px;background:#fff;overflow:hidden}';
-  html += '.counter button{border:none;background:none;width:46px;height:50px;font-size:24px;font-weight:800;color:#2A2A2A;cursor:pointer;line-height:1;font-family:inherit;padding:0}';
+  html += '.counter button{border:none;background:none;width:46px;height:50px;font-size:24px;font-weight:600;color:#2A2A2A;cursor:pointer;line-height:1;font-family:inherit;padding:0}';
   html += '.counter button:active{background:#FAF0D2}';
-  html += '.counter input{width:52px;border:none;border-radius:0;text-align:center;font-size:19px;font-weight:800;padding:0}';
+  html += '.counter input{width:52px;border:none;border-radius:0;text-align:center;font-size:19px;font-weight:600;padding:0}';
   html += '.counter input:focus{outline:none}';
-  html += '.feebox{margin-top:14px;border-radius:16px;padding:20px;text-align:center;background:#FDF8E8;border:2px solid #C8A02C;display:none}';
-  html += '.feebox .n{font-size:36px;font-weight:800;letter-spacing:-1px}';
-  html += '.feebox .l{font-size:14.5px;font-weight:700;color:#9B8A92;margin-top:4px}';
+  html += '.feebox{margin-top:14px;border-radius:12px;padding:20px;text-align:center;background:#FDF8E8;border:2px solid #C8A02C;display:none}';
+  html += '.feebox .n{font-size:36px;font-weight:600;letter-spacing:-1px}';
+  html += '.feebox .l{font-size:15px;font-weight:700;color:#6B5F65;margin-top:4px}';
   html += '.feebox.miss{background:#FFF6F4;border-color:#E8A79A}';
   html += '.feebox.miss .n{font-size:20px;line-height:1.4}';
   // Back and Next ride along at the bottom of the screen, so a long list of search
   // results can never bury them.
   html += '.navrow{position:sticky;bottom:0;z-index:5;display:flex;gap:12px;margin-top:24px;padding:14px 0 4px;background:#fff;box-shadow:0 -10px 14px 6px #fff}';
-  html += '.btn{padding:17px 22px;border:none;border-radius:14px;font-size:17px;font-weight:800;font-family:inherit;cursor:pointer;flex-shrink:0}';
+  html += '.btn{padding:17px 22px;border:none;border-radius:12px;font-size:17px;font-weight:600;font-family:inherit;cursor:pointer;flex-shrink:0}';
   html += '.btn.next{flex:1;background:#2A2A2A;color:#fff}';
   html += '.btn.next:disabled{opacity:.35;cursor:default}';
   html += '.btn.back{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.btn.sm{padding:13px 20px;font-size:15px;border-radius:12px;background:#2A2A2A;color:#fff}';
-  html += '.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.row:last-child{border-bottom:none}';
-  html += '.row .t{flex:1;font-weight:650;line-height:1.35}';
+  html += '.row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.row:last-child{border-bottom:none}';
+  html += '.row .t{flex:1;font-weight:600;line-height:1.35}';
   html += '.row input.q2{width:66px;padding:9px;text-align:center;font-size:15px}';
-  html += '.row .p{width:86px;text-align:right;font-weight:800}';
-  html += '.row .x{background:none;border:none;color:#C94F7C;font-size:23px;font-weight:800;cursor:pointer;padding:2px 6px;line-height:1}';
-  html += '.tot{display:flex;justify-content:space-between;font-size:19px;font-weight:800;padding-top:15px;margin-top:4px;border-top:2px solid #F3EDF0}';
-  html += '.muted{color:#9B8A92;font-size:15px;line-height:1.5}';
-  html += '.rev h3{font-size:12.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#9B8A92;margin:20px 0 9px}';
+  html += '.row .p{width:86px;text-align:right;font-weight:600}';
+  html += '.row .x{background:none;border:none;color:#C94F7C;font-size:23px;font-weight:600;cursor:pointer;padding:2px 6px;line-height:1}';
+  html += '.tot{display:flex;justify-content:space-between;font-size:19px;font-weight:600;padding-top:15px;margin-top:4px;border-top:2px solid #F3EDF0}';
+  html += '.muted{color:#6B5F65;font-size:15px;line-height:1.5}';
+  html += '.rev h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6B5F65;margin:20px 0 9px}';
   html += '.rev h3:first-child{margin-top:0}';
   // Long product names have to wrap here. If they can't, they push the whole page sideways.
   html += '.rev .l{display:flex;justify-content:space-between;gap:14px;padding:6px 0;font-size:16px;line-height:1.45}';
   // The label side wraps however it has to; the value side only breaks at spaces so a
   // price never splits down the middle.
-  html += '.rev .l .k{color:#9B8A92;min-width:0;overflow-wrap:anywhere}.rev .l .v{font-weight:700;text-align:right;min-width:0}';
-  html += '.rev .edit{background:none;border:none;color:#9B8A92;font-size:13.5px;font-weight:800;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}';
-  html += '.rev .msg{background:#FAF7F8;border-radius:12px;padding:14px 16px;font-size:15.5px;line-height:1.5;font-style:italic}';
-  html += '.errbox{background:#fff;border:2px solid #C94F7C;border-radius:14px;padding:14px 18px;margin-bottom:16px;font-weight:700;font-size:15.5px;display:none;line-height:1.45}';
+  html += '.rev .l .k{color:#6B5F65;min-width:0;overflow-wrap:anywhere}.rev .l .v{font-weight:700;text-align:right;min-width:0}';
+  html += '.rev .edit{background:none;border:none;color:#6B5F65;font-size:13px;font-weight:600;cursor:pointer;text-decoration:underline;padding:0;font-family:inherit}';
+  html += '.rev .msg{background:#FAF7F8;border-radius:12px;padding:14px 16px;font-size:15px;line-height:1.5;font-style:italic}';
+  html += '.errbox{background:#fff;border:2px solid #C94F7C;border-radius:12px;padding:14px 18px;margin-bottom:16px;font-weight:700;font-size:15px;display:none;line-height:1.45}';
   html += '.done{text-align:center;border-top:5px solid #C8A02C}';
-  html += '.done .big{font-size:24px;font-weight:800;margin-bottom:4px}';
-  html += '.done .path{display:block;margin-top:14px;padding:18px;border-radius:14px;background:#2A2A2A;color:#fff;text-decoration:none;font-weight:800;font-size:17px;border:none;width:100%;cursor:pointer;font-family:inherit}';
-  html += '.done .path small{display:block;font-size:13.5px;font-weight:600;opacity:.75;margin-top:3px}';
+  html += '.done .big{font-size:24px;font-weight:600;margin-bottom:4px}';
+  html += '.done .path{display:block;margin-top:14px;padding:18px;border-radius:12px;background:#2A2A2A;color:#fff;text-decoration:none;font-weight:600;font-size:17px;border:none;width:100%;cursor:pointer;font-family:inherit}';
+  html += '.done .path small{display:block;font-size:13px;font-weight:600;opacity:.75;margin-top:3px}';
   html += '.done .path.lite{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5}';
   html += '.done .path:disabled{opacity:.45;cursor:default}';
-  html += '.payhead{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:#9B8A92;margin:26px 0 12px;text-align:left}';
-  html += '.pay{text-align:left;border:1.5px solid #EFEBED;border-radius:16px;padding:18px;margin-bottom:14px}';
-  html += '.pay .payt{font-size:18px;font-weight:800;margin-bottom:6px}';
+  html += '.payhead{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#6B5F65;margin:26px 0 12px;text-align:left}';
+  html += '.pay{text-align:left;border:1.5px solid #EFEBED;border-radius:12px;padding:18px;margin-bottom:14px}';
+  html += '.pay .payt{font-size:18px;font-weight:600;margin-bottom:6px}';
   html += '.pay .path{margin-top:0}';
   html += 'ol.steps{margin:14px 0 0 20px;padding:0;font-size:15px;line-height:1.6;color:#3D3D3D}';
   html += 'ol.steps li{margin-bottom:5px}';
-  html += '@media (max-width:600px){body{padding:80px 14px 40px}.card{padding:22px 17px;border-radius:18px}.q{font-size:22px}.two{flex-direction:column;gap:0}.row .p{width:70px}}';
+  html += '@media (max-width:600px){body{padding:80px 14px 40px}.card{padding:22px 17px;border-radius:12px}.q{font-size:22px}.two{flex-direction:column;gap:0}.row .p{width:70px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
 
   html += '<div class="dots" id="dots"><i></i><i></i><i></i><i></i><i></i><i></i></div>';
@@ -2611,7 +2621,7 @@ app.get('/draft-order-new', (req, res) => {
   html += '</div>';
   html += '<button type="button" class="btn sm" style="width:100%" onclick="addManual()">Add this item</button>';
   html += '<div class="hint">Example: 30 boxes at $8 each &rarr; name it, price 8, then 30.</div>';
-  html += '<div style="margin-top:24px"><label style="display:block;font-size:15.5px;font-weight:800;margin-bottom:7px">On the order</label>';
+  html += '<div style="margin-top:24px"><label style="display:block;font-size:15px;font-weight:600;margin-bottom:7px">On the order</label>';
   html += '<div id="cart"><div class="muted">Nothing added yet.</div></div>';
   html += '<div class="tot" id="totrow" style="display:none"><span>Items total</span><span id="tot"></span></div></div>';
   html += '</div>';
@@ -2769,7 +2779,7 @@ app.get('/draft-order-new', (req, res) => {
   html += 'if(shipPrice()>0)h+=line(S.method==="local"?"Local delivery":"Shipping","$"+shipPrice().toFixed(2));';
   html += 'h+=\'<div class="tot"><span>Total</span><span>$\'+(itemsTotal()+shipPrice()).toFixed(2)+\'</span></div>\';';
   html += 'h+=\'<h3>Paying <button type="button" class="edit" onclick="go(4)">change</button></h3>\';';
-  html += 'h+=line("Name",esc(val("bname")))+line("Phone",esc(val("bphone")))+line("Email",val("bemail")?esc(val("bemail")):"<span style=\\"color:#9B8A92;font-weight:600\\">none</span>");';
+  html += 'h+=line("Name",esc(val("bname")))+line("Phone",esc(val("bphone")))+line("Email",val("bemail")?esc(val("bemail")):"<span style=\\"color:#6B5F65;font-weight:600\\">none</span>");';
   html += 'h+=\'<h3>Gift card <button type="button" class="edit" onclick="go(5)">change</button></h3>\';';
   html += 'if(S.gift){h+=line("To",esc(val("gto")))+line("From",esc(val("gfrom")));h+=\'<div class="msg">&ldquo;\'+esc(val("gmsg"))+\'&rdquo;</div>\'}';
   html += 'else{h+=\'<div class="muted">No gift message.</div>\'}';
@@ -2849,16 +2859,16 @@ function reprintShell(inner, q, pstate) {
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
-  html += '.pill{display:flex;align-items:center;justify-content:center;gap:9px;font-size:14.5px;font-weight:700;background:#fff;border:1px solid #EFEBED;border-radius:14px;padding:12px 16px;margin:28px 0 0}';
+  html += '.pill{display:flex;align-items:center;justify-content:center;gap:9px;font-size:15px;font-weight:700;background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:12px 16px;margin:28px 0 0}';
   html += '.dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}.dot.ok{background:#2E9E5B}.dot.bad{background:#C4423A}';
   html += '.searchbar{display:flex;gap:10px;margin:16px 0 18px}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
-  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
-  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}';
   html += '.note.good{border-top:5px solid #C8A02C}';
-  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
-  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
-  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '.note .big{font-size:21px;font-weight:600;margin-bottom:8px}';
+  html += '.note .muted{color:#6B5F65;font-size:15px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.hint{color:#6B5F65;font-size:15px;text-align:center;line-height:1.6}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Reprint Shipping Label</h1>';
   html += '<div class="pill"><span class="dot ' + (online ? 'ok' : 'bad') + '"></span>' +
@@ -2931,25 +2941,25 @@ function switchShell(inner, q) {
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
   html += '.searchbar{display:flex;gap:10px;margin:28px 0 18px}';
-  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:14px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
-  html += '.searchbar button{padding:16px 28px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
-  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:22px 24px;margin-bottom:18px}';
-  html += '.card h2{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:12px}';
-  html += '.rate-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #F5F1F3;font-size:15.5px}.rate-row:last-child{border-bottom:none}';
-  html += '.rate-row .svc{font-weight:700}.rate-row .eta{color:#9B8A92;font-size:13.5px;font-weight:600}';
-  html += '.rate-row a{flex-shrink:0;padding:10px 18px;background:#2A2A2A;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;font-size:14.5px}';
-  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.searchbar input{flex:1;padding:16px 18px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:18px;background:#fff}.searchbar input:focus{outline:none;border-color:#C8A02C}';
+  html += '.searchbar button{padding:16px 28px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:700;cursor:pointer}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:18px}';
+  html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:12px}';
+  html += '.rate-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.rate-row:last-child{border-bottom:none}';
+  html += '.rate-row .svc{font-weight:700}.rate-row .eta{color:#6B5F65;font-size:13px;font-weight:600}';
+  html += '.rate-row a{flex-shrink:0;padding:10px 18px;background:#2A2A2A;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:15px}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}';
   html += '.note.good{border-top:5px solid #C8A02C}';
-  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
-  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.note .big{font-size:21px;font-weight:600;margin-bottom:8px}';
+  html += '.note .muted{color:#6B5F65;font-size:15px;font-weight:600;margin-top:10px;line-height:1.5}';
   html += '.steps{text-align:left;font-size:15px;font-weight:600;line-height:2}';
-  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
-  html += '.owe-inline{color:#C4423A;font-weight:800;font-size:13.5px}';
-  html += '.owe{background:#fff;border:1px solid #EFEBED;border-top:6px solid #C4423A;border-radius:20px;padding:26px 24px;margin-bottom:18px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.05)}';
-  html += '.owe-title{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#C4423A}';
-  html += '.owe .amt{font-size:46px;font-weight:800;color:#C4423A;margin:8px 0 2px}';
-  html += '.owe-sub{color:#6B5B62;font-size:14.5px;font-weight:600;line-height:1.6;margin:10px 0 18px}';
-  html += '.paybtn{display:inline-block;padding:14px 26px;background:#C4423A;color:#fff;border-radius:12px;text-decoration:none;font-weight:800;font-size:15.5px}';
+  html += '.hint{color:#6B5F65;font-size:15px;text-align:center;line-height:1.6}';
+  html += '.owe-inline{color:#C4423A;font-weight:600;font-size:13px}';
+  html += '.owe{background:#fff;border:1px solid #EFEBED;border-top:6px solid #C4423A;border-radius:12px;padding:26px 24px;margin-bottom:18px;text-align:center;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
+  html += '.owe-title{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#C4423A}';
+  html += '.owe .amt{font-size:46px;font-weight:600;color:#C4423A;margin:8px 0 2px}';
+  html += '.owe-sub{color:#6B5B62;font-size:15px;font-weight:600;line-height:1.6;margin:10px 0 18px}';
+  html += '.paybtn{display:inline-block;padding:14px 26px;background:#C4423A;color:#fff;border-radius:12px;text-decoration:none;font-weight:600;font-size:15px}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Change Shipping Speed</h1>';
   html += '<form class="searchbar" action="/switch-shipping" method="get">';
@@ -3012,10 +3022,10 @@ app.get('/dashboard/this-is-the-store', async function (req, res) {
     if (!already) { ips.push(ip); await shopJsonWrite('store_ips', ips, r.id); storeIpsCache = { ips: ips, at: Date.now() }; }
     res.send('<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>' +
       '<body style="font-family:-apple-system,sans-serif;background:#FAF7F8;padding:80px 24px;text-align:center">' +
-      '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:20px;padding:30px">' +
+      '<div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #EFEBED;border-top:5px solid #C8A02C;border-radius:12px;padding:30px">' +
       '<div style="font-size:44px">&#128205;</div><h2 style="margin:12px 0">' + (already ? 'Already registered' : 'Store computer registered!') + '</h2>' +
       '<p style="color:#666;font-weight:600;line-height:1.6">Orders typed on this internet connection will now be automatically tagged <b>staff-entered</b> in Shopify.<br>Registered store addresses: ' + ips.length + '</p>' +
-      '<a href="/" style="display:inline-block;margin-top:14px;padding:12px 26px;background:#2A2A2A;color:#fff;border-radius:11px;text-decoration:none;font-weight:800">&#127968; HOME</a></div></body></html>');
+      '<a href="/" style="display:inline-block;margin-top:14px;padding:12px 26px;background:#2A2A2A;color:#fff;border-radius:8px;text-decoration:none;font-weight:600">&#127968; HOME</a></div></body></html>');
   } catch (e) { res.status(500).send('Error: ' + escapeHtml(e.message)); }
 });
 
@@ -3214,17 +3224,17 @@ function discountShell(inner, vals) {
   html += TOPBAR_CSS;
   html += 'h1{font-size:29px;letter-spacing:-.5px;text-align:center}';
   html += 'h1:after{content:"";display:block;width:56px;height:5px;border-radius:5px;background:#C8A02C;margin:14px auto 0}';
-  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:20px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:24px;margin:28px 0 18px}';
-  html += '.field{margin-bottom:16px}.field label{display:block;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:#9B8A92;margin-bottom:6px}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:24px;margin:28px 0 18px}';
+  html += '.field{margin-bottom:16px}.field label{display:block;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:6px}';
   html += '.field input,.field select{width:100%;padding:14px 16px;border:1.5px solid #E8E2E5;border-radius:12px;font-size:17px;background:#fff}.field input:focus,.field select:focus{outline:none;border-color:#C8A02C}';
   html += '.row2{display:flex;gap:12px}.row2 .field{flex:1}';
-  html += '.gobtn{width:100%;padding:16px;border:none;border-radius:14px;background:#2A2A2A;color:#fff;font-size:16.5px;font-weight:800;cursor:pointer}';
-  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:20px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.05);margin-bottom:18px}';
+  html += '.gobtn{width:100%;padding:16px;border:none;border-radius:12px;background:#2A2A2A;color:#fff;font-size:17px;font-weight:600;cursor:pointer}';
+  html += '.note{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:24px;text-align:center;font-size:16px;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:18px}';
   html += '.note.good{border-top:5px solid #C8A02C}';
-  html += '.note .big{font-size:21px;font-weight:800;margin-bottom:8px}';
-  html += '.note .code{font-size:34px;font-weight:800;letter-spacing:2px;background:#FAF7F8;border:1.5px dashed #E8C7D3;border-radius:12px;padding:14px;margin:12px 0}';
-  html += '.note .muted{color:#9B8A92;font-size:14.5px;font-weight:600;margin-top:10px;line-height:1.5}';
-  html += '.hint{color:#9B8A92;font-size:14.5px;text-align:center;line-height:1.6}';
+  html += '.note .big{font-size:21px;font-weight:600;margin-bottom:8px}';
+  html += '.note .code{font-size:34px;font-weight:600;letter-spacing:2px;background:#FAF7F8;border:1.5px dashed #E8C7D3;border-radius:12px;padding:14px;margin:12px 0}';
+  html += '.note .muted{color:#6B5F65;font-size:15px;font-weight:600;margin-top:10px;line-height:1.5}';
+  html += '.hint{color:#6B5F65;font-size:15px;text-align:center;line-height:1.6}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Create a Discount Code</h1>';
   html += inner;
@@ -3323,15 +3333,15 @@ app.get('/stickers', function (req, res) {
   html += '*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:72px 24px 36px}';
   html += '.wrap{max-width:960px;margin:0 auto}' + TOPBAR_CSS;
   html += 'h1{font-size:26px;letter-spacing:-.5px;text-align:center;margin-bottom:8px}';
-  html += '.sub{text-align:center;color:#9B8A92;font-size:14.5px;font-weight:600;margin-bottom:26px}';
-  html += '.sec{font-size:13.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.2px;color:#9B8A92;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
-  html += '.howto{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;line-height:1.7;margin-bottom:16px}';
+  html += '.sub{text-align:center;color:#6B5F65;font-size:15px;font-weight:600;margin-bottom:26px}';
+  html += '.sec{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1.2px;color:#6B5F65;margin:26px 0 12px;padding-bottom:7px;border-bottom:2px solid #F3EDF0}';
+  html += '.howto{background:#fff;border:1px solid #EFEBED;border-left:5px solid #C8A02C;border-radius:12px;padding:16px 20px;font-size:15px;font-weight:600;line-height:1.7;margin-bottom:16px}';
   html += '.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px}';
-  html += '.scard{background:#fff;border:1px solid #EFEBED;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:14px;text-align:center}';
-  html += '.scard img{width:100%;height:150px;object-fit:contain;background:#FAF7F8;border-radius:10px}';
-  html += '.scard .nm{font-weight:800;font-size:14.5px;margin:10px 0 8px;line-height:1.3}';
-  html += '.scard a{display:inline-block;padding:9px 16px;background:#2A2A2A;color:#fff;border-radius:10px;text-decoration:none;font-weight:800;font-size:13px}';
-  html += '.miss{background:#fff;border:1px dashed #D9CFD4;border-radius:14px;padding:16px 20px;font-size:14.5px;font-weight:600;color:#9B8A92;line-height:1.7}';
+  html += '.scard{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.05);padding:14px;text-align:center}';
+  html += '.scard img{width:100%;height:150px;object-fit:contain;background:#FAF7F8;border-radius:8px}';
+  html += '.scard .nm{font-weight:600;font-size:15px;margin:10px 0 8px;line-height:1.3}';
+  html += '.scard a{display:inline-block;padding:9px 16px;background:#2A2A2A;color:#fff;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px}';
+  html += '.miss{background:#fff;border:1px dashed #D9CFD4;border-radius:12px;padding:16px 20px;font-size:15px;font-weight:600;color:#6B5F65;line-height:1.7}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>&#128278; Stickers &amp; Labels</h1>';
   html += '<div class="sub">Every sticker file in one place &mdash; no more digging through Canva, email, and Google Drive.</div>';
@@ -3373,9 +3383,9 @@ app.get('/stickers', function (req, res) {
     'They custom-print almost anything (also quoted candy cups and chocolate boxes). Production is in Pakistan (address says Glendale, AZ) but turnaround is fast.<br><br>' +
     '<b>&#127991;&#65039; ORDER HANG TAGS:</b> reference quote <b>EPCOM-103051</b> &mdash; round swing tags 2.5&quot;&times;2.5&quot;, SBS white coated card 300gsm/14pt, full color both sides, no lamination. Last order: 2,000 DAIRY + 1,000 PARVE, $0.26 each ($693.90 after 10% discount, Dec 2025, gold Pantone D3AF37).<br><br>' +
     '<b>&#128140; ORDER GIFT CARDS:</b> same company &mdash; email James the gift message card file. Size: <b>4.3&quot; &times; 8.3&quot;</b>. Also does the coupon cards (3&quot;&times;2&quot;, rounded corners, hole punched).<br><br>' +
-    '<span style="color:#9B8A92">Also fine: hangtagsco.com (previous vendor for these &mdash; had mistakes like wrong QR codes and card sizes, but they always made good in the end). All these Pakistan-based printers end up with the best prices. One exception: their <b>boxes are overpriced</b> &mdash; price boxes elsewhere. Double-check every proof (QR codes, sizes, colors) before approving.</span></div>';
+    '<span style="color:#6B5F65">Also fine: hangtagsco.com (previous vendor for these &mdash; had mistakes like wrong QR codes and card sizes, but they always made good in the end). All these Pakistan-based printers end up with the best prices. One exception: their <b>boxes are overpriced</b> &mdash; price boxes elsewhere. Double-check every proof (QR codes, sizes, colors) before approving.</span></div>';
   html += '<div class="sgrid" style="margin-top:16px">';
-  html += '<div class="scard"><img src="/sticker-files/elegant-packages-products.png" alt=""><div class="nm">What their products look like<br><span style="font-weight:600;color:#9B8A92;font-size:12.5px">gift card &middot; coupon card &middot; parve + dairy hang tags</span></div><a href="/sticker-files/elegant-packages-products.png" target="_blank" rel="noopener">&#128065;&#65039; View full size</a></div>';
+  html += '<div class="scard"><img src="/sticker-files/elegant-packages-products.png" alt=""><div class="nm">What their products look like<br><span style="font-weight:600;color:#6B5F65;font-size:13px">gift card &middot; coupon card &middot; parve + dairy hang tags</span></div><a href="/sticker-files/elegant-packages-products.png" target="_blank" rel="noopener">&#128065;&#65039; View full size</a></div>';
   html += '</div>';
 
   html += '<div class="sec">&#128196; Printable guides</div>';
