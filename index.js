@@ -3323,7 +3323,8 @@ var STICKERS = [
   { file: 'dubai-zero-series.png', name: 'Dubai Chocolate Zero Series', how: 'order' },
   { file: 'dairy-rectangle.png', name: 'DAIRY (gold rectangle)', how: 'order' },
   { file: 'parve-oval.png', name: 'PARVE (oval)', how: 'order' },
-  { file: 'parve-rectangle.png', name: 'PARVE (gold rectangle)', how: 'order' }
+  { file: 'parve-rectangle.png', name: 'PARVE (gold rectangle)', how: 'order' },
+  { file: 'dairy-gold-ornate.png', name: 'DAIRY (gold, shaped)', how: 'order' }
 ];
 var STICKERS_MISSING = ['Mucho Gusto Munch', 'Chocolate Chunks', 'Gift message cards', 'Hang tags'];
 
@@ -3362,7 +3363,7 @@ app.get('/stickers', function (req, res) {
     '<b>Reference order SL343776-4:</b> Custom Sticker Rolls, 2&quot; &times; 1&quot; custom shape, Silver BOPP Permanent (SBP), gloss laminate, white ink: yes.<br>' +
     'Help: <a href="mailto:support@sheetlabels.com">support@sheetlabels.com</a> &middot; phone 888-391-7165 &middot; fax 518-798-0289.</div>';
   html += '<div class="sgrid">';
-  ['dairy-rectangle.png', 'parve-oval.png', 'parve-rectangle.png'].forEach(function (f) {
+  ['dairy-rectangle.png', 'dairy-gold-ornate.png', 'parve-oval.png', 'parve-rectangle.png'].forEach(function (f) {
     var s = STICKERS.filter(function (x) { return x.file === f; })[0];
     html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
   });
@@ -3373,7 +3374,7 @@ app.get('/stickers', function (req, res) {
     '<a href="https://orders.uprinting.com/order?filter_type=search&amp;keyword=21999028&amp;ch1=_w_up_sc_spk_ty_trans_te_pirn_co_sptl-acct-bttn-0" target="_blank" rel="noopener"><b>&#128257; Reorder the generic round logo stickers here</b></a> (order #21999028 &mdash; the basic round sticker that goes on every product).<br>' +
     'Other circle stickers (Dubai Chocolate etc.): reorder from <a href="https://orders.uprinting.com/order" target="_blank" rel="noopener">order history</a>. Specs are 2&quot;&times;2&quot; roll labels. Support: 888-888-4211.</div>';
   html += '<div class="sgrid">';
-  STICKERS.filter(function (s) { return s.how === 'order' && ['dairy-rectangle.png', 'parve-oval.png', 'parve-rectangle.png'].indexOf(s.file) === -1; }).forEach(function (s) {
+  STICKERS.filter(function (s) { return s.how === 'order' && ['dairy-rectangle.png', 'dairy-gold-ornate.png', 'parve-oval.png', 'parve-rectangle.png'].indexOf(s.file) === -1; }).forEach(function (s) {
     html += '<div class="scard"><img src="/sticker-files/' + s.file + '" alt=""><div class="nm">' + s.name + '</div><a href="/sticker-files/' + s.file + '" download>&#11015;&#65039; Download</a></div>';
   });
   html += '</div>';
