@@ -1076,23 +1076,39 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
     var updatePayload = { order: { id: parseInt(req.params.orderId) } };
     if (body.recipientName || body.addr1 || body.city) {
       updatePayload.order.shipping_address = {};
-      if (body.recipientName) updatePayload.order.shipping_address.name = body.recipientName;
+      // Shopify silently drops a plain "name" on an address write — it wants first/last.
+      // This is why editing the recipient name here never stuck.
+      if (body.recipientName) {
+        var parts = String(body.recipientName).trim().split(/\s+/);
+        updatePayload.order.shipping_address.first_name = parts.shift() || '';
+        updatePayload.order.shipping_address.last_name = parts.join(' ');
+      }
       if (body.addr1) updatePayload.order.shipping_address.address1 = body.addr1;
-      if (body.addr2) updatePayload.order.shipping_address.address2 = body.addr2;
+      updatePayload.order.shipping_address.address2 = body.addr2 || null;
       if (body.city) updatePayload.order.shipping_address.city = body.city;
       if (body.province) updatePayload.order.shipping_address.province = body.province;
       if (body.zip) updatePayload.order.shipping_address.zip = body.zip;
     }
     if (noteLines.length > 0) updatePayload.order.note = noteLines.join('\n');
 
-    if (body.deliveryType) {
-      var dtLabelMap = { 'pickup': 'Pickup', 'local-delivery': 'Local Delivery', 'shipping': 'Shipping', 'in-store': 'In Store' };
-      var dtLabel = dtLabelMap[body.deliveryType] || body.deliveryType;
+    // The gift card and the driver app read note_attributes, not the note. Edits here
+    // used to land only in the free-text note, so a corrected gift message never
+    // reached the card that actually gets printed.
+    if (body.deliveryType || body.giftMessage != null || body.deliveryDate) {
       var existingOrder = await fetchOrderFromShopify(req.params.orderId);
+      var drop = [];
+      if (body.deliveryType) drop.push('deliverymethod');
+      if (body.giftMessage != null) drop.push('giftmessage');
+      if (body.deliveryDate) drop.push('deliverydate');
       var attrs = (existingOrder.note_attributes || []).filter(function (a) {
-        return (a.name || '').toLowerCase().replace(/[\s_\-]+/g, '') !== 'deliverymethod';
+        return drop.indexOf((a.name || '').toLowerCase().replace(/[\s_\-]+/g, '')) === -1;
       });
-      attrs.push({ name: 'Delivery Method', value: dtLabel });
+      if (body.deliveryType) {
+        var dtLabelMap = { 'pickup': 'Pickup', 'local-delivery': 'Local Delivery', 'shipping': 'Shipping', 'in-store': 'In Store' };
+        attrs.push({ name: 'Delivery Method', value: dtLabelMap[body.deliveryType] || body.deliveryType });
+      }
+      if (body.giftMessage != null && String(body.giftMessage).trim()) attrs.push({ name: 'Gift Message', value: String(body.giftMessage) });
+      if (body.deliveryDate) attrs.push({ name: 'Delivery Date', value: String(body.deliveryDate) });
       updatePayload.order.note_attributes = attrs;
     }
 
