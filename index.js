@@ -751,8 +751,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="section-label">Notes</div>' +
         '<div class="field"><label>Special Instructions</label><textarea id="specialInstructions" oninput="refreshPreview()">' + specialInstructions + '</textarea></div>' +
         '<div class="field"><label>Gift Message</label><textarea id="giftMessage" oninput="refreshPreview()">' + giftMessage + '</textarea></div>' +
-        '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Send to Printer</button></div>' +
-        '<div class="btn-row"><button class="btn btn-blue" onclick="saveEdits()">💾 Save Changes</button></div>' +
+        '<div class="btn-row"><button class="btn btn-green" onclick="saveAndPrint(this)">&#128190; Save &amp; Print Invoice</button></div>' +
         '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
         '<div class="btn-row"><a class="btn btn-outline" href="/switch-shipping?order=' + order.order_number + '">&#128230; Address changed &mdash; get a new label</a></div>' +
         '<div style="font-size:11px;text-align:center;color:#666;margin-top:4px;line-height:1.4">Save the new address first. The old label still goes to the old address until you swap it.</div>' +
@@ -779,24 +778,28 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           'var params=new URLSearchParams(fd);' +
           'document.getElementById("previewFrame").src="/dashboard/invoice-preview/' + order.id + '?"+params.toString();' +
         '}' +
-        'function saveEdits(){' +
+        'function saveAndPrint(btn){' +
           'var fd=getFormData();' +
+          'var msg=document.getElementById("saveMsg");' +
+          'if(btn){btn.disabled=true;btn.textContent="Saving…"}' +
+          'msg.style.color="#666";msg.textContent="Saving to Shopify…";' +
           'fetch("/dashboard/invoice-save/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)})' +
           '.then(function(r){return r.json()})' +
           '.then(function(d){' +
-            'var msg=document.getElementById("saveMsg");' +
-            'if(d.success){msg.textContent="✅ Changes saved!";msg.style.color="#22c55e"}' +
-            'else{msg.textContent="❌ Save failed: "+d.error;msg.style.color="#ef4444"}' +
-            'setTimeout(function(){msg.textContent=""},3000)' +
+            'if(!d.success){throw new Error(d.error||"Shopify would not save it")}' +
+            'msg.textContent="Saved. Sending to the printer…";' +
+            'if(btn){btn.textContent="Printing…"}' +
+            'return fetch("/dashboard/invoice-print-edited/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)}).then(function(r){return r.json()})' +
           '})' +
-          '.catch(function(e){var msg=document.getElementById("saveMsg");msg.textContent="Error: "+e.message;msg.style.color="#ef4444"})' +
-        '}' +
-        'function printToPrinter(){' +
-          'var fd=getFormData();' +
-          'fetch("/dashboard/invoice-print-edited/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)})' +
-          '.then(function(r){return r.json()})' +
-          '.then(function(d){if(d.success){alert("✅ Invoice sent to printer!")}else{alert("❌ "+d.error)}})' +
-          '.catch(function(e){alert("Error: "+e.message)})' +
+          '.then(function(d){' +
+            'if(!d.success){throw new Error("Saved, but the printer said: "+(d.error||"unknown error"))}' +
+            'msg.style.color="#22c55e";msg.textContent="\u2705 Saved and sent to the printer";' +
+            'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
+          '})' +
+          '.catch(function(e){' +
+            'msg.style.color="#ef4444";msg.textContent="\u274C "+e.message+" \u2014 nothing was printed";' +
+            'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
+          '})' +
         '}' +
       '</script>' +
     '</body></html>');
@@ -1091,7 +1094,18 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
       if (body.province) updatePayload.order.shipping_address.province = body.province;
       if (body.zip) updatePayload.order.shipping_address.zip = body.zip;
     }
-    if (noteLines.length > 0) updatePayload.order.note = noteLines.join('\n');
+    // The note also carries internal stamps (label swaps) that the edit form never
+    // shows. Rebuilding the note from the form alone would silently wipe them.
+    if (noteLines.length > 0) {
+      var keep = [];
+      try {
+        var priorOrder = await fetchOrderFromShopify(req.params.orderId);
+        keep = String(priorOrder.note || '').split('\n').filter(function (line) {
+          return /^\s*SHIPPING SWITCHED\b/i.test(line);
+        });
+      } catch (ne) { console.error('could not read prior note:', ne.message); }
+      updatePayload.order.note = noteLines.concat(keep).join('\n');
+    }
 
     // The gift card and the driver app read note_attributes, not the note. Edits here
     // used to land only in the free-text note, so a corrected gift message never
