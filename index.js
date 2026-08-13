@@ -754,6 +754,8 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="btn-row"><button class="btn btn-green" onclick="printToPrinter()">🖨 Send to Printer</button></div>' +
         '<div class="btn-row"><button class="btn btn-blue" onclick="saveEdits()">💾 Save Changes</button></div>' +
         '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
+        '<div class="btn-row"><a class="btn btn-outline" href="/switch-shipping?order=' + order.order_number + '">&#128230; Address changed &mdash; get a new label</a></div>' +
+        '<div style="font-size:11px;text-align:center;color:#666;margin-top:4px;line-height:1.4">Save the new address first. The old label still goes to the old address until you swap it.</div>' +
         '<div class="btn-row"><button class="btn btn-black" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard/invoices" class="btn btn-outline">← Back</a></div>' +
       '</div>' +
       '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +

@@ -238,7 +238,16 @@ function extractOrderData(order) {
     }
   }
   
-  var specialInstructions = allInstructions.join('\n\n');
+  // Internal bookkeeping the label tools stamp on the order note. It is for us, not
+  // for the customer, so it must never reach the printed invoice.
+  var specialInstructions = allInstructions
+    .map(function (t) {
+      return String(t).split('\n').filter(function (line) {
+        return !/^\s*SHIPPING SWITCHED\b/i.test(line);
+      }).join('\n').trim();
+    })
+    .filter(Boolean)
+    .join('\n\n');
 
   var orderDateObj = new Date(order.created_at);
   var orderDate = orderDateObj.toLocaleDateString('en-US', {
