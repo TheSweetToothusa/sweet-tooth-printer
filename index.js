@@ -709,6 +709,27 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
     var orderData = extractOrderData(order);
     var invoiceHTML = generateInvoiceHTML(orderData);
 
+    // A label that is already printed cannot follow an address change. Say so in the
+    // plainest words possible, and only on orders where it can actually happen.
+    var existingTracking = null;
+    (order.fulfillments || []).forEach(function (f) { if (f.tracking_number) existingTracking = f.tracking_number; });
+    var labelWarningHTML = '';
+    if (existingTracking && orderData.deliveryType === 'shipping') {
+      labelWarningHTML =
+        '<div class="label-q">' +
+          '<div class="label-q-head">Did you change the address?</div>' +
+          '<div class="label-q-body">' +
+            'A shipping label for this order is <b>already printed</b>.<br>' +
+            'Tracking <b>' + escapeHtml(existingTracking) + '</b>.<br><br>' +
+            'That label goes to the <b>OLD</b> address. Changing the address above does <b>not</b> change it. ' +
+            'UPS will still take the box to the old place.' +
+          '</div>' +
+          '<div class="label-q-yes">If the address changed, click this:</div>' +
+          '<a class="btn btn-red" href="/switch-shipping?order=' + order.order_number + '">Throw away the old label and make a new one</a>' +
+          '<div class="label-q-foot">Nothing is bought until you see the price and say yes.</div>' +
+        '</div>';
+    }
+
     var recipientName = (orderData.recipient.name || '').replace(/"/g, '&quot;');
     var addr1 = (orderData.recipient.address1 || '').replace(/"/g, '&quot;');
     var addr2 = (orderData.recipient.address2 || '').replace(/"/g, '&quot;');
@@ -733,7 +754,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       '.field input,.field textarea,.field select{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff}.field textarea{height:80px;resize:vertical}.field select{cursor:pointer;font-weight:700}' +
       '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
       '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
-      '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}' +
+      '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}.btn-red{background:#dc2626;color:#fff;border:none;display:block;text-align:center;padding:16px;font-size:16px;font-weight:800;border-radius:8px;margin-top:10px}.label-q{border:3px solid #dc2626;border-radius:10px;padding:0 0 14px;margin-top:22px;background:#fff}.label-q-head{background:#dc2626;color:#fff;font-size:17px;font-weight:800;padding:11px 14px;text-align:center}.label-q-body{font-size:14px;line-height:1.6;padding:14px 16px 0;color:#111}.label-q-yes{font-size:14px;font-weight:800;padding:14px 16px 0;color:#111}.label-q a.btn-red{margin:8px 16px 0;width:calc(100% - 32px);box-sizing:border-box}.label-q-foot{font-size:12px;color:#555;padding:9px 16px 0;text-align:center;line-height:1.4}' +
       '</style></head><body>' +
       '<div class="editor-panel no-print">' +
         '<h2>Edit Invoice</h2>' +
@@ -753,8 +774,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>Gift Message</label><textarea id="giftMessage" oninput="refreshPreview()">' + giftMessage + '</textarea></div>' +
         '<div class="btn-row"><button class="btn btn-green" onclick="saveAndPrint(this)">&#128190; Save &amp; Print Invoice</button></div>' +
         '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
-        '<div class="btn-row"><a class="btn btn-outline" href="/switch-shipping?order=' + order.order_number + '">&#128230; Address changed &mdash; get a new label</a></div>' +
-        '<div style="font-size:11px;text-align:center;color:#666;margin-top:4px;line-height:1.4">Save the new address first. The old label still goes to the old address until you swap it.</div>' +
+        labelWarningHTML +
         '<div class="btn-row"><button class="btn btn-black" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard/invoices" class="btn btn-outline">← Back</a></div>' +
       '</div>' +
       '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +
@@ -1748,7 +1768,7 @@ app.get('/', (req, res) => {
   // Top tier: the three things staff do all day. Size says "most used"; no label needed.
   body += '<div class="herogrid">';
   body += dashTile('Order Lookup', '/order-lookup', { hero: true, icon: 'search', kw: 'order lookup customer find status tracking track delivered delivery reschedule schedule where phone zip local help refund' });
-  body += dashTile('Edit or Reprint Invoice', '/dashboard/invoices', { hero: true, icon: 'printer', kw: 'invoice receipt reprint print edit paperwork paper box' });
+  body += dashTile('Edit or Print Order', '/dashboard/invoices', { hero: true, icon: 'printer', kw: 'invoice receipt reprint print edit paperwork paper box' });
   body += dashTile('Edit or Reprint Gift Card Message', '/dashboard', { hero: true, icon: 'heart', kw: 'gift card message edit reprint note change' });
   body += '</div>';
 
