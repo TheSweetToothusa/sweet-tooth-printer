@@ -240,6 +240,16 @@ function extractOrderData(order) {
   
   // Internal bookkeeping the label tools stamp on the order note. It is for us, not
   // for the customer, so it must never reach the printed invoice.
+  // If this order's label was swapped, the old label may still be sitting in the
+  // printer tray. Pull both tracking numbers out so the invoice can say which to bin.
+  var labelSwap = null;
+  var swapLine = String(order.note || '').split('\n').filter(function (l) { return /^\s*SHIPPING SWITCHED\b/i.test(l); }).pop();
+  if (swapLine) {
+    var newTrk = (swapLine.match(/tracking\s+([A-Z0-9]+)/i) || [])[1] || '';
+    var oldTrk = (swapLine.match(/old label\s+([A-Z0-9]+)/i) || [])[1] || '';
+    if (newTrk) labelSwap = { newTracking: newTrk, oldTracking: oldTrk };
+  }
+
   var specialInstructions = allInstructions
     .map(function (t) {
       return String(t).split('\n').filter(function (line) {
@@ -312,7 +322,8 @@ function extractOrderData(order) {
     totalTax: totalTax,
     deliveryFee: deliveryFee,
     occasion: occasion,
-    babyGender: babyGender
+    babyGender: babyGender,
+    labelSwap: labelSwap
   };
 }
 
@@ -567,8 +578,20 @@ function generateInvoiceHTML(data) {
   html += '.footer { margin-top: 12px; padding-top: 8px; border-top: 1px solid #000; display: flex; justify-content: space-between; align-items: center; }';
   html += '.logo-area { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; }';
   html += '.print-timestamp { font-size: 9px; }';
+  html += '.label-swap-alert { border: 4px solid #000; padding: 12px 14px; margin-bottom: 14px; }';
+  html += '.lsa-title { font-size: 15px; font-weight: 800; text-align: center; background: #000; color: #fff; padding: 6px; margin: -12px -14px 10px; letter-spacing: 1px; }';
+  html += '.lsa-line { font-size: 13px; line-height: 1.5; margin-top: 3px; }';
   html += '</style></head><body>';
   html += '<div class="invoice-page">';
+  if (data.labelSwap) {
+    html += '<div class="label-swap-alert">' +
+      '<div class="lsa-title">&#9888; THE SHIPPING LABEL CHANGED &#9888;</div>' +
+      '<div class="lsa-line"><b>THROW AWAY</b> the old label' +
+      (data.labelSwap.oldTracking ? ' ending <b>' + data.labelSwap.oldTracking.slice(-6) + '</b>' : '') +
+      '. It goes to the wrong address.</div>' +
+      '<div class="lsa-line"><b>USE ONLY</b> the newest label &mdash; tracking <b>' + data.labelSwap.newTracking + '</b></div>' +
+      '</div>';
+  }
   html += '<div class="header"><div class="delivery-badge">' + badgeText + '</div><div class="order-number-header">' + orderNumber + '</div>' + topRightHTML + '</div>';
   html += dateBarHTML;
   html += occasionHTML;
