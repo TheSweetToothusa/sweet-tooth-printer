@@ -1795,6 +1795,7 @@ app.get('/', (req, res) => {
   // The old all-on-one-page version still lives at /draft-order if we ever need it back.
   body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
   body += dashTile('Create a Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
+  body += dashTile('Refund an Order', '/refund', { row: true, icon: 'percent', kw: 'refund money back return credit reimburse cancel charge back give money' });
   body += '</div>';
 
   body += '<div class="col"><h2 class="sec">&#127978; Shop</h2>';
@@ -3275,6 +3276,224 @@ app.get('/switch-shipping/email-invoice', async (req, res) => {
     res.send(switchShell('<div class="note good"><div class="big">&#10004; Pay link emailed</div>Sent to ' + escapeHtml(to) + '. When they pay, the invoice completes in Shopify automatically.</div>', clean));
   } catch (e) {
     res.send(switchShell('<div class="note"><div class="big">Email failed</div>' + escapeHtml(e.message) + '<div class="muted">Open the draft in Shopify and send the invoice from there.</div></div>', String(req.query.order || '')));
+  }
+});
+
+// ============ REFUND AN ORDER ============
+// Money leaving is the only thing on this dashboard that cannot be undone, so it is a
+// two-screen flow: look at the numbers, then confirm on a separate screen. Shopify does
+// the arithmetic (refunds/calculate) — we never work out a refundable amount ourselves.
+
+function refundShell(inner, q) {
+  var html = '<!DOCTYPE html><html><head><title>Refund an Order — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:88px 20px 40px}';
+  html += '.wrap{max-width:620px;margin:0 auto}' + TOPBAR_CSS;
+  html += 'h1{font-size:26px;letter-spacing:-.4px;text-align:center;margin-bottom:6px}';
+  html += '.sub{text-align:center;color:#6B5F65;font-size:15px;margin-bottom:22px}';
+  html += '.searchbar{display:flex;gap:10px;margin-bottom:20px}';
+  html += '.searchbar input{flex:1;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:17px;background:#fff}';
+  html += '.searchbar input:focus{outline:none;border-color:#C8A02C}';
+  html += '.searchbar button{padding:15px 26px;border:none;border-radius:8px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
+  html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:12px}';
+  html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:16px}';
+  html += '.row .k{color:#6B5F65}.row .v{font-weight:600;text-align:right}';
+  html += '.big{font-size:30px;font-weight:600;text-align:center;padding:6px 0}';
+  html += '.field{margin-bottom:14px}';
+  html += '.field label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}';
+  html += 'input[type=text],input[type=number],textarea,select{width:100%;padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:16px;font-family:inherit;background:#fff;color:#2A2A2A}';
+  html += 'input:focus,textarea:focus,select:focus{outline:none;border-color:#C8A02C}';
+  html += 'textarea{min-height:76px;resize:vertical;line-height:1.5}';
+  html += '.money{display:flex;align-items:center;border:1.5px solid #E8E2E5;border-radius:8px;background:#fff;padding-left:15px}';
+  html += '.money span{font-size:19px;font-weight:600;color:#6B5F65}';
+  html += '.money input{border:none;padding-left:7px}.money input:focus{outline:none}';
+  html += '.pick{display:flex;align-items:center;gap:13px;width:100%;background:#fff;border:2px solid #EFEBED;border-radius:12px;padding:15px 18px;margin-bottom:11px;cursor:pointer;text-align:left;font-family:inherit;color:#2A2A2A}';
+  html += '.pick:hover{border-color:#C8A02C}.pick.on{border-color:#C8A02C;background:#FDF8E8}';
+  html += '.pick .t{display:block;font-size:17px;font-weight:600}';
+  html += '.pick .s{display:block;font-size:13.5px;color:#6B5F65;margin-top:2px}';
+  html += '.btn{display:block;width:100%;padding:16px;border:none;border-radius:8px;font-size:17px;font-weight:600;font-family:inherit;cursor:pointer;text-align:center;text-decoration:none}';
+  html += '.btn-red{background:#dc2626;color:#fff}.btn-red:disabled{opacity:.35;cursor:not-allowed}';
+  html += '.btn-grey{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5;margin-top:10px}';
+  html += '.warn{border:3px solid #dc2626;border-radius:12px;overflow:hidden;margin-bottom:16px}';
+  html += '.warn .h{background:#dc2626;color:#fff;font-size:17px;font-weight:600;padding:12px 16px;text-align:center}';
+  html += '.warn .b{padding:16px 18px;font-size:16px;line-height:1.6}';
+  html += '.err{background:#fff;border:2px solid #dc2626;border-radius:8px;padding:13px 16px;margin-bottom:16px;font-weight:600;font-size:15px;line-height:1.45}';
+  html += '.ok{background:#fff;border:2px solid #16a34a;border-radius:12px;padding:24px;text-align:center}';
+  html += '.ok .big2{font-size:22px;font-weight:600;color:#15803d;margin-bottom:6px}';
+  html += '.muted{color:#6B5F65;font-size:14.5px;line-height:1.5}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>Refund an Order</h1>';
+  html += '<div class="sub">Sends money back to the customer&#39;s card.</div>';
+  html += '<form class="searchbar" action="/refund" method="get">';
+  html += '<input type="text" name="order" inputmode="numeric" placeholder="Order number, like 36376" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<button type="submit">Find it</button></form>';
+  html += inner;
+  html += '</div></body></html>';
+  return html;
+}
+
+// What Shopify says is actually refundable on this order, straight from their own maths.
+async function refundableForOrder(orderId) {
+  var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + orderId + '/refunds/calculate.json', {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refund: { shipping: { full_refund: false }, refund_line_items: [] } })
+  });
+  var j = await r.json();
+  if (!r.ok || !j.refund) throw new Error('Shopify would not work out the refund: ' + JSON.stringify(j.errors || j).slice(0, 200));
+  var tx = (j.refund.transactions || []).filter(function (t) { return t.parent_id; })[0];
+  if (!tx) throw new Error('This order has no payment that can be refunded.');
+  return { parentId: tx.parent_id, gateway: tx.gateway, max: parseFloat(tx.maximum_refundable || 0) };
+}
+
+app.get('/refund', async function (req, res) {
+  var q = (req.query.order || '').trim();
+  if (!q) return res.send(refundShell('', ''));
+  try {
+    var clean = q.replace(/[^0-9]/g, '');
+    if (!clean) return res.send(refundShell('<div class="err">Type an order number, like 36376.</div>', q));
+    var orders = await searchShopifyOrders('#' + clean);
+    var order = (orders || []).filter(function (o) { return String(o.order_number) === clean; })[0];
+    if (!order) return res.send(refundShell('<div class="err">No order matches ' + escapeHtml(q) + '. Check the number.</div>', q));
+
+    var info = await refundableForOrder(order.id);
+    if (!(info.max > 0)) {
+      return res.send(refundShell('<div class="card"><h2>Order ' + escapeHtml(order.name) + '</h2>' +
+        '<div class="muted">There is nothing left to refund on this order. It may already be fully refunded.</div></div>', q));
+    }
+    var cust = order.customer || {};
+    var who = ((cust.first_name || '') + ' ' + (cust.last_name || '')).trim() ||
+      ((order.shipping_address || {}).name || 'the customer');
+
+    var inner = '<div class="card"><h2>Order ' + escapeHtml(order.name) + '</h2>';
+    inner += '<div class="row"><span class="k">Customer</span><span class="v">' + escapeHtml(who) + '</span></div>';
+    if (order.email) inner += '<div class="row"><span class="k">Email</span><span class="v">' + escapeHtml(order.email) + '</span></div>';
+    inner += '<div class="row"><span class="k">They paid</span><span class="v">$' + escapeHtml(order.total_price) + '</span></div>';
+    inner += '<div class="row"><span class="k">Left to refund</span><span class="v">$' + info.max.toFixed(2) + '</span></div>';
+    inner += '</div>';
+
+    inner += '<form method="POST" action="/refund/review">';
+    inner += '<input type="hidden" name="orderId" value="' + order.id + '">';
+    inner += '<input type="hidden" name="orderName" value="' + escapeHtml(order.name) + '">';
+    inner += '<input type="hidden" name="max" value="' + info.max.toFixed(2) + '">';
+    inner += '<div class="card"><h2>How much are you sending back?</h2>';
+    inner += '<button type="button" class="pick on" id="p-all" onclick="pickAll()"><span><span class="t">All of it &mdash; $' + info.max.toFixed(2) + '</span><span class="s">The whole thing goes back</span></span></button>';
+    inner += '<button type="button" class="pick" id="p-part" onclick="pickPart()"><span><span class="t">Just part of it</span><span class="s">You type the amount</span></span></button>';
+    inner += '<div class="field" id="amtwrap" style="display:none;margin-top:14px"><label>How much?</label>';
+    inner += '<div class="money"><span>$</span><input type="text" id="amount" name="amount" inputmode="decimal" placeholder="0.00"></div>';
+    inner += '<div class="muted" style="margin-top:6px">The most you can send back is $' + info.max.toFixed(2) + '.</div></div>';
+    inner += '</div>';
+
+    inner += '<div class="card"><h2>Who and why</h2>';
+    inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required></div>';
+    inner += '<div class="field"><label>Why are you refunding this?</label><textarea name="reason" maxlength="300" required placeholder="Melted in transit, wrong item, customer cancelled..."></textarea></div>';
+    inner += '</div>';
+    inner += '<button type="submit" class="btn btn-red">Next &mdash; check it before it sends</button>';
+    inner += '<a class="btn btn-grey" href="/order-lookup?q=' + escapeHtml(clean) + '">Back to the order</a>';
+    inner += '</form>';
+
+    inner += '<script>var full="' + info.max.toFixed(2) + '";' +
+      'function pickAll(){document.getElementById("p-all").className="pick on";document.getElementById("p-part").className="pick";' +
+      'document.getElementById("amtwrap").style.display="none";document.getElementById("amount").value=full}' +
+      'function pickPart(){document.getElementById("p-part").className="pick on";document.getElementById("p-all").className="pick";' +
+      'document.getElementById("amtwrap").style.display="block";document.getElementById("amount").value="";document.getElementById("amount").focus()}' +
+      'document.getElementById("amount").value=full;' +
+      'document.getElementById("amount").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"")});<\/script>';
+    res.send(refundShell(inner, q));
+  } catch (e) {
+    res.send(refundShell('<div class="err">Something went wrong: ' + escapeHtml(e.message) + '</div>', q));
+  }
+});
+
+// Screen two. Nothing has moved yet — this only restates it in plain words.
+app.post('/refund/review', async function (req, res) {
+  var b = req.body || {};
+  var amount = parseFloat(b.amount);
+  var max = parseFloat(b.max);
+  var who = String(b.who || '').trim();
+  var reason = String(b.reason || '').trim();
+  var clean = String(b.orderName || '').replace(/[^0-9]/g, '');
+  if (!(amount > 0)) return res.send(refundShell('<div class="err">Type how much to send back.</div>', clean));
+  if (amount > max + 0.001) return res.send(refundShell('<div class="err">That is more than this order has left. The most is $' + max.toFixed(2) + '.</div>', clean));
+  if (who.length < 3) return res.send(refundShell('<div class="err">Put your name on it.</div>', clean));
+  if (!reason) return res.send(refundShell('<div class="err">Say why you are refunding it.</div>', clean));
+
+  var inner = '<div class="warn"><div class="h">Read this before you press the button</div><div class="b">' +
+    'You are about to send <b>$' + amount.toFixed(2) + '</b> back to the customer for order <b>' + escapeHtml(b.orderName) + '</b>.<br><br>' +
+    'The money leaves the shop account and goes to their card. <b>This cannot be undone.</b> ' +
+    'There is no way to take it back afterwards.<br><br>' +
+    'Shopify will email the customer about the refund.' +
+    '</div></div>';
+  inner += '<div class="card"><h2>What you typed</h2>';
+  inner += '<div class="row"><span class="k">Amount</span><span class="v">$' + amount.toFixed(2) + '</span></div>';
+  inner += '<div class="row"><span class="k">Your name</span><span class="v">' + escapeHtml(who) + '</span></div>';
+  inner += '<div class="row"><span class="k">Reason</span><span class="v">' + escapeHtml(reason) + '</span></div></div>';
+  inner += '<form method="POST" action="/refund/issue">';
+  ['orderId', 'orderName', 'max'].forEach(function (k) {
+    inner += '<input type="hidden" name="' + k + '" value="' + escapeHtml(String(b[k] || '')) + '">';
+  });
+  inner += '<input type="hidden" name="amount" value="' + amount.toFixed(2) + '">';
+  inner += '<input type="hidden" name="who" value="' + escapeHtml(who) + '">';
+  inner += '<input type="hidden" name="reason" value="' + escapeHtml(reason) + '">';
+  inner += '<button type="submit" class="btn btn-red">Yes &mdash; send $' + amount.toFixed(2) + ' back now</button>';
+  inner += '<a class="btn btn-grey" href="/refund?order=' + escapeHtml(clean) + '">No &mdash; go back and change it</a>';
+  inner += '</form>';
+  res.send(refundShell(inner, clean));
+});
+
+app.post('/refund/issue', async function (req, res) {
+  var b = req.body || {};
+  var clean = String(b.orderName || '').replace(/[^0-9]/g, '');
+  try {
+    var amount = parseFloat(b.amount);
+    var who = String(b.who || '').trim();
+    var reason = String(b.reason || '').trim();
+    if (!(amount > 0) || who.length < 3 || !reason) throw new Error('Something was missing. Start again.');
+
+    // Re-read what is refundable at this instant, so a double submit or a refund
+    // someone else just issued cannot push it past the limit.
+    var info = await refundableForOrder(b.orderId);
+    if (amount > info.max + 0.001) {
+      throw new Error('This order only has $' + info.max.toFixed(2) + ' left to refund now. Someone may have just refunded it. Nothing was sent.');
+    }
+
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + b.orderId + '/refunds.json', {
+      method: 'POST',
+      headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        refund: {
+          notify: true,
+          note: 'Refunded by ' + who + ' on the employee dashboard. Reason: ' + reason,
+          transactions: [{ parent_id: info.parentId, amount: amount.toFixed(2), kind: 'refund', gateway: info.gateway }]
+        }
+      })
+    });
+    var j = await r.json();
+    if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+
+    // Leave a trail on the order itself, the same way store runs get a name on them.
+    try {
+      var when = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+      var existing = await fetchOrderFromShopify(b.orderId);
+      var line = 'REFUNDED $' + amount.toFixed(2) + ' by ' + who + ' on ' + when + ' ET — ' + reason;
+      await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + b.orderId + '.json', {
+        method: 'PUT',
+        headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order: { id: parseInt(b.orderId, 10), note: (existing.note ? existing.note + '\n' : '') + line } })
+      });
+    } catch (ne) { console.error('refund note failed:', ne.message); }
+
+    var inner = '<div class="ok"><div class="big2">&#10004; $' + amount.toFixed(2) + ' sent back</div>' +
+      '<div class="muted">Order ' + escapeHtml(b.orderName) + ' &middot; refunded by ' + escapeHtml(who) + '<br>' +
+      'Shopify has emailed the customer. It takes a few days to show on their card.</div>' +
+      '<a class="btn btn-grey" href="/order-lookup?q=' + escapeHtml(clean) + '">See the order</a>' +
+      '<a class="btn btn-grey" href="/refund">Refund another order</a></div>';
+    res.send(refundShell(inner, ''));
+  } catch (e) {
+    console.error('refund error:', e.message);
+    res.send(refundShell('<div class="err"><b>No money was sent.</b><br>' + escapeHtml(e.message) + '</div>', clean));
   }
 });
 
