@@ -3334,6 +3334,14 @@ function refundShell(inner, q) {
   return html;
 }
 
+// Refunds over the cap are Mike's and Denis's call. Everyone else stops at $50.
+var REFUND_CAP = 50;
+var REFUND_NO_CAP = ['mike', 'mikey', 'michael', 'denis', 'dennis'];
+function refundCapFor(who) {
+  var first = String(who || '').trim().toLowerCase().split(/\s+/)[0] || '';
+  return REFUND_NO_CAP.indexOf(first) > -1 ? Infinity : REFUND_CAP;
+}
+
 // What Shopify says is actually refundable on this order, straight from their own maths.
 async function refundableForOrder(orderId) {
   var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + orderId + '/refunds/calculate.json', {
@@ -3387,7 +3395,8 @@ app.get('/refund', async function (req, res) {
     inner += '</div>';
 
     inner += '<div class="card"><h2>Who and why</h2>';
-    inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required></div>';
+    inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required>';
+    inner += '<div class="muted" style="margin-top:6px">Anything over $' + REFUND_CAP + ' has to be Mike or Denis.</div></div>';
     inner += '<div class="field"><label>Why are you refunding this?</label><textarea name="reason" maxlength="300" required placeholder="Melted in transit, wrong item, customer cancelled..."></textarea></div>';
     inner += '</div>';
     inner += '<button type="submit" class="btn btn-red">Next &mdash; check it before it sends</button>';
@@ -3419,6 +3428,11 @@ app.post('/refund/review', async function (req, res) {
   if (amount > max + 0.001) return res.send(refundShell('<div class="err">That is more than this order has left. The most is $' + max.toFixed(2) + '.</div>', clean));
   if (who.length < 3) return res.send(refundShell('<div class="err">Put your name on it.</div>', clean));
   if (!reason) return res.send(refundShell('<div class="err">Say why you are refunding it.</div>', clean));
+  var cap = refundCapFor(who);
+  if (amount > cap) {
+    return res.send(refundShell('<div class="err"><b>That is over the $' + REFUND_CAP + ' limit.</b><br>' +
+      'Refunds above $' + REFUND_CAP + ' have to be done by Mike or Denis. Ask one of them to do this one.</div>', clean));
+  }
 
   var inner = '<div class="warn"><div class="h">Read this before you press the button</div><div class="b">' +
     'You are about to send <b>$' + amount.toFixed(2) + '</b> back to the customer for order <b>' + escapeHtml(b.orderName) + '</b>.<br><br>' +
@@ -3451,6 +3465,7 @@ app.post('/refund/issue', async function (req, res) {
     var who = String(b.who || '').trim();
     var reason = String(b.reason || '').trim();
     if (!(amount > 0) || who.length < 3 || !reason) throw new Error('Something was missing. Start again.');
+    if (amount > refundCapFor(who)) throw new Error('Refunds over $' + REFUND_CAP + ' have to be done by Mike or Denis. Nothing was sent.');
 
     // Re-read what is refundable at this instant, so a double submit or a refund
     // someone else just issued cannot push it past the limit.
