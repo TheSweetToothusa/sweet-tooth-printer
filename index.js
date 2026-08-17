@@ -3569,13 +3569,13 @@ function taxShell(inner, q) {
 function taxHowTo() {
   return '<div class="card"><h2>How to do this properly</h2><div class="howto">' +
     '<h4>1. Get their certificate FIRST.</h4>' +
-    'Ask for a copy of their tax exemption certificate and check the dates. If it has expired, we have to charge tax. Keep the copy in our files &mdash; Shopify does not store it.' +
+    'Ask them to email a copy of their tax exemption certificate to <b>orders@thesweettooth.com</b>, and check the dates on it. If it has expired, we have to charge tax.' +
     '<h4>2. Set them up here, BEFORE they order.</h4>' +
     'Type their email above and switch it on. From then on that customer is exempt on every order they place.' +
     '<h4>3. They must be signed in when they order.</h4>' +
     'The exemption only comes off reliably when the customer is signed into their account with that same email. If we place the order for them, use <b>Create a Draft Order</b> instead and tell Mike to switch the tax off on it.' +
-    '<h4>&#9888; If they already paid with tax on it</h4>' +
-    'Do <b>not</b> just refund the tax amount. Shopify still counts that tax as ours to pay, so we would pay it twice. Tell Mike or Denis &mdash; the order has to be refunded in full and rebuilt with tax switched off.' +
+    '<h4>If they already paid with tax on it</h4>' +
+    'Tell Mike or Denis. They will refund the tax back to the customer.' +
     '</div></div>';
 }
 
