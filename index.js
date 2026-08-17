@@ -1796,7 +1796,7 @@ app.get('/', (req, res) => {
   body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
   body += dashTile('Create a Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
   body += dashTile('Tax Exempt Customer', '/tax-exempt', { row: true, icon: 'percent', kw: 'tax exempt exemption no tax nonprofit synagogue school certificate resale charity 501c3 sales tax' });
-  body += dashTile('Refund an Order', '/refund', { row: true, icon: 'percent', kw: 'refund money back return credit reimburse cancel charge back give money' });
+  body += dashTile('Refund', '/refund', { row: true, icon: 'percent', kw: 'refund money back return credit reimburse cancel charge back give money' });
   body += '</div>';
 
   body += '<div class="col"><h2 class="sec">&#127978; Shop</h2>';
