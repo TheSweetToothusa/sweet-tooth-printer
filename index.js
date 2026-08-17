@@ -1795,6 +1795,7 @@ app.get('/', (req, res) => {
   // The old all-on-one-page version still lives at /draft-order if we ever need it back.
   body += dashTile('Create a Draft Order', '/draft-order-new', { row: true, icon: 'fileText', kw: 'draft order phone charge pay payment custom quick sell collect money' });
   body += dashTile('Create a Discount Code', '/create-discount', { row: true, icon: 'percent', kw: 'discount code coupon promo percent off sorry deal' });
+  body += dashTile('Tax Exempt Customer', '/tax-exempt', { row: true, icon: 'percent', kw: 'tax exempt exemption no tax nonprofit synagogue school certificate resale charity 501c3 sales tax' });
   body += dashTile('Refund an Order', '/refund', { row: true, icon: 'percent', kw: 'refund money back return credit reimburse cancel charge back give money' });
   body += '</div>';
 
@@ -3509,6 +3510,199 @@ app.post('/refund/issue', async function (req, res) {
   } catch (e) {
     console.error('refund error:', e.message);
     res.send(refundShell('<div class="err"><b>No money was sent.</b><br>' + escapeHtml(e.message) + '</div>', clean));
+  }
+});
+
+// ============ TAX EXEMPT CUSTOMER ============
+// Shopify has no place to store an exemption certificate and will not verify anyone for
+// you, so this records who set it and when the certificate expires on the customer
+// record itself. The flag never expires on its own — that is the whole reason for the
+// expiry date and the review list at the bottom of the page.
+
+function taxShell(inner, q) {
+  var html = '<!DOCTYPE html><html><head><title>Tax Exempt Customer — The Sweet Tooth</title>';
+  html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>';
+  html += '*{box-sizing:border-box;margin:0;padding:0}';
+  html += 'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#FAF7F8;color:#2A2A2A;min-height:100vh;padding:88px 20px 40px}';
+  html += '.wrap{max-width:640px;margin:0 auto}' + TOPBAR_CSS;
+  html += 'h1{font-size:26px;letter-spacing:-.4px;text-align:center;margin-bottom:6px}';
+  html += '.sub{text-align:center;color:#6B5F65;font-size:15px;margin-bottom:22px}';
+  html += '.searchbar{display:flex;gap:10px;margin-bottom:20px}';
+  html += '.searchbar input{flex:1;padding:15px 16px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:17px;background:#fff}';
+  html += '.searchbar input:focus{outline:none;border-color:#C8A02C}';
+  html += '.searchbar button{padding:15px 26px;border:none;border-radius:8px;background:#2A2A2A;color:#fff;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit}';
+  html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:20px 22px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
+  html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:12px}';
+  html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:16px}';
+  html += '.row .k{color:#6B5F65}.row .v{font-weight:600;text-align:right}';
+  html += '.field{margin-bottom:14px}';
+  html += '.field label{display:block;font-size:14px;font-weight:600;margin-bottom:6px}';
+  html += 'input[type=text],input[type=email],input[type=date],textarea{width:100%;padding:13px 15px;border:1.5px solid #E8E2E5;border-radius:8px;font-size:16px;font-family:inherit;background:#fff;color:#2A2A2A}';
+  html += 'input:focus,textarea:focus{outline:none;border-color:#C8A02C}';
+  html += '.cbrow{display:flex;align-items:flex-start;gap:11px;padding:14px 15px;border:2px solid #E8E2E5;border-radius:8px;margin-bottom:14px;cursor:pointer;font-size:15px;font-weight:600;line-height:1.45}';
+  html += '.cbrow:hover{border-color:#C8A02C}.cbrow input{width:22px;height:22px;flex-shrink:0;accent-color:#C8A02C;margin:0;cursor:pointer}';
+  html += '.btn{display:block;width:100%;padding:16px;border:none;border-radius:8px;font-size:17px;font-weight:600;font-family:inherit;cursor:pointer;text-align:center;text-decoration:none}';
+  html += '.btn-go{background:#2A2A2A;color:#fff}.btn-go:disabled{opacity:.35;cursor:not-allowed}';
+  html += '.btn-grey{background:#fff;color:#2A2A2A;border:1.5px solid #E8E2E5;margin-top:10px}';
+  html += '.btn-off{background:#fff;color:#dc2626;border:2px solid #dc2626;margin-top:10px}';
+  html += '.note{border:2px solid #C8A02C;background:#FDF8E8;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:15px;line-height:1.55}';
+  html += '.err{background:#fff;border:2px solid #dc2626;border-radius:8px;padding:13px 16px;margin-bottom:16px;font-weight:600;font-size:15px;line-height:1.45}';
+  html += '.ok{background:#fff;border:2px solid #16a34a;border-radius:12px;padding:22px;text-align:center;margin-bottom:16px}';
+  html += '.ok .big2{font-size:21px;font-weight:600;color:#15803d;margin-bottom:6px}';
+  html += '.muted{color:#6B5F65;font-size:14.5px;line-height:1.55}';
+  html += '.on{color:#15803d;font-weight:600}.off{color:#6B5F65}';
+  html += '.howto{background:#fff;border:1px solid #EFEBED;border-radius:12px;padding:18px 22px;font-size:15px;line-height:1.65}';
+  html += '.howto h4{display:block;font-size:15px;font-weight:600;margin-top:14px}.howto h4:first-child{margin-top:0}';
+  html += '.howto ol{margin:6px 0 0 20px}.howto li{margin-bottom:5px}';
+  html += '.expsoon{color:#B0521E;font-weight:600}';
+  html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
+  html += '<h1>Tax Exempt Customer</h1>';
+  html += '<div class="sub">Stops Florida sales tax being charged to a customer.</div>';
+  html += '<form class="searchbar" action="/tax-exempt" method="get">';
+  html += '<input type="email" name="email" placeholder="Their email address" value="' + escapeHtml(q || '') + '" autofocus>';
+  html += '<button type="submit">Find them</button></form>';
+  html += inner;
+  html += '</div></body></html>';
+  return html;
+}
+
+function taxHowTo() {
+  return '<div class="card"><h2>How to do this properly</h2><div class="howto">' +
+    '<h4>1. Get their certificate FIRST.</h4>' +
+    'Ask for a copy of their tax exemption certificate and check the dates. If it has expired, we have to charge tax. Keep the copy in our files &mdash; Shopify does not store it.' +
+    '<h4>2. Set them up here, BEFORE they order.</h4>' +
+    'Type their email above and switch it on. From then on that customer is exempt on every order they place.' +
+    '<h4>3. They must be signed in when they order.</h4>' +
+    'The exemption only comes off reliably when the customer is signed into their account with that same email. If we place the order for them, use <b>Create a Draft Order</b> instead and tell Mike to switch the tax off on it.' +
+    '<h4>&#9888; If they already paid with tax on it</h4>' +
+    'Do <b>not</b> just refund the tax amount. Shopify still counts that tax as ours to pay, so we would pay it twice. Tell Mike or Denis &mdash; the order has to be refunded in full and rebuilt with tax switched off.' +
+    '</div></div>';
+}
+
+async function findCustomerByEmail(email) {
+  var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/customers/search.json?query=' +
+    encodeURIComponent('email:' + email), { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+  var j = await r.json();
+  return ((j && j.customers) || [])[0] || null;
+}
+
+app.get('/tax-exempt', async function (req, res) {
+  var email = (req.query.email || '').trim();
+  try {
+    if (!email) {
+      // No search yet: show the instructions plus anyone already switched on.
+      var listed = '';
+      try {
+        var lr = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/customers.json?limit=250&fields=id,email,first_name,last_name,tax_exempt,tags',
+          { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+        var all = ((await lr.json()).customers || []).filter(function (c) { return c.tax_exempt; });
+        listed = '<div class="card"><h2>Customers who pay no tax right now (' + all.length + ')</h2>';
+        if (!all.length) listed += '<div class="muted">Nobody.</div>';
+        all.forEach(function (c) {
+          var exp = ((c.tags || '').split(',').map(function (t) { return t.trim(); })
+            .filter(function (t) { return t.indexOf('taxexempt-expires-') === 0; })[0] || '').replace('taxexempt-expires-', '');
+          var late = exp && new Date(exp) < new Date();
+          listed += '<div class="row"><span class="k">' + escapeHtml(((c.first_name || '') + ' ' + (c.last_name || '')).trim() || '(no name)') +
+            (c.email ? '<br><span style="font-size:13px">' + escapeHtml(c.email) + '</span>' : '<br><span style="font-size:13px;color:#B0521E">no email on file &mdash; this does nothing</span>') +
+            '</span><span class="v">' + (exp ? (late ? '<span class="expsoon">certificate expired ' + escapeHtml(exp) + '</span>' : 'good until ' + escapeHtml(exp)) : '<span class="expsoon">no expiry recorded</span>') + '</span></div>';
+        });
+        listed += '</div>';
+      } catch (le) { listed = ''; }
+      return res.send(taxShell(taxHowTo() + listed, ''));
+    }
+
+    var cust = await findCustomerByEmail(email);
+    if (!cust) {
+      return res.send(taxShell('<div class="err">No customer with that email yet.<br><br>' +
+        'They have to order once, or be added in Shopify, before we can switch this on. ' +
+        'If they are ordering right now, use <b>Create a Draft Order</b> and have Mike switch the tax off on it.</div>' + taxHowTo(), email));
+    }
+    var name = ((cust.first_name || '') + ' ' + (cust.last_name || '')).trim() || '(no name)';
+    var expTag = ((cust.tags || '').split(',').map(function (t) { return t.trim(); })
+      .filter(function (t) { return t.indexOf('taxexempt-expires-') === 0; })[0] || '').replace('taxexempt-expires-', '');
+
+    var inner = '<div class="card"><h2>' + escapeHtml(name) + '</h2>';
+    inner += '<div class="row"><span class="k">Email</span><span class="v">' + escapeHtml(cust.email || '—') + '</span></div>';
+    inner += '<div class="row"><span class="k">Orders</span><span class="v">' + (cust.orders_count || 0) + '</span></div>';
+    inner += '<div class="row"><span class="k">Pays tax?</span><span class="v ' + (cust.tax_exempt ? 'on' : 'off') + '">' +
+      (cust.tax_exempt ? 'NO — already exempt' : 'Yes — normal') + '</span></div>';
+    if (expTag) inner += '<div class="row"><span class="k">Certificate good until</span><span class="v">' + escapeHtml(expTag) + '</span></div>';
+    inner += '</div>';
+
+    if (cust.tax_exempt) {
+      inner += '<div class="note">This customer is already set up. They pay no tax on any order they place while signed in with this email.</div>';
+      inner += '<form method="POST" action="/tax-exempt/off">';
+      inner += '<input type="hidden" name="id" value="' + cust.id + '"><input type="hidden" name="email" value="' + escapeHtml(cust.email || '') + '">';
+      inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required></div>';
+      inner += '<button type="submit" class="btn btn-off">Turn it off — start charging them tax again</button></form>';
+    } else {
+      inner += '<form method="POST" action="/tax-exempt/on">';
+      inner += '<input type="hidden" name="id" value="' + cust.id + '"><input type="hidden" name="email" value="' + escapeHtml(cust.email || '') + '">';
+      inner += '<div class="card"><h2>Before you switch this on</h2>';
+      inner += '<label class="cbrow"><input type="checkbox" name="hascert" value="1" required><span>I have a copy of their tax exemption certificate.</span></label>';
+      inner += '<label class="cbrow"><input type="checkbox" name="notexpired" value="1" required><span>I checked the dates and it has <b>not</b> expired.</span></label>';
+      inner += '<div class="field"><label>Certificate good until (date on the form)</label><input type="date" name="expires" required></div>';
+      inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required></div>';
+      inner += '</div>';
+      inner += '<div class="note"><b>This does not expire by itself.</b> Once it is on, this customer pays no tax on every future order, forever, until somebody turns it off here.</div>';
+      inner += '<button type="submit" class="btn btn-go">Switch on — stop charging this customer tax</button>';
+      inner += '</form>';
+    }
+    inner += '<a class="btn btn-grey" href="/tax-exempt">Back</a>';
+    res.send(taxShell(inner + taxHowTo(), email));
+  } catch (e) {
+    res.send(taxShell('<div class="err">Something went wrong: ' + escapeHtml(e.message) + '</div>', email));
+  }
+});
+
+async function setTaxExempt(id, on, who, expires) {
+  var cur = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/customers/' + id + '.json?fields=id,tags,note',
+    { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+  var c = ((await cur.json()) || {}).customer || {};
+  var tags = String(c.tags || '').split(',').map(function (t) { return t.trim(); })
+    .filter(function (t) { return t && t.indexOf('taxexempt-expires-') !== 0; });
+  if (on && expires) tags.push('taxexempt-expires-' + expires);
+  var when = new Date().toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' });
+  var line = on
+    ? 'TAX EXEMPT switched ON by ' + who + ' on ' + when + '. Certificate on file, good until ' + expires + '.'
+    : 'TAX EXEMPT switched OFF by ' + who + ' on ' + when + '.';
+  var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/customers/' + id + '.json', {
+    method: 'PUT',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ customer: { id: parseInt(id, 10), tax_exempt: !!on, tags: tags.join(', '), note: (c.note ? c.note + '\n' : '') + line } })
+  });
+  var j = await r.json();
+  if (!r.ok || j.errors) throw new Error(typeof j.errors === 'object' ? JSON.stringify(j.errors) : (j.errors || 'Shopify error ' + r.status));
+  return j.customer;
+}
+
+app.post('/tax-exempt/on', async function (req, res) {
+  var b = req.body || {};
+  try {
+    var who = String(b.who || '').trim();
+    if (!b.hascert || !b.notexpired) throw new Error('Both boxes have to be ticked.');
+    if (who.length < 3) throw new Error('Put your name on it.');
+    if (!b.expires) throw new Error('Type the date the certificate runs out.');
+    if (new Date(b.expires) < new Date(new Date().toDateString())) throw new Error('That certificate has already expired. We have to charge them tax.');
+    await setTaxExempt(b.id, true, who, b.expires);
+    res.send(taxShell('<div class="ok"><div class="big2">&#10004; Switched on</div><div class="muted">' +
+      escapeHtml(b.email || 'This customer') + ' will not be charged tax from now on.<br>' +
+      'They need to be <b>signed in</b> with this email when they order.</div></div>' + taxHowTo(), b.email || ''));
+  } catch (e) {
+    res.send(taxShell('<div class="err">Nothing changed. ' + escapeHtml(e.message) + '</div>', b.email || ''));
+  }
+});
+
+app.post('/tax-exempt/off', async function (req, res) {
+  var b = req.body || {};
+  try {
+    var who = String(b.who || '').trim();
+    if (who.length < 3) throw new Error('Put your name on it.');
+    await setTaxExempt(b.id, false, who, null);
+    res.send(taxShell('<div class="ok"><div class="big2">&#10004; Switched off</div><div class="muted">' +
+      escapeHtml(b.email || 'This customer') + ' will be charged tax again like everyone else.</div></div>' + taxHowTo(), b.email || ''));
+  } catch (e) {
+    res.send(taxShell('<div class="err">Nothing changed. ' + escapeHtml(e.message) + '</div>', b.email || ''));
   }
 });
 
