@@ -1647,6 +1647,9 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.searchwrap input{flex:1;border:none;background:transparent;font-size:17px;padding:14px 0;min-width:0}.searchwrap input:focus{outline:none}';
   html += '.micbtn{border:none;background:#FAF7F8;border-radius:12px;font-size:21px;padding:9px 13px;cursor:pointer;line-height:1}.micbtn.listening{background:#C8A02C}';
   html += '.search-miss{display:none;text-align:center;color:#6B5F65;font-size:15px;font-weight:600;margin-top:26px}';
+  html += '.dashjump{display:block;margin-top:12px;padding:16px 20px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-size:19px;font-weight:600;text-align:center}';
+  html += '.dashjump small{display:block;font-size:13px;font-weight:600;opacity:.72;margin-top:3px}';
+  html += '.dashjump:hover{background:#000}';
   html += '@media (max-width:760px){body{padding:88px 18px 36px}.grid{gap:16px;margin-top:32px}.tile{min-height:150px}h1{font-size:26px}}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   if (!noH1) html += '<h1>' + title + '</h1>';
@@ -1760,6 +1763,7 @@ app.get('/', (req, res) => {
   body += '<span class="zout" id="dashzipout">&mdash;</span></div>';
   body += '<a class="bubble" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer admin">&#128172; Ask Shopify AI</a>';
   body += '</div>';
+  body += '<a class="dashjump" id="dashjump" href="#" style="display:none"></a>';
   body += '<script>(function(){var F=' + JSON.stringify(DELIVERY_FEES) + ';var i=document.getElementById("dashzip"),o=document.getElementById("dashzipout");';
   body += 'i.addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,5);var z=this.value;';
   body += 'if(z.length<5){o.textContent="\\u2014";o.className="zout";return}';
@@ -1806,10 +1810,20 @@ app.get('/', (req, res) => {
   body += 'var tiles=[].slice.call(document.querySelectorAll("[data-kw]"));';
   body += 'var secs=[].slice.call(document.querySelectorAll(".sec"));';
   // Tiles dim rather than disappear, so nothing ever moves. Staff learn where things are.
-  body += 'q.addEventListener("input",function(){var v=q.value.trim().toLowerCase();var any=false;';
+  // Typing an order number here used to match no tile and dead-end on "Nothing matches",
+  // so staff had to open Order Lookup and search a second time. Now it jumps straight in.
+  body += 'var jump=document.getElementById("dashjump");';
+  body += 'function orderNumFrom(v){var m=String(v).replace(/[^0-9]/g,"");return (m.length>=4&&m.length<=7)?m:null}';
+  body += 'q.addEventListener("input",function(){var raw=q.value.trim();var v=raw.toLowerCase();var any=false;';
   body += 'tiles.forEach(function(t){var hit=!v||v.split(/\\s+/).every(function(w){return t.getAttribute("data-kw").indexOf(w)>-1});';
   body += 't.classList.toggle("dim",!hit);if(hit)any=true});';
-  body += 'miss.style.display=(v&&!any)?"block":"none"});';
+  body += 'var num=orderNumFrom(raw);';
+  body += 'if(num){jump.href="/order-lookup?q="+encodeURIComponent(num);';
+  body += 'jump.innerHTML="Open order <b>#"+num+"</b> \\u2192<small>Everything on it: address, items, gift message, tracking</small>";';
+  body += 'jump.style.display="block";miss.style.display="none"}';
+  body += 'else{jump.style.display="none";miss.style.display=(v&&!any)?"block":"none"}});';
+  body += 'q.addEventListener("keydown",function(e){if(e.key!=="Enter")return;var num=orderNumFrom(q.value.trim());';
+  body += 'if(num){e.preventDefault();location.href="/order-lookup?q="+encodeURIComponent(num)}});';
   // Voice search: Chrome's built-in speech recognition. Mic button hides if unsupported.
   body += 'var mic=document.getElementById("dashmic");var SR=window.SpeechRecognition||window.webkitSpeechRecognition;';
   body += 'if(!SR){mic.style.display="none"}else{mic.addEventListener("click",function(){var r=new SR();r.lang="en-US";';
