@@ -359,13 +359,10 @@ async function printShippingLabel(order) {
 // still in the future we park the tracking on the order and say nothing; sweepShipToday()
 // fulfills (and emails) on the morning it actually goes out.
 async function writeTrackingToShopify(order, label) {
-  var shipOn = shipDateFromOrder(order);
-  if (shipOn && shipOn > miamiToday()) {
-    await parkTrackingOnOrder(order, label, shipOn);
-    return;
-  }
-  var done = await fulfillWithTracking(order.id, order.name, label.tracking, label.carrier, label.trackingUrl, true);
-  if (done) console.log('  tracking written to Shopify + customer notified:', label.tracking);
+  // Nothing is "on the way" until UPS actually takes it, and that's the ~6pm pickup. So the
+  // tracking always gets parked here — even for a same-day order — and the evening sweep
+  // sends the email. No ship date on the order means treat it as going out today.
+  await parkTrackingOnOrder(order, label, shipDateFromOrder(order) || miamiToday());
 }
 
 // Hold the tracking on the order until its ship date. Tag drives the sweep; the note
@@ -3966,15 +3963,18 @@ app.get('/stickers', function (req, res) {
 });
 
 // ============ SHIP-DAY SWEEP ============
-// Labels are bought and printed when the order comes in, but orders with a future ship date
-// are held unfulfilled so the customer isn't told "it's on the way" weeks early. This runs
-// hourly and, from 8am store time, fulfills anything whose ship date has arrived — which is
-// what fires Shopify's shipping email, on the right day, with the tracking already on it.
+// Labels are bought and printed when the order comes in, but every order is held unfulfilled
+// so the customer isn't told "it's on the way" before it is. This runs each evening and
+// fulfills anything whose ship date has arrived — which is what fires Shopify's shipping
+// email, on the right day, after the packages are staged for the ~6pm UPS pickup.
 var sweepRunning = false;
 
 async function sweepShipToday(force) {
   if (sweepRunning) return { skipped: 'already running' };
-  if (!force && miamiNow().getHours() < 8) return { skipped: 'before 8am store time' };
+  // UPS picks up around 6pm. 5pm is when the packages are done and staged, so that's when
+  // "on the way" is true. Runs again at 6/7/8pm purely as a retry if 5pm didn't go through.
+  var hr = miamiNow().getHours();
+  if (!force && (hr < 17 || hr > 20)) return { skipped: 'outside the 5pm-8pm send window' };
   sweepRunning = true;
   var shipped = [], failed = [], held = 0;
   try {
