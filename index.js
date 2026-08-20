@@ -39,6 +39,36 @@ function shouldAutoLabel(order) {
   return true;
 }
 
+function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+// Render runs on UTC; every date decision here has to be made in store time.
+function miamiNow() {
+  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+}
+function miamiToday() {
+  var d = miamiNow();
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+// The date the customer picks at checkout is the day the order SHIPS. It lands on the order
+// as a note attribute ("Delivery Date" = "Sep 7, 2026"). Returns YYYY-MM-DD, or null.
+function shipDateFromOrder(order) {
+  var raw = '';
+  (order.note_attributes || []).forEach(function (na) {
+    if (na && /delivery date/i.test(na.name || '')) raw = String(na.value || '');
+  });
+  if (!raw) return null;
+  var d = new Date(raw.trim() + ' 12:00:00');
+  if (isNaN(d.getTime())) return null;
+  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+}
+
+function tagValue(tags, prefix) {
+  var hit = '';
+  tags.forEach(function (t) { if (t.indexOf(prefix) === 0) hit = t.slice(prefix.length); });
+  return hit;
+}
+
 // Fire the shipping label once per order (from whichever webhook is active: create OR paid).
 async function maybeAutoLabel(order) {
   if (!shouldAutoLabel(order) || labeledOrderIds[order.id]) return;
@@ -324,23 +354,55 @@ async function printShippingLabel(order) {
   return label;
 }
 
-// Push the carrier tracking onto the Shopify order (fulfills + notifies the customer once).
+// Buying the label the moment the order lands is fine — the paperwork stays with the order.
+// Telling the customer "it's on the way" three weeks early is not. So when the ship date is
+// still in the future we park the tracking on the order and say nothing; sweepShipToday()
+// fulfills (and emails) on the morning it actually goes out.
 async function writeTrackingToShopify(order, label) {
-  var foRes = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders/' + order.id + '/fulfillment_orders.json',
+  var shipOn = shipDateFromOrder(order);
+  if (shipOn && shipOn > miamiToday()) {
+    await parkTrackingOnOrder(order, label, shipOn);
+    return;
+  }
+  var done = await fulfillWithTracking(order.id, order.name, label.tracking, label.carrier, label.trackingUrl, true);
+  if (done) console.log('  tracking written to Shopify + customer notified:', label.tracking);
+}
+
+// Hold the tracking on the order until its ship date. Tag drives the sweep; the note
+// attribute is so anyone opening the order in Shopify can see what's going on.
+async function parkTrackingOnOrder(order, label, shipOn) {
+  var tags = (order.tags || '').split(',').map(function (t) { return t.trim(); }).filter(function (t) {
+    return t && t !== 'st_holdlabel' && t.indexOf('st_track:') !== 0 && t.indexOf('st_carrier:') !== 0;
+  });
+  tags.push('st_holdlabel', 'st_track:' + label.tracking, 'st_carrier:' + (label.carrier || 'UPS'));
+  var attrs = (order.note_attributes || []).filter(function (na) { return na && na.name !== '\ud83d\udce6 Label'; });
+  attrs.unshift({ name: '\ud83d\udce6 Label', value: 'Printed and held \u2014 ships ' + shipOn + ' \u00b7 ' + (label.carrier || '') + ' ' + label.tracking + ' \u00b7 customer is emailed that morning' });
+  var res = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + order.id + '.json', {
+    method: 'PUT',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: { id: order.id, tags: tags.join(', '), note_attributes: attrs } })
+  });
+  if (!res.ok) throw new Error('Shopify ' + res.status + ' parking tracking');
+  console.log('  label held for', order.name, '- ships', shipOn, '- customer NOT emailed yet');
+}
+
+// Create the fulfillment. notify=true is what makes Shopify send the shipping email.
+async function fulfillWithTracking(orderId, orderName, tracking, carrier, trackingUrl, notify) {
+  var foRes = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders/' + orderId + '/fulfillment_orders.json',
     { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
   var fos = (await foRes.json()).fulfillment_orders || [];
   var open = fos.filter(function (f) { return f.status === 'open'; }).map(function (f) { return { fulfillment_order_id: f.id }; });
-  if (!open.length) { console.log('  no open fulfillment order for', order.name, '- tracking not written'); return; }
+  if (!open.length) { console.log('  no open fulfillment order for', orderName, '- tracking not written'); return false; }
   var body = { fulfillment: {
-    notify_customer: true,
-    tracking_info: { number: label.tracking, company: label.carrier, url: label.trackingUrl || undefined },
+    notify_customer: !!notify,
+    tracking_info: { number: tracking, company: carrier, url: trackingUrl || undefined },
     line_items_by_fulfillment_order: open
   } };
   var res = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/fulfillments.json',
     { method: 'POST', headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   var j = await res.json();
   if (!res.ok || j.errors) throw new Error(JSON.stringify(j.errors || j));
-  console.log('  tracking written to Shopify + customer notified:', label.tracking);
+  return true;
 }
 
 // Diagnostic: confirms config + that the app is receiving orders. No secrets exposed.
@@ -3901,6 +3963,90 @@ app.get('/stickers', function (req, res) {
 
   html += '</div></body></html>';
   res.send(html);
+});
+
+// ============ SHIP-DAY SWEEP ============
+// Labels are bought and printed when the order comes in, but orders with a future ship date
+// are held unfulfilled so the customer isn't told "it's on the way" weeks early. This runs
+// hourly and, from 8am store time, fulfills anything whose ship date has arrived — which is
+// what fires Shopify's shipping email, on the right day, with the tracking already on it.
+var sweepRunning = false;
+
+async function sweepShipToday(force) {
+  if (sweepRunning) return { skipped: 'already running' };
+  if (!force && miamiNow().getHours() < 8) return { skipped: 'before 8am store time' };
+  sweepRunning = true;
+  var shipped = [], failed = [], held = 0;
+  try {
+    var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders.json' +
+      '?status=open&fulfillment_status=unfulfilled&limit=250&fields=id,name,tags,note_attributes',
+      { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    var orders = ((await r.json()) || {}).orders || [];
+    var today = miamiToday();
+    for (var i = 0; i < orders.length; i++) {
+      var o = orders[i];
+      var tags = (o.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+      if (tags.indexOf('st_holdlabel') === -1) continue;
+      // Read the date off the order, not the tag, so a date someone changed is respected.
+      var shipOn = shipDateFromOrder(o);
+      if (shipOn && shipOn > today) { held++; continue; }
+      var tracking = tagValue(tags, 'st_track:');
+      var carrier = tagValue(tags, 'st_carrier:') || 'UPS';
+      if (!tracking) { failed.push(o.name + ' (no tracking on the order)'); continue; }
+      try {
+        var done = await fulfillWithTracking(o.id, o.name, tracking, carrier, null, true);
+        if (!done) { failed.push(o.name + ' (nothing left to fulfill)'); continue; }
+        await clearHoldTags(o, tags);
+        shipped.push(o.name);
+        console.log('ship-day sweep: fulfilled + emailed', o.name, tracking);
+      } catch (e) {
+        failed.push(o.name + ' (' + e.message + ')');
+        console.error('ship-day sweep failed for', o.name, '-', e.message);
+      }
+    }
+    // A silent failure here means a customer never gets a shipping email, so it goes on paper.
+    if (failed.length) await printSweepAlert(failed);
+  } catch (e) {
+    console.error('ship-day sweep error:', e.message);
+    try { await printSweepAlert(['sweep could not run: ' + e.message]); } catch (e2) {}
+    return { error: e.message };
+  } finally {
+    sweepRunning = false;
+  }
+  return { shipped: shipped, failed: failed, stillHeld: held, ranAt: miamiNow().toString() };
+}
+
+async function clearHoldTags(order, tags) {
+  var keep = tags.filter(function (t) {
+    return t !== 'st_holdlabel' && t.indexOf('st_carrier:') !== 0;
+  });
+  await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + order.id + '.json', {
+    method: 'PUT',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: { id: order.id, tags: keep.join(', ') } })
+  });
+}
+
+async function printSweepAlert(lines) {
+  if (!CONFIG.printNode.invoicePrinterId) return;
+  var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
+    '<div style="font-size:34px;font-weight:600">&#9888; SHIPPING EMAIL NOT SENT</div>' +
+    '<div style="font-size:20px;margin-top:18px;line-height:1.6">These orders ship today but Shopify would not mark them shipped, ' +
+    'so the customer got no tracking email. Mark them fulfilled by hand:<br><br><b>' +
+    lines.map(escapeHtml).join('</b><br><b>') + '</b></div></div>';
+  var pdf = await htmlToPdfBase64(html);
+  await sendToPrintNode(pdf, CONFIG.printNode.invoicePrinterId, 'SHIP SWEEP FAILED');
+}
+
+setInterval(function () { sweepShipToday(false); }, 60 * 60 * 1000);
+setTimeout(function () { sweepShipToday(false); }, 30 * 1000);
+
+// For an outside cron, and for checking it by hand. ?force=1 ignores the 8am gate.
+app.get('/tasks/ship-today', async function (req, res) {
+  try {
+    var out = await sweepShipToday(String(req.query.force || '') === '1');
+    res.json(out);
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.listen(PORT, function() { console.log('Server running on port ' + PORT); });
