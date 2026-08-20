@@ -41,13 +41,32 @@ function shouldAutoLabel(order) {
 
 function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
-// Render runs on UTC; every date decision here has to be made in store time.
+// Render's Node build ships without full timezone data, so asking it for 'America/New_York'
+// quietly hands back UTC — which would have fired the 5pm send at 1pm. Eastern is worked out
+// by hand instead: UTC-4 on daylight time, UTC-5 the rest of the year.
+function nthSundayUtc(year, monthIdx, n, hourUtc) {
+  var first = new Date(Date.UTC(year, monthIdx, 1));
+  var date = 1 + ((7 - first.getUTCDay()) % 7) + (n - 1) * 7;
+  return new Date(Date.UTC(year, monthIdx, date, hourUtc));
+}
+function easternOffsetHours(d) {
+  var y = d.getUTCFullYear();
+  var dstStart = nthSundayUtc(y, 2, 2, 7);   // 2nd Sunday in March, 2am ET
+  var dstEnd = nthSundayUtc(y, 10, 1, 6);    // 1st Sunday in November, 2am ET
+  return (d >= dstStart && d < dstEnd) ? -4 : -5;
+}
+// Returns a Date whose UTC fields read as the Miami wall clock, so use the getUTC* getters.
 function miamiNow() {
-  return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  var now = new Date();
+  return new Date(now.getTime() + easternOffsetHours(now) * 3600000);
 }
 function miamiToday() {
   var d = miamiNow();
-  return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+}
+function miamiClock() {
+  var d = miamiNow();
+  return miamiToday() + ' ' + pad2(d.getUTCHours()) + ':' + pad2(d.getUTCMinutes()) + ' ET';
 }
 
 // The date the customer picks at checkout is the day the order SHIPS. It lands on the order
@@ -3973,8 +3992,8 @@ async function sweepShipToday(force) {
   if (sweepRunning) return { skipped: 'already running' };
   // UPS picks up around 6pm. 5pm is when the packages are done and staged, so that's when
   // "on the way" is true. Runs again at 6/7/8pm purely as a retry if 5pm didn't go through.
-  var hr = miamiNow().getHours();
-  if (!force && (hr < 17 || hr > 20)) return { skipped: 'outside the 5pm-8pm send window' };
+  var hr = miamiNow().getUTCHours();
+  if (!force && (hr < 17 || hr > 20)) return { skipped: 'outside the 5pm-8pm send window', now: miamiClock() };
   sweepRunning = true;
   var shipped = [], failed = [], held = 0;
   try {
@@ -4013,7 +4032,7 @@ async function sweepShipToday(force) {
   } finally {
     sweepRunning = false;
   }
-  return { shipped: shipped, failed: failed, stillHeld: held, ranAt: miamiNow().toString() };
+  return { shipped: shipped, failed: failed, stillHeld: held, ranAt: miamiClock() };
 }
 
 async function clearHoldTags(order, tags) {
