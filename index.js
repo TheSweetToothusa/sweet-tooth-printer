@@ -1749,7 +1749,8 @@ function dashPage(title, subtitle, tilesHtml, backHref, notice, rawBody, noH1) {
   html += '.bubble{flex-shrink:0;display:flex;align-items:center;gap:9px;background:#2A2A2A;color:#fff;border-radius:999px;padding:0 26px;font-weight:600;font-size:15px;text-decoration:none;white-space:nowrap}';
   html += '.zipquick{flex-shrink:0;display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:12px;padding:0 16px;height:56px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
   html += '.zipquick .zl{font-size:13px;font-weight:600;color:#6B5F65;white-space:nowrap}';
-  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:8px;padding:9px 10px;font-size:16px;font-weight:600;text-align:center}';
+  html += '.zipquick input{width:100px;border:2px solid #C8A02C;background:#fff;border-radius:8px;padding:10px;font-size:17px;font-weight:700;text-align:center}';
+  html += '.zipquick input::placeholder{color:#B3A48A;font-weight:700}';
   html += '.zipquick input:focus{outline:2px solid #C8A02C}';
   html += '.zipquick .zout{font-size:19px;font-weight:600;min-width:56px;color:#6B5F65}';
   html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
@@ -1933,14 +1934,15 @@ app.get('/', (req, res) => {
   body += 'function load(){fetch("/dashboard/supply-alerts").then(function(r){return r.json()}).then(render).catch(function(){})}';
   body += 'load();setInterval(load,60000)})();</script>';
 
+  // Quick ZIP price check, at the very top of the page. Same table the driver app uses.
+  body += '<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><div class="zipquick">';
+  body += '<span class="zl">Calculate local delivery fee</span>';
+  body += '<input type="text" id="dashzip" inputmode="numeric" maxlength="5" placeholder="ZIP">';
+  body += '<span class="zout" id="dashzipout">&mdash;</span></div></div>';
   body += '<div class="actionbar">';
   body += '<div class="searchwrap"><span class="mag">&#128269;</span>';
   body += '<input id="dashq" type="text" placeholder="Search">';
-  body += '<button class="micbtn" id="dashmic" type="button" title="Talk instead of typing">&#127908;</button></div>';
-  // Quick ZIP price check, right where they can see it. Same table the driver app uses.
-  body += '<div class="zipquick"><span class="zl">&#128663; Delivery price</span>';
-  body += '<input type="text" id="dashzip" inputmode="numeric" maxlength="5" placeholder="ZIP">';
-  body += '<span class="zout" id="dashzipout">&mdash;</span></div>';
+  body += '</div>';
   body += '<a class="bubble" href="https://admin.shopify.com/store/thesweettoothfl" target="_blank" rel="noopener" data-kw="ask shopify ai sidekick help question how expert answer admin">&#128172; Ask Shopify AI</a>';
   body += '</div>';
   body += '<a class="dashjump" id="dashjump" href="#" style="display:none"></a>';
