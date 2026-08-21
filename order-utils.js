@@ -146,12 +146,24 @@ function extractOrderData(order) {
     var itemQty = item.quantity || 1;
     itemsSubtotal += itemPrice * itemQty;
     
+    var itemProps = item.properties || [];
+    var itemIsGlutenFree = false;
+    for (var gp = 0; gp < itemProps.length; gp++) {
+      var gpName = (itemProps[gp].name || '').toLowerCase();
+      var gpValue = String(itemProps[gp].value || '').toLowerCase();
+      if (gpName.indexOf('gluten') > -1 && gpValue.indexOf('yes') > -1) {
+        itemIsGlutenFree = true;
+      }
+    }
+
     items.push({
       title: itemTitle,
       variant: variantTitle,
       sku: item.sku || '',
       quantity: itemQty,
-      price: itemPrice.toFixed(2)
+      price: itemPrice.toFixed(2),
+      isGlutenFree: itemIsGlutenFree,
+      isGlutenFreeUpgrade: (item.sku || '').toString().toUpperCase().indexOf('GF-UPGRADE') === 0
     });
     
     var props = item.properties || [];
@@ -248,6 +260,15 @@ function extractOrderData(order) {
     var newTrk = (swapLine.match(/tracking\s+([A-Z0-9]+)/i) || [])[1] || '';
     var oldTrk = (swapLine.match(/old label\s+([A-Z0-9]+)/i) || [])[1] || '';
     if (newTrk) labelSwap = { newTracking: newTrk, oldTracking: oldTrk };
+  }
+
+  // Gluten-free orders: force the swap instruction to the top of the alert box.
+  var orderIsGlutenFree = false;
+  for (var gfi = 0; gfi < items.length; gfi++) {
+    if (items[gfi].isGlutenFree || items[gfi].isGlutenFreeUpgrade) { orderIsGlutenFree = true; }
+  }
+  if (orderIsGlutenFree) {
+    allInstructions.unshift('MAKE THIS BASKET GLUTEN FREE \u2014 swap every treat for its gluten-free version. One basket only.');
   }
 
   var specialInstructions = allInstructions
@@ -400,11 +421,24 @@ function generateInvoiceHTML(data) {
     var item = items[i];
     var isAddon = item.sku && item.sku.toString().toUpperCase().indexOf('ADDON') === 0;
     if (isAddon) { hasAddons = true; continue; }
+    if (item.isGlutenFreeUpgrade) { continue; }
     var variantHTML = '';
     if (item.variant) {
       variantHTML = '<span class="variant-tag">' + item.variant + '</span>';
     }
+    if (item.isGlutenFree) {
+      variantHTML += '<span class="variant-tag gf-tag">Gluten Free</span>';
+    }
     itemRows += '<tr><td class="item-name">' + item.title + ' ' + variantHTML + '</td><td>' + item.sku + '</td><td>' + item.quantity + '</td><td>$' + item.price + '</td></tr>';
+
+    // Gluten-free upgrade prints as a sub-line under the basket it belongs to,
+    // never as its own item — staff were reading it as a second basket.
+    if (item.isGlutenFree) {
+      for (var g = 0; g < items.length; g++) {
+        if (!items[g].isGlutenFreeUpgrade) continue;
+        itemRows += '<tr class="gf-subrow"><td class="gf-subnote">&#8627; SAME BASKET &mdash; SWAP EVERY TREAT FOR GLUTEN FREE. THIS IS NOT A SECOND BASKET.</td><td>' + items[g].sku + '</td><td>' + items[g].quantity + '</td><td>$' + items[g].price + '</td></tr>';
+      }
+    }
   }
 
   // Build add-ons as a separate left-aligned section below the items table
@@ -560,6 +594,9 @@ function generateInvoiceHTML(data) {
   html += '.items-table td:last-child { text-align: right; font-weight: 600; }';
   html += '.items-table tbody tr:last-child td { border-bottom: 2px solid #000; }';
   html += '.variant-tag { display: inline-block; background: #000; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; margin-left: 6px; vertical-align: middle; text-transform: uppercase; }';
+  html += '.variant-tag.gf-tag { background: #000; color: #fff; }';
+  html += '.items-table tr.gf-subrow td { border-bottom: 1px solid #ccc; padding-top: 2px; }';
+  html += '.items-table td.gf-subnote { font-size: 12px; font-weight: 700; padding-left: 26px; }';
   html += '.totals-section { margin-bottom: 12px; padding: 10px; border: 2px solid #000; max-width: 280px; margin-left: auto; }';
   html += '.totals-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; }';
   html += '.totals-total { font-size: 14px; font-weight: 800; border-top: 1px solid #000; margin-top: 6px; padding-top: 6px; }';
