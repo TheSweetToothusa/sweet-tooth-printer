@@ -826,7 +826,10 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       });
     });
     alreadyRefunded = alreadyRefunded.toFixed(2);
-    var specialInstructions = (orderData.specialInstructions || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    var siRaw = String(orderData.specialInstructions || '').split('\n').filter(function (line) {
+      return !/^\s*(gift\s*message|delivery\s*date|shipping\s+switched|refunded)\b\s*:?/i.test(line);
+    }).join('\n').trim().replace(/^\s*special\s*instructions\s*:\s*/i, '').trim();
+    var specialInstructions = siRaw.replace(/</g, '&lt;').replace(/"/g, '&quot;');
     var giftMessage = (orderData.giftMessage || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
     var dtChoices = [['pickup', 'Pickup'], ['local-delivery', 'Local Delivery'], ['shipping', 'Shipping'], ['in-store', 'In Store']];
@@ -1279,9 +1282,7 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
   try {
     var body = req.body;
     var noteLines = [];
-    if (body.specialInstructions) noteLines.push('Special Instructions: ' + body.specialInstructions);
-    if (body.giftMessage) noteLines.push('Gift Message: ' + body.giftMessage);
-    if (body.deliveryDate) noteLines.push('Delivery Date: ' + body.deliveryDate);
+    if (body.specialInstructions) noteLines.push('Special Instructions: ' + String(body.specialInstructions).trim());
 
     var updatePayload = { order: { id: parseInt(req.params.orderId) } };
     if (body.recipientName || body.addr1 || body.city) {
@@ -2222,6 +2223,12 @@ function parseDeliveryTags(order) {
     if (t.indexOf('st_deliverydate:') === 0) out.deliveryDate = t.slice(16);
     if (t.indexOf('st_completed:') === 0) out.completed = t.slice(13);
   });
+  if (!out.deliveryDate) {
+    (order.note_attributes || []).forEach(function (na) {
+      var n = String(na.name || '').toLowerCase().replace(/[\s_-]+/g, '');
+      if (n === 'deliverydate' && String(na.value || '').trim()) out.deliveryDate = String(na.value).trim();
+    });
+  }
   return out;
 }
 
