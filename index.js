@@ -928,6 +928,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           '.then(function(r){return r.json()})' +
           '.then(function(d){' +
             'if(!d.success){throw new Error(d.error||"Shopify would not save it")}' +
+            'window.__feeWarning=d.warning||"";' +
             'msg.textContent="Saved. Sending to the printer…";' +
             'if(btn){btn.textContent="Printing…"}' +
             'return fetch("/dashboard/invoice-print-edited/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)}).then(function(r){return r.json()})' +
