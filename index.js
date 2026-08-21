@@ -2254,7 +2254,7 @@ function lookupShell(inner, q) {
   html += '.zipquick .zout{font-size:19px;font-weight:600;min-width:56px;color:#6B5F65}';
   html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
-  html += '<div style="text-align:right"><div class="zipquick"><span class="zl">&#128663; Delivery price</span>';
+  html += '<div style="text-align:right"><div class="zipquick"><span class="zl">Calculate local delivery fee</span>';
   html += '<input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP">';
   html += '<span class="zout" id="zipout">&mdash;</span></div></div>';
   html += '<h1>Order Lookup</h1>';
