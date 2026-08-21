@@ -897,36 +897,28 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         'function feeTyped(){updateFeeNote();refreshPreview()}' +
         // Two separate questions, and staff need both answered out loud:
         // does the fee match the ZIP, and does anyone owe anyone money.
+        // One fact and one button. Three lines of arithmetic at once, including a
+        // line saying the customer owes money, made this unreadable and alarming.
         'function updateFeeNote(){' +
           'var n=document.getElementById("feeNote");' +
           'var z=(document.getElementById("zip").value||"").replace(/\\D/g,"").slice(0,5);' +
           'var isLocal=document.getElementById("deliveryType").value==="local-delivery";' +
           'var now=feeVal();var table=(isLocal&&z.length===5)?FEES[z]:undefined;' +
-          'var h="";var loud=false;' +
-          'if(isLocal&&z.length===5){' +
-            'if(table==null){h+="ZIP <b>"+z+"</b> is not in the price list. Type the fee yourself.<br>";loud=true}' +
-            'else if(Math.abs(table-now)>0.004){h+="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>. This invoice says <b>$"+now.toFixed(2)+"</b>.<br>";loud=true}' +
-            'else{h+="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>.<br>"}' +
-          '}' +
-          'var diff=Math.round((CHARGED-now-REFUNDED)*100)/100;' +
-          'h+="Charged at checkout: <b>$"+CHARGED.toFixed(2)+"</b>.";' +
-          'if(REFUNDED>0.004){h+=" Already sent back: <b>$"+REFUNDED.toFixed(2)+"</b>.";}' +
-          'if(diff>0.004){h+="<br>Send <b>$"+diff.toFixed(2)+"</b> back to the customer.";loud=true}' +
-          'else if(diff<-0.004){h+="<br>The customer owes <b>$"+Math.abs(diff).toFixed(2)+"</b> more.";loud=true}' +
-          'else if(REFUNDED>0.004){h+="<br>&#10004; The money side is already square.";}' +
-          'n.className=loud?"fee-note warn":"fee-note ok";n.innerHTML=h;' +
-          // One click to take the ZIP price, so nobody retypes a number we already know.
-          'if(table!=null&&Math.abs(table-now)>0.004){' +
-            'var b=document.createElement("a");b.className="fee-refund";b.style.background="#2563eb";b.href="#";' +
-            'b.textContent="Use $"+table.toFixed(2)+" \\u2014 the price for "+z;' +
+          'var h="",warn=false,fix=false;' +
+          'if(isLocal&&z.length===5&&table==null){h="ZIP <b>"+z+"</b> is not in the price list. Type the price yourself.";warn=true}' +
+          'else if(table!=null&&Math.abs(table-now)>0.004){h="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>.";warn=true;fix=true}' +
+          'else if(table!=null){h="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>."}' +
+          // Money only comes up once the price itself is settled.
+          'var back=fix?0:Math.round((CHARGED-REFUNDED-now)*100)/100;' +
+          'if(back>0.004){h=(h?h+"<br>":"")+"Send <b>$"+back.toFixed(2)+"</b> back to the customer.";warn=true}' +
+          'n.className=warn?"fee-note warn":"fee-note ok";n.innerHTML=h;' +
+          'if(fix){var b=document.createElement("a");b.className="fee-refund";b.style.background="#2563eb";b.href="#";' +
+            'b.textContent="Change it to $"+table.toFixed(2);' +
             'b.onclick=function(e){e.preventDefault();document.getElementById("deliveryFee").value=table.toFixed(2);updateFeeNote();refreshPreview()};' +
-            'n.appendChild(b);' +
-          '}' +
-          'if(diff>0.004){' +
-            'var a=document.createElement("a");a.className="fee-refund";' +
-            'a.href="/refund?order="+ORDERNUM+"&amount="+diff.toFixed(2)+"&why="+encodeURIComponent("Delivery fee corrected to $"+now.toFixed(2)+(z?" for ZIP "+z:""));' +
-            'a.textContent="Send $"+diff.toFixed(2)+" back \\u2192";n.appendChild(a);' +
-          '}' +
+            'n.appendChild(b)}' +
+          'if(back>0.004){var a=document.createElement("a");a.className="fee-refund";' +
+            'a.href="/refund?order="+ORDERNUM+"&amount="+back.toFixed(2)+"&why="+encodeURIComponent("Delivery price corrected to $"+now.toFixed(2)+(z?" for ZIP "+z:""));' +
+            'a.textContent="Send $"+back.toFixed(2)+" back \\u2192";n.appendChild(a)}' +
         '}' +
         'function getFormData(){return{' +
           'recipientName:document.getElementById("recipientName").value,' +
