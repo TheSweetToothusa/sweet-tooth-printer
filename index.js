@@ -851,7 +851,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
       '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}.btn-red{background:#dc2626;color:#fff;border:none;display:block;text-align:center;padding:16px;font-size:16px;font-weight:800;border-radius:8px;margin-top:10px}.label-q{border:3px solid #dc2626;border-radius:10px;padding:0 0 14px;margin-top:22px;background:#fff}.label-q-head{background:#dc2626;color:#fff;font-size:17px;font-weight:800;padding:11px 14px;text-align:center}.label-q-body{font-size:14px;line-height:1.6;padding:14px 16px 0;color:#111}.label-q-yes{font-size:14px;font-weight:800;padding:14px 16px 0;color:#111}.label-q a.btn-red{margin:8px 16px 0;width:calc(100% - 32px);box-sizing:border-box}.label-q-foot{font-size:12px;color:#555;padding:9px 16px 0;text-align:center;line-height:1.4}' +
       '</style></head><body>' +
-      '<div class="editor-panel no-print">' +
+      '<div class="editor-panel no-print" data-build="shippingLines-fix">' +
         '<h2>Edit Invoice</h2>' +
         '<div class="order-sub">' + orderData.orderNumber + ' &mdash; ' + orderData.deliveryType.toUpperCase() + '</div>' +
         '<div class="section-label">Recipient</div>' +
@@ -942,7 +942,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
             'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
           '})' +
         '}' +
-        'zipChanged();' +
+        'window.__booted=true;zipChanged();doRefresh();' +
       '</script>' +
     '</body></html>');
   } catch (error) {
