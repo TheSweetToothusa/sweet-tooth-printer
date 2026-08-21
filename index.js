@@ -815,6 +815,17 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
     var province = (orderData.recipient.province || '').replace(/"/g, '&quot;');
     var zip = (orderData.recipient.zip || '').replace(/"/g, '&quot;');
     var deliveryDate = (orderData.deliveryDate || '').replace(/"/g, '&quot;');
+    var chargedFee = parseFloat(orderData.deliveryFee || 0).toFixed(2);
+    var orderNumDigits = String(orderData.orderNumber || '').replace(/[^0-9]/g, '');
+    var alreadyRefunded = 0;
+    (order.refunds || []).forEach(function (rf) {
+      (rf.transactions || []).forEach(function (t) {
+        if (t.kind === 'refund' && (t.status === 'success' || t.status === 'pending')) {
+          alreadyRefunded += parseFloat(t.amount || 0);
+        }
+      });
+    });
+    alreadyRefunded = alreadyRefunded.toFixed(2);
     var specialInstructions = (orderData.specialInstructions || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
     var giftMessage = (orderData.giftMessage || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
@@ -830,6 +841,9 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       '.editor-panel h2{font-size:18px;font-weight:600;margin-bottom:4px}.order-sub{font-size:12px;color:#888;margin-bottom:16px}' +
       '.field{margin-bottom:12px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#555}' +
       '.field input,.field textarea,.field select{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff}.field textarea{height:80px;resize:vertical}.field select{cursor:pointer;font-weight:700}' +
+      '.money-row{display:flex;align-items:center;gap:7px}.money-row span{font-size:16px;font-weight:800;color:#555}.money-row input{flex:1;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:15px;font-weight:800;font-family:inherit}' +
+      '.fee-note{font-size:12px;line-height:1.5;margin-top:7px;color:#555}.fee-note b{color:#111}.fee-note.warn{background:#fff7ed;border:2px solid #fdba74;border-radius:8px;padding:9px 10px;color:#7c2d12}.fee-note.ok{color:#15803d}' +
+      '.fee-refund{display:block;margin-top:9px;background:#dc2626;color:#fff;text-align:center;padding:10px;border-radius:8px;font-size:13px;font-weight:800;text-decoration:none}' +
       '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
       '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
       '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}.btn-red{background:#dc2626;color:#fff;border:none;display:block;text-align:center;padding:16px;font-size:16px;font-weight:800;border-radius:8px;margin-top:10px}.label-q{border:3px solid #dc2626;border-radius:10px;padding:0 0 14px;margin-top:22px;background:#fff}.label-q-head{background:#dc2626;color:#fff;font-size:17px;font-weight:800;padding:11px 14px;text-align:center}.label-q-body{font-size:14px;line-height:1.6;padding:14px 16px 0;color:#111}.label-q-yes{font-size:14px;font-weight:800;padding:14px 16px 0;color:#111}.label-q a.btn-red{margin:8px 16px 0;width:calc(100% - 32px);box-sizing:border-box}.label-q-foot{font-size:12px;color:#555;padding:9px 16px 0;text-align:center;line-height:1.4}' +
@@ -843,9 +857,13 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>Address Line 2 / Suite</label><input type="text" id="addr2" value="' + addr2 + '" oninput="refreshPreview()"></div>' +
         '<div class="field"><label>City</label><input type="text" id="city" value="' + city + '" oninput="refreshPreview()"></div>' +
         '<div class="field"><label>State</label><input type="text" id="province" value="' + province + '" oninput="refreshPreview()"></div>' +
-        '<div class="field"><label>ZIP</label><input type="text" id="zip" value="' + zip + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>ZIP</label><input type="text" id="zip" value="' + zip + '" oninput="zipChanged()"></div>' +
         '<div class="section-label">Delivery</div>' +
-        '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="refreshPreview()">' + dtOptions + '</select></div>' +
+        '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="zipChanged()">' + dtOptions + '</select></div>' +
+        '<div class="field"><label>Delivery Fee</label>' +
+          '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + chargedFee + '" oninput="feeTyped()"></div>' +
+          '<div class="fee-note" id="feeNote"></div>' +
+        '</div>' +
         '<div class="field"><label>Delivery Date</label><input type="text" id="deliveryDate" value="' + deliveryDate + '" oninput="refreshPreview()"></div>' +
         '<div class="section-label">Notes</div>' +
         '<div class="field"><label>Special Instructions</label><textarea id="specialInstructions" oninput="refreshPreview()">' + specialInstructions + '</textarea></div>' +
@@ -858,7 +876,55 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
       '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +
       '<script>' +
         'var debounceTimer;' +
-        'function refreshPreview(){clearTimeout(debounceTimer);debounceTimer=setTimeout(doRefresh,600)}' +
+        // The ZIP table is the same one the dashboard and the driver app use.
+        'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';' +
+        'var CHARGED=' + chargedFee + ';' +
+        'var REFUNDED=' + alreadyRefunded + ';' +
+        'var ORDERNUM="' + orderNumDigits + '";' +
+        'function feeVal(){return parseFloat(document.getElementById("deliveryFee").value)||0}' +
+        // Changing the ZIP is the whole point: the price of a local delivery is
+        // decided by the ZIP, so the fee follows it without anyone retyping it.
+        'function zipChanged(){' +
+          'var z=(document.getElementById("zip").value||"").replace(/\D/g,"").slice(0,5);' +
+          'if(document.getElementById("deliveryType").value==="local-delivery"&&z.length===5&&FEES[z]!=null){' +
+            'document.getElementById("deliveryFee").value=FEES[z].toFixed(2);' +
+          '}' +
+          'updateFeeNote();refreshPreview();' +
+        '}' +
+        'function feeTyped(){updateFeeNote();refreshPreview()}' +
+        // Two separate questions, and staff need both answered out loud:
+        // does the fee match the ZIP, and does anyone owe anyone money.
+        'function updateFeeNote(){' +
+          'var n=document.getElementById("feeNote");' +
+          'var z=(document.getElementById("zip").value||"").replace(/\\D/g,"").slice(0,5);' +
+          'var isLocal=document.getElementById("deliveryType").value==="local-delivery";' +
+          'var now=feeVal();var table=(isLocal&&z.length===5)?FEES[z]:undefined;' +
+          'var h="";var loud=false;' +
+          'if(isLocal&&z.length===5){' +
+            'if(table==null){h+="ZIP <b>"+z+"</b> is not in the price list. Type the fee yourself.<br>";loud=true}' +
+            'else if(Math.abs(table-now)>0.004){h+="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>. This invoice says <b>$"+now.toFixed(2)+"</b>.<br>";loud=true}' +
+            'else{h+="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>.<br>"}' +
+          '}' +
+          'var diff=Math.round((CHARGED-now-REFUNDED)*100)/100;' +
+          'h+="Charged at checkout: <b>$"+CHARGED.toFixed(2)+"</b>.";' +
+          'if(REFUNDED>0.004){h+=" Already sent back: <b>$"+REFUNDED.toFixed(2)+"</b>.";}' +
+          'if(diff>0.004){h+="<br>Send <b>$"+diff.toFixed(2)+"</b> back to the customer.";loud=true}' +
+          'else if(diff<-0.004){h+="<br>The customer owes <b>$"+Math.abs(diff).toFixed(2)+"</b> more.";loud=true}' +
+          'else if(REFUNDED>0.004){h+="<br>&#10004; The money side is already square.";}' +
+          'n.className=loud?"fee-note warn":"fee-note ok";n.innerHTML=h;' +
+          // One click to take the ZIP price, so nobody retypes a number we already know.
+          'if(table!=null&&Math.abs(table-now)>0.004){' +
+            'var b=document.createElement("a");b.className="fee-refund";b.style.background="#2563eb";b.href="#";' +
+            'b.textContent="Use $"+table.toFixed(2)+" \\u2014 the price for "+z;' +
+            'b.onclick=function(e){e.preventDefault();document.getElementById("deliveryFee").value=table.toFixed(2);updateFeeNote();refreshPreview()};' +
+            'n.appendChild(b);' +
+          '}' +
+          'if(diff>0.004){' +
+            'var a=document.createElement("a");a.className="fee-refund";' +
+            'a.href="/refund?order="+ORDERNUM+"&amount="+diff.toFixed(2)+"&why="+encodeURIComponent("Delivery fee corrected to $"+now.toFixed(2)+(z?" for ZIP "+z:""));' +
+            'a.textContent="Send $"+diff.toFixed(2)+" back \\u2192";n.appendChild(a);' +
+          '}' +
+        '}' +
         'function getFormData(){return{' +
           'recipientName:document.getElementById("recipientName").value,' +
           'addr1:document.getElementById("addr1").value,' +
@@ -867,6 +933,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           'province:document.getElementById("province").value,' +
           'zip:document.getElementById("zip").value,' +
           'deliveryType:document.getElementById("deliveryType").value,' +
+          'deliveryFee:document.getElementById("deliveryFee").value,' +
           'deliveryDate:document.getElementById("deliveryDate").value,' +
           'specialInstructions:document.getElementById("specialInstructions").value,' +
           'giftMessage:document.getElementById("giftMessage").value' +
@@ -899,6 +966,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
             'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
           '})' +
         '}' +
+        'updateFeeNote();' +
       '</script>' +
     '</body></html>');
   } catch (error) {
@@ -921,6 +989,7 @@ app.get('/dashboard/invoice-preview/:orderId', async (req, res) => {
     if (req.query.province !== undefined) orderData.recipient.province = req.query.province;
     if (req.query.zip !== undefined) orderData.recipient.zip = req.query.zip;
     if (req.query.deliveryType) orderData.deliveryType = req.query.deliveryType;
+    if (req.query.deliveryFee !== undefined && req.query.deliveryFee !== '') orderData.deliveryFee = req.query.deliveryFee;
     if (req.query.deliveryDate !== undefined) orderData.deliveryDate = req.query.deliveryDate;
     if (req.query.specialInstructions !== undefined) orderData.specialInstructions = req.query.specialInstructions;
     if (req.query.giftMessage !== undefined) orderData.giftMessage = req.query.giftMessage;
@@ -948,6 +1017,7 @@ app.post('/dashboard/invoice-print-edited/:orderId', async (req, res) => {
     if (body.province !== undefined) orderData.recipient.province = body.province;
     if (body.zip !== undefined) orderData.recipient.zip = body.zip;
     if (body.deliveryType) orderData.deliveryType = body.deliveryType;
+    if (body.deliveryFee !== undefined && body.deliveryFee !== '') orderData.deliveryFee = body.deliveryFee;
     if (body.deliveryDate !== undefined) orderData.deliveryDate = body.deliveryDate;
     if (body.specialInstructions !== undefined) orderData.specialInstructions = body.specialInstructions;
     if (body.giftMessage !== undefined) orderData.giftMessage = body.giftMessage;
@@ -1168,6 +1238,43 @@ app.post('/dashboard/print-custom-submit', async (req, res) => {
 
 // ============ SAVE INVOICE EDITS TO SHOPIFY ============
 
+async function shopifyGraphQL(query, variables) {
+  var r = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2025-01/graphql.json', {
+    method: 'POST',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: query, variables: variables || {} })
+  });
+  var j = await r.json();
+  if (j.errors) throw new Error(JSON.stringify(j.errors).slice(0, 300));
+  return j.data;
+}
+
+// A plain order PUT cannot change what delivery costs — Shopify refuses it, which is
+// why correcting a wrong ZIP used to leave the old price on the order for ever. The
+// only door in is the order-editing flow: open an edit, reprice the line, commit it.
+// The customer is NOT emailed; money is handled separately on the refund screen.
+async function setShopifyShippingPrice(orderId, price) {
+  var begun = await shopifyGraphQL(
+    'mutation($id: ID!){ orderEditBegin(id:$id){ calculatedOrder{ id shippingLine{ id } } userErrors{ message } } }',
+    { id: 'gid://shopify/Order/' + orderId });
+  var beginErr = (begun.orderEditBegin.userErrors || [])[0];
+  if (beginErr) throw new Error(beginErr.message);
+  var calc = begun.orderEditBegin.calculatedOrder;
+  if (!calc || !calc.shippingLine) throw new Error('This order has no delivery line to reprice.');
+
+  var updated = await shopifyGraphQL(
+    'mutation($id: ID!, $lineId: ID!, $price: MoneyInput!){ orderEditUpdateShippingLine(id:$id, shippingLineId:$lineId, shippingLine:{price:$price}){ userErrors{ message } } }',
+    { id: calc.id, lineId: calc.shippingLine.id, price: { amount: price.toFixed(2), currencyCode: 'USD' } });
+  var updErr = (updated.orderEditUpdateShippingLine.userErrors || [])[0];
+  if (updErr) throw new Error(updErr.message);
+
+  var committed = await shopifyGraphQL(
+    'mutation($id: ID!, $note: String!){ orderEditCommit(id:$id, notifyCustomer:false, staffNote:$note){ userErrors{ message } } }',
+    { id: calc.id, note: 'Delivery fee set to $' + price.toFixed(2) + ' on the employee dashboard' });
+  var comErr = (committed.orderEditCommit.userErrors || [])[0];
+  if (comErr) throw new Error(comErr.message);
+}
+
 app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
   try {
     var body = req.body;
@@ -1236,6 +1343,26 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
       var errText = await response.text();
       return res.json({ success: false, error: 'Shopify error ' + response.status + ': ' + errText });
     }
+
+    // The delivery price lives on the shipping line, not on anything the PUT above
+    // can touch. Katie's driver app reads that same line, so repricing here is what
+    // makes the invoice, Shopify and her app agree.
+    if (body.deliveryFee !== undefined && body.deliveryFee !== '') {
+      var wantFee = parseFloat(body.deliveryFee);
+      if (!isNaN(wantFee) && wantFee >= 0) {
+        var priorOrderForFee = await fetchOrderFromShopify(req.params.orderId);
+        var lineNow = (priorOrderForFee.shipping_lines || [])[0];
+        var feeNow = lineNow ? parseFloat(lineNow.price || 0) : null;
+        if (lineNow && Math.abs(feeNow - wantFee) > 0.004) {
+          try {
+            await setShopifyShippingPrice(req.params.orderId, wantFee);
+          } catch (fe) {
+            return res.json({ success: false, error: 'Everything else saved, but the delivery fee did not: ' + fe.message });
+          }
+        }
+      }
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.json({ success: false, error: error.message });
@@ -3476,18 +3603,22 @@ app.get('/refund', async function (req, res) {
     inner += '<div class="card"><h2>Who and why</h2>';
     inner += '<div class="field"><label>Your name</label><input type="text" name="who" maxlength="40" required>';
     inner += '<div class="muted" style="margin-top:6px">Anything over $' + REFUND_CAP + ' has to be Mike or Denis.</div></div>';
-    inner += '<div class="field"><label>Why are you refunding this?</label><textarea name="reason" maxlength="300" required placeholder="Melted in transit, wrong item, customer cancelled..."></textarea></div>';
+    var whyPre = String(req.query.why || '').slice(0, 300);
+    inner += '<div class="field"><label>Why are you refunding this?</label><textarea name="reason" maxlength="300" required placeholder="Melted in transit, wrong item, customer cancelled...">' + escapeHtml(whyPre) + '</textarea></div>';
     inner += '</div>';
     inner += '<button type="submit" class="btn btn-red">Next &mdash; check it before it sends</button>';
     inner += '<a class="btn btn-grey" href="/order-lookup?q=' + escapeHtml(clean) + '">Back to the order</a>';
     inner += '</form>';
 
+    var askRaw = parseFloat(req.query.amount);
+    var askPart = (!isNaN(askRaw) && askRaw > 0 && askRaw < info.max - 0.004) ? askRaw.toFixed(2) : '';
     inner += '<script>var full="' + info.max.toFixed(2) + '";' +
       'function pickAll(){document.getElementById("p-all").className="pick on";document.getElementById("p-part").className="pick";' +
       'document.getElementById("amtwrap").style.display="none";document.getElementById("amount").value=full}' +
       'function pickPart(){document.getElementById("p-part").className="pick on";document.getElementById("p-all").className="pick";' +
       'document.getElementById("amtwrap").style.display="block";document.getElementById("amount").value="";document.getElementById("amount").focus()}' +
       'document.getElementById("amount").value=full;' +
+      (askPart ? 'pickPart();document.getElementById("amount").value="' + askPart + '";' : '') +
       'document.getElementById("amount").addEventListener("input",function(){this.value=this.value.replace(/[^0-9.]/g,"")});<\/script>';
     res.send(refundShell(inner, q));
   } catch (e) {
