@@ -2222,6 +2222,12 @@ function parseDeliveryTags(order) {
     if (t.indexOf('st_deliverydate:') === 0) out.deliveryDate = t.slice(16);
     if (t.indexOf('st_completed:') === 0) out.completed = t.slice(13);
   });
+  if (!out.deliveryDate) {
+    (order.note_attributes || []).forEach(function (na) {
+      var n = String(na.name || '').toLowerCase().replace(/[\s_-]+/g, '');
+      if (n === 'deliverydate' && String(na.value || '').trim()) out.deliveryDate = String(na.value).trim();
+    });
+  }
   return out;
 }
 
@@ -2236,7 +2242,25 @@ function formatStCompleted(raw) {
   } catch (e) { return raw; }
 }
 
-function lookupShell(inner, q) {
+// A folded section. The chevron and the "Tap to open" pill are both there because
+// staff could not tell the old plain headings were clickable at all.
+function acc(title, note, bodyHtml, open) {
+  return '<details class="acc"' + (open ? ' open' : '') + '>' +
+    '<summary><span class="chev">&#9660;</span><span class="ttl">' + title + '</span>' +
+    (note ? '<span class="cnt">' + note + '</span>' : '') +
+    '<span class="pill"></span></summary>' +
+    '<div class="accbody">' + bodyHtml + '</div></details>';
+}
+
+// One thing staff might need to do, named for the job rather than the paperwork.
+function doRow(href, icon, title, sub, onclick) {
+  return '<a href="' + href + '"' + (onclick ? ' onclick="' + onclick + '"' : '') + '>' +
+    '<span class="ic">' + icon + '</span>' +
+    '<span><span class="t">' + title + '</span><span class="s">' + sub + '</span></span>' +
+    '<span class="go">&rarr;</span></a>';
+}
+
+function lookupShell(inner, q, hasOrder) {
   var html = '<!DOCTYPE html><html><head><title>Order Lookup — The Sweet Tooth</title>';
   html += '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
   html += '<style>';
@@ -2252,9 +2276,30 @@ function lookupShell(inner, q) {
   html += '.card{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:18px}';
   html += '.card h2{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.8px;color:#6B5F65;margin-bottom:12px}';
   html += '.row{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15px}.row .k{color:#6B5F65;flex-shrink:0}.row .v{font-weight:600;text-align:right}';
-  html += '.status-banner{border-radius:12px;padding:20px 24px;margin-bottom:18px;font-size:19px;font-weight:600;text-align:center;background:#fff;border:1px solid #EFEBED;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
-  html += '.status-banner .sub{display:block;font-size:15px;font-weight:600;color:#6B5F65;margin-top:6px}';
-  html += '.status-banner.delivered{border-top:5px solid #C8A02C}';
+  html += '.status-banner{border-radius:14px;padding:22px 24px;margin-bottom:18px;font-size:23px;font-weight:800;text-align:center;letter-spacing:.3px;border:3px solid;background:#fff}';
+  html += '.status-banner .sub{display:block;font-size:15px;font-weight:600;opacity:.85;margin-top:7px;letter-spacing:0}';
+  html += '.status-banner.tone-green{background:#ECFDF5;border-color:#10B981;color:#065F46}';
+  html += '.status-banner.tone-amber{background:#FFF7ED;border-color:#F59E0B;color:#7C2D12}';
+  html += '.status-banner.tone-blue{background:#EFF6FF;border-color:#3B82F6;color:#1E3A8A}';
+  html += '.status-banner.tone-grey{background:#F7F4F5;border-color:#C8A02C;color:#2A2A2A}';
+  // Native <details> so it works with no JavaScript. The "Tap to open" pill is the
+  // whole point: new staff could not tell the old headings were clickable.
+  html += '.acc{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);margin-bottom:12px;overflow:hidden}';
+  html += '.acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:17px 22px;font-size:16px;font-weight:700;color:#2A2A2A;-webkit-tap-highlight-color:transparent}';
+  html += '.acc>summary::-webkit-details-marker{display:none}';
+  html += '.acc>summary:hover{background:#FCFAFB}';
+  html += '.acc>summary .ttl{flex:1;min-width:0}';
+  html += '.acc>summary .cnt{font-size:14px;font-weight:600;color:#6B5F65}';
+  // On a phone the heading, the note and the pill will not share one line without
+  // shredding the words, so the note drops underneath.
+  html += '@media (max-width:620px){.acc>summary{flex-wrap:wrap}.acc>summary .cnt{order:3;flex-basis:100%;margin:3px 0 0 27px}.acc>summary .pill{order:2}}';
+  html += '.acc>summary .pill{margin-left:auto;flex-shrink:0;font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#8A6D1F;background:#FBF4E2;border:1px solid #EBDCB4;border-radius:20px;padding:5px 11px}';
+  html += '.acc>summary .pill:after{content:"Tap to open"}';
+  html += '.acc[open]>summary .pill:after{content:"Tap to close"}';
+  html += '.acc>summary .chev{flex-shrink:0;font-size:13px;color:#6B5F65;transition:transform .15s}';
+  html += '.acc[open]>summary .chev{transform:rotate(180deg)}';
+  html += '.acc[open]>summary{border-bottom:1px solid #F2EEF0}';
+  html += '.accbody{padding:16px 22px 20px}';
   html += '.item{display:flex;justify-content:space-between;gap:14px;padding:9px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.item:last-child{border-bottom:none}.item .qty{font-weight:600}';
   html += '.trackbtn{display:inline-block;margin-top:10px;padding:13px 24px;background:#2A2A2A;color:#fff;border-radius:12px;text-decoration:none;font-weight:700;font-size:15px}';
   html += '.muted{color:#6B5F65;font-size:15px}';
@@ -2263,28 +2308,39 @@ function lookupShell(inner, q) {
   html += '.toolout .miss{font-size:15px;font-weight:600;color:#6B5F65}';
   html += '.phone-row{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #F5F1F3;font-size:15px}.phone-row:last-child{border-bottom:none}';
   html += '.phone-row a{font-weight:600;color:#2A2A2A;text-decoration:none}';
-  html += '.doact{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}';
-  html += '@media (max-width:620px){.doact{grid-template-columns:1fr}}';
-  html += '.doact a{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:8px;padding:15px 16px;font-size:15px;font-weight:600;color:#2A2A2A;text-decoration:none;line-height:1.3}';
+  // One job per row, in the words staff actually use. The grey line under each
+  // one answers the only question they ever ask: does this print, or change something?
+  html += '.doact{display:flex;flex-direction:column;gap:10px}';
+  html += '.doact a{display:flex;align-items:center;gap:14px;background:#fff;border:1.5px solid #E8E2E5;border-radius:10px;padding:16px 18px;color:#2A2A2A;text-decoration:none}';
   html += '.doact a:hover{border-color:#C8A02C;box-shadow:0 4px 12px rgba(0,0,0,.07)}';
+  html += '.doact .ic{font-size:23px;line-height:1;flex-shrink:0;width:28px;text-align:center}';
+  html += '.doact .t{font-size:17px;font-weight:700;line-height:1.25}';
+  html += '.doact .s{display:block;font-size:14px;font-weight:600;color:#6B5F65;margin-top:3px;line-height:1.4}';
+  html += '.doact .go{margin-left:auto;flex-shrink:0;font-size:19px;color:#C8A02C}';
+  html += '.headline{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:14px}';
+  html += '.headline .num{font-size:31px;font-weight:800;letter-spacing:-.5px;line-height:1.1}';
+  html += '.headline .who{font-size:19px;font-weight:700;margin-top:6px}';
+  html += '.headline .meta{font-size:15px;font-weight:600;color:#6B5F65;margin-top:7px;line-height:1.6}';
+  html += '.headline .warnline{margin-top:9px;font-size:15px;font-weight:700;color:#B0521E}';
+  html += '.sectitle{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#6B5F65;margin:26px 0 11px}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
   html += '<h1>Order Lookup</h1>';
-  // Staff use this constantly, so it goes above the fold, not buried at the bottom.
-  html += '<div class="card"><h2>Local Delivery Price by ZIP</h2>';
-  html += '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div>';
-  html += '<div class="toolout" id="zipout"></div></div>';
   html += '<form class="searchbar" action="/order-lookup" method="get">';
   html += '<input type="text" name="q" placeholder="Order number, customer name, email, or phone" value="' + escapeHtml(q || '') + '" autofocus>';
   html += '<button type="submit">Look Up</button></form>';
   html += inner;
 
-  // --- Quick tools: zip fee, UPS tracking, phones ---
-  html += '<div class="card"><h2>UPS Tracking</h2>';
-  html += '<div class="searchbar" style="margin:0"><input type="text" id="upsin" placeholder="Paste a UPS tracking number"><button type="button" onclick="upsTrack()">Track on UPS</button></div></div>';
+  // The ZIP price is used constantly, so it sits open on the empty page. Once an
+  // order is on screen it folds away with the other tools, or the page is enormous.
+  var zipTool = '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div><div class="toolout" id="zipout"></div>';
+  var upsTool = '<div class="searchbar" style="margin:0"><input type="text" id="upsin" placeholder="Paste a UPS tracking number"><button type="button" onclick="upsTrack()">Track on UPS</button></div>';
+  var phoneTool = '<div class="phone-row"><span>UPS</span><a href="tel:18007425877">1-800-742-5877</a></div>' +
+    '<div class="phone-row"><span>Bernard (our UPS driver)</span><a href="tel:9545942577">(954) 594-2577</a></div>';
 
-  html += '<div class="card"><h2>Phone Numbers</h2>';
-  html += '<div class="phone-row"><span>UPS</span><a href="tel:18007425877">1-800-742-5877</a></div>';
-  html += '<div class="phone-row"><span>Bernard (our UPS driver)</span><a href="tel:9545942577">(954) 594-2577</a></div></div>';
+  if (hasOrder) html += '<div class="sectitle">Other tools</div>';
+  html += acc('What does delivery cost to a ZIP code?', '', zipTool, !hasOrder);
+  html += acc('Track any UPS number', '', upsTool, false);
+  html += acc('Phone numbers', '', phoneTool, false);
 
   html += '<script>';
   html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
@@ -2358,125 +2414,138 @@ app.get('/order-lookup', async (req, res) => {
 
     var inner = '';
 
-    // --- Status banner ---
-    var banner = '', sub = '', delivered = false;
-    if (st.status === 'DELIVERED') {
-      delivered = true;
-      banner = '&#10004; DELIVERED';
-      sub = (st.completed ? formatStCompleted(st.completed) : '') + (st.driver ? ' &middot; by ' + escapeHtml(st.driver) : '');
-    } else if (isLocal) {
-      banner = 'NOT DELIVERED YET';
-      sub = st.deliveryDate ? 'Local delivery scheduled for ' + escapeHtml(st.deliveryDate) : 'Local delivery — no date set yet';
-      if (st.status) sub += ' &middot; status: ' + escapeHtml(st.status);
-    } else if (isPickup) {
-      banner = 'PICK UP ORDER';
-      sub = order.fulfillment_status === 'fulfilled' ? 'Marked fulfilled' : 'Waiting for customer pickup';
-    } else if (trackings.length) {
-      banner = 'SHIPPED';
-      sub = 'Tracking below' + (order.fulfillment_status ? ' &middot; Shopify: ' + escapeHtml(order.fulfillment_status) : '');
-    } else {
-      banner = 'NOT SHIPPED / NOT DELIVERED YET';
-      sub = method ? escapeHtml(method) : 'No shipping method on this order';
-    }
-    inner += '<div class="status-banner' + (delivered ? ' delivered' : '') + '">' + banner + '<span class="sub">' + sub + '</span></div>';
-
-    // One click straight to the paperwork, so nobody has to go back to the dashboard.
-    inner += '<div class="card"><h2>Print or Fix This Order</h2><div class="doact">';
-    inner += '<a href="/dashboard/invoice-edit/' + order.id + '">&#128424;&#65039; Edit &amp; Print Invoice</a>';
-    // This one goes straight to the printer, so a stray click has to be confirmed.
-    inner += '<a href="/dashboard/reprint-invoice/' + order.id + '" onclick="return confirm(\'Print the invoice for ' + escapeHtml(order.name) + ' right now?\')">&#128438; Reprint Invoice &mdash; prints now</a>';
-    inner += '<a href="/dashboard/print-custom/' + order.id + '">&#128140; Edit &amp; Print Gift Card</a>';
-    inner += '<a href="/reprint-label?order=' + encodeURIComponent(String(order.order_number)) + '">&#128230; Reprint Shipping Label</a>';
-    inner += '<a href="/switch-shipping?order=' + encodeURIComponent(String(order.order_number)) + '">&#9889; Change Shipping Speed</a>';
-    inner += '</div></div>';
-
-    // --- Order details ---
+    // --- Who and what, in big letters, straight under the search box ---
     var c = order.customer || {};
     var custName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || (order.shipping_address && order.shipping_address.name) || '—';
-    inner += '<div class="card"><h2>Order ' + escapeHtml(order.name) + '</h2>';
-    inner += '<div class="row"><span class="k">Placed</span><span class="v">' + new Date(order.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) + '</span></div>';
-    inner += '<div class="row"><span class="k">Customer</span><span class="v">' + escapeHtml(custName) + '</span></div>';
-    if (order.email) inner += '<div class="row"><span class="k">Email</span><span class="v">' + escapeHtml(order.email) + '</span></div>';
-    if (order.phone || c.phone) inner += '<div class="row"><span class="k">Phone</span><span class="v">' + escapeHtml(order.phone || c.phone) + '</span></div>';
-    inner += '<div class="row"><span class="k">Payment</span><span class="v">' + escapeHtml((order.financial_status || '—').toUpperCase()) + ' &middot; $' + escapeHtml(order.total_price) + '</span></div>';
-    if (method) inner += '<div class="row"><span class="k">Method</span><span class="v">' + escapeHtml(method) + '</span></div>';
+    var placedWhen = new Date(order.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
     // Who placed it: store-IP registered = staff typed it in; POS = rung up in store.
     var storeIps = await getStoreIps();
-    var origin, originStyle = '';
-    if (order.source_name === 'pos') { origin = 'In-store POS sale'; }
-    else if (order.browser_ip && storeIps.indexOf(order.browser_ip) > -1) { origin = '&#9888;&#65039; STAFF ENTERED (placed from a store computer)'; originStyle = 'color:#B0521E'; }
-    else if (order.browser_ip && storeIps.length) { origin = 'Customer placed it online'; }
-    else { origin = storeIps.length ? '—' : 'Unknown (store computers not registered yet)'; }
-    inner += '<div class="row"><span class="k">Placed by</span><span class="v" style="' + originStyle + '">' + origin + '</span></div>';
+    var origin = '', originWarn = false;
+    if (order.source_name === 'pos') { origin = 'Rung up in the store'; }
+    else if (order.browser_ip && storeIps.indexOf(order.browser_ip) > -1) { origin = 'Typed in by staff on a store computer'; originWarn = true; }
+    else if (order.browser_ip && storeIps.length) { origin = 'The customer ordered it online'; }
 
+    inner += '<div class="headline">';
+    inner += '<div class="num">' + escapeHtml(order.name) + '</div>';
+    inner += '<div class="who">' + escapeHtml(custName) + '</div>';
+    inner += '<div class="meta">' + escapeHtml((order.financial_status || '').toUpperCase() || 'UNPAID') + ' &middot; $' + escapeHtml(order.total_price) + '<br>Ordered ' + placedWhen;
+    if (method) inner += '<br>' + escapeHtml(method);
+    if (order.email) inner += '<br>' + escapeHtml(order.email);
+    if (order.phone || c.phone) inner += '<br>&#9742; ' + escapeHtml(order.phone || c.phone);
+    inner += '</div>';
+    if (origin) inner += '<div class="' + (originWarn ? 'warnline' : 'meta') + '" style="margin-top:9px">' + (originWarn ? '&#9888;&#65039; ' : '') + escapeHtml(origin) + '</div>';
     inner += '<a class="trackbtn" href="https://admin.shopify.com/store/thesweettoothfl/orders/' + order.id + '" target="_blank" rel="noopener">Open in Shopify</a>';
     inner += '</div>';
 
-    // --- Items with variant (Dairy/Parve/size) + special instructions ---
-    inner += '<div class="card"><h2>Items</h2>';
-    (order.line_items || []).forEach(function (li) {
-      if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
-      var vt = li.variant_title ? ' <span style="color:#6B5F65;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
-      inner += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + vt + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
-      (li.properties || []).forEach(function (pr) {
-        if (!pr || !pr.value || String(pr.name || '').charAt(0) === '_') return;
-        inner += '<div style="padding:2px 0 8px 26px;font-size:14px;color:#6B5B62;font-weight:600">&#8627; ' + escapeHtml(pr.name) + ': ' + escapeHtml(String(pr.value)) + '</div>';
-      });
-    });
+    // --- Where is it? One loud coloured box, so nobody has to read to find out. ---
+    var banner = '', sub = '', tone = 'tone-grey';
+    if (st.status === 'DELIVERED') {
+      tone = 'tone-green';
+      banner = '&#10004; DELIVERED';
+      sub = (st.completed ? formatStCompleted(st.completed) : '') + (st.driver ? ' &middot; by ' + escapeHtml(st.driver) : '');
+    } else if (isLocal) {
+      tone = 'tone-amber';
+      banner = 'NOT DELIVERED YET';
+      sub = st.deliveryDate ? 'Going out ' + escapeHtml(st.deliveryDate) : 'No delivery date set yet';
+      if (st.status) sub += ' &middot; ' + escapeHtml(st.status);
+    } else if (isPickup) {
+      tone = 'tone-blue';
+      banner = 'PICK UP IN THE STORE';
+      sub = order.fulfillment_status === 'fulfilled' ? 'Already picked up' : 'Waiting for the customer to come in';
+    } else if (trackings.length) {
+      tone = 'tone-blue';
+      banner = '&#128230; SHIPPED';
+      sub = 'Tracking number is further down this page';
+    } else {
+      tone = 'tone-amber';
+      banner = 'NOT SHIPPED YET';
+      sub = method ? escapeHtml(method) : 'No delivery or shipping method on this order';
+    }
+    inner += '<div class="status-banner ' + tone + '">' + banner + '<span class="sub">' + sub + '</span></div>';
+
+    // --- What do you need to do? Named for the job, not for the piece of paper. ---
+    inner += '<div class="sectitle">What do you need to do?</div>';
+    inner += '<div class="doact">';
+    inner += doRow('/dashboard/invoice-edit/' + order.id, '&#9999;&#65039;', 'Edit Order',
+      'Wrong address, date, delivery price or notes. Fix it, then it prints.');
+    inner += doRow('/dashboard/reprint-invoice/' + order.id, '&#128424;&#65039;', 'Reprint Order Invoice',
+      'Prints right now. Nothing on the order changes.',
+      'return confirm(\'Print the invoice for ' + escapeHtml(order.name) + ' right now?\')');
+    inner += doRow('/dashboard/print-custom/' + order.id, '&#128140;', 'Edit Gift Message',
+      'Change what the gift card says, then print the card.');
+    inner += doRow('/reprint-label?order=' + encodeURIComponent(String(order.order_number)), '&#128230;', 'Reprint Shipping Label',
+      'Same box, same address. Prints the UPS label again.');
+    inner += doRow('/switch-shipping?order=' + encodeURIComponent(String(order.order_number)), '&#9889;', 'Change Shipping Speed',
+      'Needs to get there sooner. Buys a new label.');
     inner += '</div>';
 
-    // --- Gift & order details: every checkout attribute + the order note ---
+    // --- Everything else is folded away. Staff open only what they came for. ---
+    inner += '<div class="sectitle">Look at the order</div>';
+
+    var itemRows = '', itemCount = 0;
+    (order.line_items || []).forEach(function (li) {
+      if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
+      itemCount += li.quantity;
+      var vt = li.variant_title ? ' <span style="color:#6B5F65;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
+      itemRows += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + vt + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
+      (li.properties || []).forEach(function (pr) {
+        if (!pr || !pr.value || String(pr.name || '').charAt(0) === '_') return;
+        itemRows += '<div style="padding:2px 0 8px 26px;font-size:14px;color:#6B5B62;font-weight:600">&#8627; ' + escapeHtml(pr.name) + ': ' + escapeHtml(String(pr.value)) + '</div>';
+      });
+    });
+    if (itemRows) inner += acc('What they ordered', itemCount + (itemCount === 1 ? ' item' : ' items'), itemRows);
+
+    var a = order.shipping_address;
+    if (a) {
+      var addrBody = '<div style="font-size:17px;line-height:1.7;font-weight:600">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
+      if (a.address2) addrBody += '<br>' + escapeHtml(a.address2);
+      addrBody += '<br>' + escapeHtml(a.city || '') + ', ' + escapeHtml(a.province_code || '') + ' ' + escapeHtml(a.zip || '');
+      if (a.phone) addrBody += '<br>&#9742; ' + escapeHtml(a.phone);
+      addrBody += '</div>';
+      addrBody += '<div class="muted" style="margin-top:12px">Wrong? Use <b>Edit Order</b> above.</div>';
+      inner += acc(isLocal ? 'Where it is going' : (isPickup ? 'Who is picking it up' : 'Where it is being shipped'),
+        escapeHtml((a.city || '') + (a.zip ? ' ' + a.zip : '')), addrBody);
+    }
+
     var attrs = (order.note_attributes || []).filter(function (na) { return na && na.value && String(na.value).trim(); });
     if (attrs.length || order.note) {
-      inner += '<div class="card"><h2>Gift &amp; Order Details</h2>';
+      var giftBody = '';
       attrs.forEach(function (na) {
         var val = String(na.value);
         if (val.length > 60 || /message/i.test(na.name || '')) {
-          inner += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:15px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
+          giftBody += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:16px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
         } else {
-          inner += '<div class="row"><span class="k">' + escapeHtml(na.name) + '</span><span class="v">' + escapeHtml(val) + '</span></div>';
+          giftBody += '<div class="row"><span class="k">' + escapeHtml(na.name) + '</span><span class="v">' + escapeHtml(val) + '</span></div>';
         }
       });
-      if (order.note) inner += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">Order note</span><div style="font-weight:600;font-size:15px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
-      inner += '</div>';
+      if (order.note) giftBody += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">Order note</span><div style="font-weight:600;font-size:16px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
+      giftBody += '<div class="muted" style="margin-top:12px">Gift message wrong? Use <b>Edit Gift Message</b> above.</div>';
+      inner += acc('Gift message and order notes', '', giftBody);
     }
 
-    // --- Address ---
-    var a = order.shipping_address;
-    if (a) {
-      inner += '<div class="card"><h2>' + (isLocal ? 'Deliver To' : (isPickup ? 'Customer' : 'Ship To')) + '</h2>';
-      inner += '<div style="font-size:15px;line-height:1.65">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
-      if (a.address2) inner += ', ' + escapeHtml(a.address2);
-      inner += '<br>' + escapeHtml(a.city || '') + ', ' + escapeHtml(a.province_code || '') + ' ' + escapeHtml(a.zip || '');
-      if (a.phone) inner += '<br>&#9742; ' + escapeHtml(a.phone);
-      inner += '</div></div>';
-    }
-
-    // --- UPS tracking ---
     if (trackings.length) {
-      inner += '<div class="card"><h2>UPS Tracking</h2>';
+      var trkBody = '';
       trackings.forEach(function (f) {
         var num = f.tracking_number;
-        var url = (f.tracking_urls && f.tracking_urls[0]) || f.tracking_url || ('https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(num));
-        inner += '<div class="row"><span class="k">' + escapeHtml(f.tracking_company || 'Carrier') + '</span><span class="v">' + escapeHtml(num) + '</span></div>';
-        inner += '<a class="trackbtn" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Track on UPS</a>';
+        var turl = (f.tracking_urls && f.tracking_urls[0]) || f.tracking_url || ('https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(num));
+        trkBody += '<div class="row"><span class="k">' + escapeHtml(f.tracking_company || 'Carrier') + '</span><span class="v">' + escapeHtml(num) + '</span></div>';
+        trkBody += '<a class="trackbtn" href="' + escapeHtml(turl) + '" target="_blank" rel="noopener">Track on UPS</a>';
       });
-      inner += '</div>';
+      inner += acc('Tracking', escapeHtml(trackings[0].tracking_number || ''), trkBody);
     } else if (!isLocal && !isPickup) {
-      inner += '<div class="card"><h2>UPS Tracking</h2><div class="muted">No tracking number on this order yet.</div></div>';
+      inner += acc('Tracking', 'none yet', '<div class="muted">No tracking number on this order yet.</div>');
     }
 
-    // --- Local delivery info ---
     if (isLocal) {
-      inner += '<div class="card"><h2>Local Delivery</h2>';
-      inner += '<div class="row"><span class="k">Delivery date</span><span class="v">' + (st.deliveryDate ? escapeHtml(st.deliveryDate) : '—') + '</span></div>';
-      inner += '<div class="row"><span class="k">Driver</span><span class="v">' + (st.driver ? escapeHtml(st.driver) : '—') + '</span></div>';
-      inner += '<div class="row"><span class="k">Delivered at</span><span class="v">' + (st.completed ? formatStCompleted(st.completed) : 'Not delivered yet') + '</span></div>';
-      inner += '</div>';
+      var locBody = '';
+      locBody += '<div class="row"><span class="k">Delivery day</span><span class="v">' + (st.deliveryDate ? escapeHtml(st.deliveryDate) : '—') + '</span></div>';
+      locBody += '<div class="row"><span class="k">Driver</span><span class="v">' + (st.driver ? escapeHtml(st.driver) : 'Not assigned yet') + '</span></div>';
+      locBody += '<div class="row"><span class="k">Delivered at</span><span class="v">' + (st.completed ? formatStCompleted(st.completed) : 'Not delivered yet') + '</span></div>';
+      inner += acc('Delivery details', st.deliveryDate ? escapeHtml(st.deliveryDate) : '', locBody);
     }
 
-    res.send(lookupShell(inner, q));
+    res.send(lookupShell(inner, q, true));
   } catch (err) {
     console.error('order-lookup error:', err.message);
     res.send(lookupShell('<div class="err">Something went wrong looking that up: ' + escapeHtml(err.message) + '</div>', q));
