@@ -1332,7 +1332,10 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
           try {
             await setShopifyShippingPrice(req.params.orderId, wantFee);
           } catch (fe) {
-            return res.json({ success: false, error: 'Everything else saved, but the delivery fee did not: ' + fe.message });
+            var why = /cannot be edited/i.test(fe.message)
+              ? 'Shopify will not change the delivery price on this order because money has already been refunded on it. Change the price FIRST, then send the refund.'
+              : fe.message;
+            return res.json({ success: false, error: 'The address and notes saved. The delivery price did not: ' + why });
           }
         }
       }
