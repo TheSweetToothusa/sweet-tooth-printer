@@ -1231,16 +1231,17 @@ async function shopifyGraphQL(query, variables) {
 // The customer is NOT emailed; money is handled separately on the refund screen.
 async function setShopifyShippingPrice(orderId, price) {
   var begun = await shopifyGraphQL(
-    'mutation($id: ID!){ orderEditBegin(id:$id){ calculatedOrder{ id shippingLine{ id } } userErrors{ message } } }',
+    'mutation($id: ID!){ orderEditBegin(id:$id){ calculatedOrder{ id shippingLines{ id title } } userErrors{ message } } }',
     { id: 'gid://shopify/Order/' + orderId });
   var beginErr = (begun.orderEditBegin.userErrors || [])[0];
   if (beginErr) throw new Error(beginErr.message);
   var calc = begun.orderEditBegin.calculatedOrder;
-  if (!calc || !calc.shippingLine) throw new Error('This order has no delivery line to reprice.');
+  var line = (calc && calc.shippingLines || [])[0];
+  if (!line) throw new Error('This order has no delivery line to reprice.');
 
   var updated = await shopifyGraphQL(
     'mutation($id: ID!, $lineId: ID!, $price: MoneyInput!){ orderEditUpdateShippingLine(id:$id, shippingLineId:$lineId, shippingLine:{price:$price}){ userErrors{ message } } }',
-    { id: calc.id, lineId: calc.shippingLine.id, price: { amount: price.toFixed(2), currencyCode: 'USD' } });
+    { id: calc.id, lineId: line.id, price: { amount: price.toFixed(2), currencyCode: 'USD' } });
   var updErr = (updated.orderEditUpdateShippingLine.userErrors || [])[0];
   if (updErr) throw new Error(updErr.message);
 
