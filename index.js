@@ -1329,6 +1329,18 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
         var priorOrderForFee = await fetchOrderFromShopify(req.params.orderId);
         var lineNow = (priorOrderForFee.shipping_lines || [])[0];
         var feeNow = lineNow ? parseFloat(lineNow.price || 0) : null;
+        try {
+          var tagList = String(priorOrderForFee.tags || '').split(',')
+            .map(function (t) { return t.trim(); })
+            .filter(function (t) { return t && t.toLowerCase().indexOf('st_fee:') !== 0; });
+          tagList.push('st_fee:' + wantFee.toFixed(2));
+          await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + req.params.orderId + '.json', {
+            method: 'PUT',
+            headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ order: { id: parseInt(req.params.orderId, 10), tags: tagList.join(', ') } })
+          });
+        } catch (te) { console.error('st_fee tag write failed:', te.message); }
+
         if (lineNow && Math.abs(feeNow - wantFee) > 0.004) {
           try {
             await setShopifyShippingPrice(req.params.orderId, wantFee);

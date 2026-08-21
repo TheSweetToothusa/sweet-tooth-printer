@@ -315,6 +315,13 @@ function extractOrderData(order) {
   var subtotal = itemsSubtotal.toFixed(2);
   var totalTax = order.total_tax || '0.00';
   var deliveryFee = shippingPrice;
+  var feeTag = String(order.tags || '').split(',')
+    .map(function (t) { return t.trim(); })
+    .filter(function (t) { return t.toLowerCase().indexOf('st_fee:') === 0; })[0];
+  if (feeTag) {
+    var tagged = parseFloat(feeTag.slice(7));
+    if (!isNaN(tagged)) deliveryFee = tagged.toFixed(2);
+  }
 
   if (!occasion) {
     occasion = notes['Occasion'] || notes['occasion'] || notes['Order Occasion'] || notes['_Occasion'] || '';
