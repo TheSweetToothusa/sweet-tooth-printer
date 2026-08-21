@@ -6,7 +6,7 @@ const puppeteerCore = require('puppeteer-core');
 const chromium = require('@sparticuz/chromium');
 const { extractOrderData, generateInvoiceHTML } = require('./order-utils');
 const { generateGiftCardHTML } = require('./gift-card-template');
-const { buyLabelForOrder, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService } = require('./shipping-label');
+const { buyLabelForOrder, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService, trackingStatusFor } = require('./shipping-label');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -4056,6 +4056,157 @@ async function printSweepAlert(lines) {
   var pdf = await htmlToPdfBase64(html);
   await sendToPrintNode(pdf, CONFIG.printNode.invoicePrinterId, 'SHIP SWEEP FAILED');
 }
+
+// ============ AUTO-VOID: cancelled / refunded orders get their label refunded ============
+// The label is bought the second the order lands, so a cancel an hour later leaves a live
+// label that nobody remembers to void when it's busy — and a printed one on the pack bench.
+// This sweep finds them and does it. It reads state off the order's own tags, so a restart,
+// a refund taken over the phone, or one done in POS all still get caught on the next pass.
+
+var VOID_LOOKBACK_HOURS = 72;
+var VOID_SWEEP_MINUTES = 10;
+
+// The card refund can sit at "pending" for a day, so pending counts. A refund that doesn't
+// cover the whole order is somebody handing back a few dollars — that order is still shipping.
+function refundedInFull(order) {
+  var total = parseFloat(order.total_price || '0');
+  var back = 0;
+  (order.refunds || []).forEach(function (r) {
+    ((r && r.transactions) || []).forEach(function (t) {
+      if (t && t.kind === 'refund' && (t.status === 'success' || t.status === 'pending')) {
+        back += parseFloat(t.amount || '0');
+      }
+    });
+  });
+  return total > 0 && back >= total - 0.01;
+}
+
+function needsLabelVoid(order) {
+  if (order.cancelled_at) return 'order cancelled';
+  if (['refunded', 'voided'].indexOf(order.financial_status || '') > -1) return 'fully refunded';
+  if (refundedInFull(order)) return 'fully refunded';
+  return null;
+}
+
+// Drop st_holdlabel (that tag is what makes the evening sweep email tracking) and leave a
+// marker so this order is never processed twice. st_track stays for the record.
+async function stampVoidResult(order, tags, marker, note) {
+  var keep = tags.filter(function (t) {
+    return t !== 'st_holdlabel' && t !== 'st_labelvoided' && t !== 'st_labelmoving';
+  });
+  keep.push(marker);
+  var attrs = (order.note_attributes || []).filter(function (na) { return na && na.name !== '📦 Label'; });
+  attrs.unshift({ name: '📦 Label', value: note });
+  var res = await fetch('https://' + CONFIG.shopify.store + '/admin/api/2024-01/orders/' + order.id + '.json', {
+    method: 'PUT',
+    headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ order: { id: order.id, tags: keep.join(', '), note_attributes: attrs } })
+  });
+  if (!res.ok) throw new Error('Shopify ' + res.status + ' stamping the void result');
+}
+
+// Voiding in Shippo doesn't move the paper. The label was printed hours ago and is sitting
+// on the bench, so print a slip telling whoever is packing what happened to it.
+async function printVoidSlip(order, headline, lines) {
+  try {
+    var html = '<div style="font-family:Arial,sans-serif;padding:40px;border:6px solid #000;margin:30px">' +
+      '<div style="font-size:34px;font-weight:600">&#9888; ' + escapeHtml(headline) + '</div>' +
+      '<div style="font-size:28px;margin-top:14px">Order ' + escapeHtml(order.name || '') + '</div>' +
+      '<div style="font-size:22px;margin-top:18px;line-height:1.6">' +
+      lines.map(escapeHtml).join('<br>') + '</div></div>';
+    var pdf = await htmlToPdfBase64(html);
+    await sendToPrintNode(pdf, CONFIG.printNode.invoicePrinterId, 'VOID ' + (order.name || ''));
+  } catch (e) { console.error('  void slip failed:', e.message); }
+}
+
+async function voidLabelForOrder(order, why) {
+  var tags = (order.tags || '').split(',').map(function (t) { return t.trim(); }).filter(Boolean);
+  if (tags.indexOf('st_labelvoided') > -1 || tags.indexOf('st_labelmoving') > -1) return null;
+
+  var tracking = tagValue(tags, 'st_track:');
+  if (!tracking) {
+    (order.fulfillments || []).forEach(function (f) { if (f && f.tracking_number) tracking = f.tracking_number; });
+  }
+  if (!tracking) return null;   // no label was ever bought for this order — nothing to void
+  var carrier = tagValue(tags, 'st_carrier:') || 'UPS';
+
+  var state = await trackingStatusFor(carrier, tracking);
+  if (['TRANSIT', 'DELIVERED', 'RETURNED', 'FAILURE'].indexOf(state) > -1) {
+    await stampVoidResult(order, tags, 'st_labelmoving',
+      'NOT voided — ' + carrier + ' already has this package (' + state + '). ' +
+      tracking + ' · no refund is possible; sort it out with the carrier.');
+    await printVoidSlip(order, 'LABEL ALREADY MOVING — CALL THE CARRIER', [
+      why + ', but ' + carrier + ' already scanned this package (' + state + ').',
+      carrier + ' ' + tracking,
+      'No label refund is possible. Intercept or recall it with the carrier.'
+    ]);
+    console.log('void sweep: ' + order.name + ' label already ' + state + ' - left alone');
+    return { voided: false, tracking: tracking, state: state };
+  }
+
+  var v = await voidLabelByTracking(tracking);
+  await stampVoidResult(order, tags, 'st_labelvoided',
+    'VOIDED ' + miamiToday() + ' — ' + why + '. ' + carrier + ' ' + tracking +
+    ' refunded in Shippo (' + (v.status || 'submitted') + '). No shipping email will be sent.');
+  await printVoidSlip(order, 'LABEL VOIDED — PULL IT FROM THE BENCH', [
+    why + '. The shipping label has been refunded in Shippo.',
+    carrier + ' ' + tracking,
+    'Find this label, throw it away, and do NOT ship this order.'
+  ]);
+  return { voided: true, tracking: tracking, status: v.status };
+}
+
+var voidSweepRunning = false;
+async function sweepVoidRefunded() {
+  if (voidSweepRunning) return { skipped: 'already running' };
+  voidSweepRunning = true;
+  var voided = [], moving = [], failed = [];
+  try {
+    var since = new Date(Date.now() - VOID_LOOKBACK_HOURS * 3600000).toISOString();
+    var url = 'https://' + CONFIG.shopify.store + '/admin/api/2025-01/orders.json?status=any&limit=250' +
+      '&updated_at_min=' + encodeURIComponent(since) +
+      '&fields=id,name,tags,note_attributes,financial_status,cancelled_at,total_price,refunds,fulfillments';
+    var r = await fetch(url, { headers: { 'X-Shopify-Access-Token': CONFIG.shopify.token } });
+    if (!r.ok) throw new Error('Shopify ' + r.status + ' listing orders');
+    var orders = ((await r.json()) || {}).orders || [];
+    for (var i = 0; i < orders.length; i++) {
+      var o = orders[i];
+      var why = needsLabelVoid(o);
+      if (!why) continue;
+      try {
+        var out = await voidLabelForOrder(o, why);
+        if (!out) continue;
+        if (out.voided) {
+          voided.push(o.name + ' ' + out.tracking);
+          console.log('void sweep: refunded label for', o.name, out.tracking, '(' + why + ')');
+        } else {
+          moving.push(o.name + ' (' + out.state + ')');
+        }
+      } catch (e) {
+        failed.push(o.name + ' (' + e.message + ')');
+        console.error('void sweep failed for', o.name, '-', e.message);
+      }
+    }
+  } catch (e) {
+    voidSweepRunning = false;
+    console.error('void sweep error:', e.message);
+    return { error: e.message };
+  }
+  voidSweepRunning = false;
+  return {
+    checked: 'orders touched in the last ' + VOID_LOOKBACK_HOURS + 'h',
+    voided: voided, alreadyMoving: moving, failed: failed, at: miamiClock()
+  };
+}
+
+setInterval(function () { sweepVoidRefunded(); }, VOID_SWEEP_MINUTES * 60 * 1000);
+setTimeout(function () { sweepVoidRefunded(); }, 45 * 1000);
+
+// For an outside cron, and for checking it by hand.
+app.get('/tasks/void-refunded', async function (req, res) {
+  try { res.json(await sweepVoidRefunded()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 setInterval(function () { sweepShipToday(false); }, 60 * 60 * 1000);
 setTimeout(function () { sweepShipToday(false); }, 30 * 1000);

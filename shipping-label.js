@@ -276,8 +276,27 @@ async function voidLabelByTracking(tracking) {
   var data = await res.json();
   var match = ((data && data.results) || []).filter(function (t) { return t.tracking_number === tracking; })[0];
   if (!match) throw new Error('No Shippo label found for tracking ' + tracking);
+  // The auto-void sweep retries anything it couldn't finish, so it can land here twice.
+  // Shippo errors on a second refund request — treat an already-refunded label as done.
+  if (match.status === 'REFUNDPENDING' || match.status === 'REFUNDED') {
+    return { status: match.status, alreadyDone: true };
+  }
   var refund = await shippo('/refunds/', { transaction: match.object_id, async: false });
   return { status: refund.status, amount: match.rate && match.rate.amount };
+}
+
+// Ask Shippo where the package is before voiding. A label the carrier has already scanned
+// can't be refunded, and voiding one mid-transit would strand a real shipment.
+// Returns a Shippo status: UNKNOWN, PRE_TRANSIT, TRANSIT, DELIVERED, RETURNED or FAILURE.
+async function trackingStatusFor(carrier, tracking) {
+  if (!SHIPPO_TOKEN) throw new Error('SHIPPO_API_TOKEN not set');
+  var token = String(carrier || 'ups').toLowerCase().replace(/[^a-z]/g, '') || 'ups';
+  var res = await fetch('https://api.goshippo.com/tracks/' + token + '/' + encodeURIComponent(tracking), {
+    headers: { 'Authorization': 'ShippoToken ' + SHIPPO_TOKEN }
+  });
+  if (!res.ok) return 'UNKNOWN';
+  var data = await res.json();
+  return ((data && data.tracking_status) || {}).status || 'UNKNOWN';
 }
 
 // Buy a label for a SPECIFIC service the human just picked (used by Change Shipping Speed).
@@ -311,4 +330,4 @@ async function buyLabelWithService(order, serviceToken) {
   };
 }
 
-module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService };
+module.exports = { buyLabelForOrder, mapServiceToken, orderWeightOz, reprintLabelByTracking, quoteRatesForOrder, voidLabelByTracking, buyLabelWithService, trackingStatusFor };
