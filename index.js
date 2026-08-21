@@ -863,7 +863,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>ZIP</label><input type="text" id="zip" value="' + zip + '" oninput="zipChanged()"></div>' +
         '<div class="section-label">Delivery</div>' +
         '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="zipChanged()">' + dtOptions + '</select></div>' +
-        '<div class="field"><label>Delivery Price</label>' +
+        '<div class="field"><label>Calculate local delivery fee</label>' +
           '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + chargedFee + '" oninput="feeTyped()"></div>' +
           '<div id="feeNote" style="display:none"></div>' +
         '</div>' +
