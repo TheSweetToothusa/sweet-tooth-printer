@@ -781,14 +781,196 @@ app.get('/dashboard/invoice-view/:orderId', async (req, res) => {
 
 // ============ EDIT INVOICE ============
 
-// There is one place to change an order now, and it is the order page you land on
-// from Order Lookup. Two editors for the same fields was the confusion itself.
 app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
   try {
     var order = await fetchOrderFromShopify(req.params.orderId);
-    res.redirect('/order-lookup?q=' + encodeURIComponent(String(order.order_number)));
+    var orderData = extractOrderData(order);
+    var invoiceHTML = generateInvoiceHTML(orderData);
+
+    // A label that is already printed cannot follow an address change. Say so in the
+    // plainest words possible, and only on orders where it can actually happen.
+    var existingTracking = null;
+    (order.fulfillments || []).forEach(function (f) { if (f.tracking_number) existingTracking = f.tracking_number; });
+    var labelWarningHTML = '';
+    if (existingTracking && orderData.deliveryType === 'shipping') {
+      labelWarningHTML =
+        '<div class="label-q">' +
+          '<div class="label-q-head">Did you change the address?</div>' +
+          '<div class="label-q-body">' +
+            'A shipping label for this order is <b>already printed</b>.<br>' +
+            'Tracking <b>' + escapeHtml(existingTracking) + '</b>.<br><br>' +
+            'That label goes to the <b>OLD</b> address. Changing the address above does <b>not</b> change it. ' +
+            'UPS will still take the box to the old place.' +
+          '</div>' +
+          '<div class="label-q-yes">If the address changed, click this:</div>' +
+          '<a class="btn btn-red" href="/switch-shipping?order=' + order.order_number + '">Throw away the old label and make a new one</a>' +
+          '<div class="label-q-foot">Nothing is bought until you see the price and say yes.</div>' +
+        '</div>';
+    }
+
+    var recipientName = (orderData.recipient.name || '').replace(/"/g, '&quot;');
+    var addr1 = (orderData.recipient.address1 || '').replace(/"/g, '&quot;');
+    var addr2 = (orderData.recipient.address2 || '').replace(/"/g, '&quot;');
+    var city = (orderData.recipient.city || '').replace(/"/g, '&quot;');
+    var province = (orderData.recipient.province || '').replace(/"/g, '&quot;');
+    var zip = (orderData.recipient.zip || '').replace(/"/g, '&quot;');
+    var deliveryDate = (orderData.deliveryDate || '').replace(/"/g, '&quot;');
+    var chargedFee = parseFloat(orderData.deliveryFee || 0).toFixed(2);
+    var orderNumDigits = String(orderData.orderNumber || '').replace(/[^0-9]/g, '');
+    var alreadyRefunded = 0;
+    (order.refunds || []).forEach(function (rf) {
+      (rf.transactions || []).forEach(function (t) {
+        if (t.kind === 'refund' && (t.status === 'success' || t.status === 'pending')) {
+          alreadyRefunded += parseFloat(t.amount || 0);
+        }
+      });
+    });
+    alreadyRefunded = alreadyRefunded.toFixed(2);
+    var specialInstructions = (orderData.specialInstructions || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+    var giftMessage = (orderData.giftMessage || '').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+
+    var dtChoices = [['pickup', 'Pickup'], ['local-delivery', 'Local Delivery'], ['shipping', 'Shipping'], ['in-store', 'In Store']];
+    var dtOptions = '';
+    for (var dti = 0; dti < dtChoices.length; dti++) {
+      dtOptions += '<option value="' + dtChoices[dti][0] + '"' + (orderData.deliveryType === dtChoices[dti][0] ? ' selected' : '') + '>' + dtChoices[dti][1] + '</option>';
+    }
+
+    res.send('<!DOCTYPE html><html><head><title>Edit Invoice ' + orderData.orderNumber + '</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,sans-serif;background:#f5f5f5;display:flex;height:100vh}@media print{.no-print{display:none!important}body{display:block;background:white}.editor-panel{display:none}.preview-wrap{padding:0}}' +
+      '.editor-panel{width:360px;min-width:360px;background:#fff;border-right:2px solid #eee;padding:20px;overflow-y:auto;flex-shrink:0}' +
+      '.preview-wrap{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;align-items:center}' +
+      '.editor-panel h2{font-size:18px;font-weight:600;margin-bottom:4px}.order-sub{font-size:12px;color:#888;margin-bottom:16px}' +
+      '.field{margin-bottom:12px}.field label{display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;color:#555}' +
+      '.field input,.field textarea,.field select{width:100%;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:13px;font-family:inherit;background:#fff}.field textarea{height:80px;resize:vertical}.field select{cursor:pointer;font-weight:700}' +
+      '.money-row{display:flex;align-items:center;gap:7px}.money-row span{font-size:16px;font-weight:800;color:#555}.money-row input{flex:1;padding:9px 10px;border:2px solid #ddd;border-radius:6px;font-size:15px;font-weight:800;font-family:inherit}' +
+      '.fee-note{font-size:12px;line-height:1.5;margin-top:7px;color:#555}.fee-note b{color:#111}.fee-note.warn{background:#fff7ed;border:2px solid #fdba74;border-radius:8px;padding:9px 10px;color:#7c2d12}.fee-note.ok{color:#15803d}' +
+      '.fee-refund{display:block;margin-top:9px;background:#dc2626;color:#fff;text-align:center;padding:10px;border-radius:8px;font-size:13px;font-weight:800;text-decoration:none}' +
+      '.section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin:16px 0 8px;padding-top:12px;border-top:1px solid #eee}' +
+      '.btn-row{display:flex;gap:8px;margin-top:20px}.btn{padding:11px 16px;border-radius:8px;font-size:13px;font-weight:700;border:none;cursor:pointer;text-decoration:none;text-align:center;flex:1}' +
+      '.btn-green{background:#22c55e;color:#fff}.btn-black{background:#000;color:#fff}.btn-blue{background:#2563eb;color:#fff}.btn-outline{background:#fff;color:#000;border:2px solid #000}.btn-red{background:#dc2626;color:#fff;border:none;display:block;text-align:center;padding:16px;font-size:16px;font-weight:800;border-radius:8px;margin-top:10px}.label-q{border:3px solid #dc2626;border-radius:10px;padding:0 0 14px;margin-top:22px;background:#fff}.label-q-head{background:#dc2626;color:#fff;font-size:17px;font-weight:800;padding:11px 14px;text-align:center}.label-q-body{font-size:14px;line-height:1.6;padding:14px 16px 0;color:#111}.label-q-yes{font-size:14px;font-weight:800;padding:14px 16px 0;color:#111}.label-q a.btn-red{margin:8px 16px 0;width:calc(100% - 32px);box-sizing:border-box}.label-q-foot{font-size:12px;color:#555;padding:9px 16px 0;text-align:center;line-height:1.4}' +
+      '</style></head><body>' +
+      '<div class="editor-panel no-print">' +
+        '<h2>Edit Invoice</h2>' +
+        '<div class="order-sub">' + orderData.orderNumber + ' &mdash; ' + orderData.deliveryType.toUpperCase() + '</div>' +
+        '<div class="section-label">Recipient</div>' +
+        '<div class="field"><label>Name</label><input type="text" id="recipientName" value="' + recipientName + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>Address Line 1</label><input type="text" id="addr1" value="' + addr1 + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>Address Line 2 / Suite</label><input type="text" id="addr2" value="' + addr2 + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>City</label><input type="text" id="city" value="' + city + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>State</label><input type="text" id="province" value="' + province + '" oninput="refreshPreview()"></div>' +
+        '<div class="field"><label>ZIP</label><input type="text" id="zip" value="' + zip + '" oninput="zipChanged()"></div>' +
+        '<div class="section-label">Delivery</div>' +
+        '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="zipChanged()">' + dtOptions + '</select></div>' +
+        '<div class="field"><label>Delivery Fee</label>' +
+          '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + chargedFee + '" oninput="feeTyped()"></div>' +
+          '<div class="fee-note" id="feeNote"></div>' +
+        '</div>' +
+        '<div class="field"><label>Delivery Date</label><input type="text" id="deliveryDate" value="' + deliveryDate + '" oninput="refreshPreview()"></div>' +
+        '<div class="section-label">Notes</div>' +
+        '<div class="field"><label>Special Instructions</label><textarea id="specialInstructions" oninput="refreshPreview()">' + specialInstructions + '</textarea></div>' +
+        '<div class="field"><label>Gift Message</label><textarea id="giftMessage" oninput="refreshPreview()">' + giftMessage + '</textarea></div>' +
+        '<div class="btn-row"><button class="btn btn-green" onclick="saveAndPrint(this)">&#128190; Save &amp; Print Invoice</button></div>' +
+        '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
+        labelWarningHTML +
+        '<div class="btn-row"><button class="btn btn-black" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard/invoices" class="btn btn-outline">← Back</a></div>' +
+      '</div>' +
+      '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +
+      '<script>' +
+        'var debounceTimer;' +
+        // The ZIP table is the same one the dashboard and the driver app use.
+        'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';' +
+        'var CHARGED=' + chargedFee + ';' +
+        'var REFUNDED=' + alreadyRefunded + ';' +
+        'var ORDERNUM="' + orderNumDigits + '";' +
+        'function feeVal(){return parseFloat(document.getElementById("deliveryFee").value)||0}' +
+        // Changing the ZIP is the whole point: the price of a local delivery is
+        // decided by the ZIP, so the fee follows it without anyone retyping it.
+        'function zipChanged(){' +
+          'var z=(document.getElementById("zip").value||"").replace(/\D/g,"").slice(0,5);' +
+          'if(document.getElementById("deliveryType").value==="local-delivery"&&z.length===5&&FEES[z]!=null){' +
+            'document.getElementById("deliveryFee").value=FEES[z].toFixed(2);' +
+          '}' +
+          'updateFeeNote();refreshPreview();' +
+        '}' +
+        'function feeTyped(){updateFeeNote();refreshPreview()}' +
+        // Two separate questions, and staff need both answered out loud:
+        // does the fee match the ZIP, and does anyone owe anyone money.
+        'function updateFeeNote(){' +
+          'var n=document.getElementById("feeNote");' +
+          'var z=(document.getElementById("zip").value||"").replace(/\\D/g,"").slice(0,5);' +
+          'var isLocal=document.getElementById("deliveryType").value==="local-delivery";' +
+          'var now=feeVal();var table=(isLocal&&z.length===5)?FEES[z]:undefined;' +
+          'var h="";var loud=false;' +
+          'if(isLocal&&z.length===5){' +
+            'if(table==null){h+="ZIP <b>"+z+"</b> is not in the price list. Type the fee yourself.<br>";loud=true}' +
+            'else if(Math.abs(table-now)>0.004){h+="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>. This invoice says <b>$"+now.toFixed(2)+"</b>.<br>";loud=true}' +
+            'else{h+="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>.<br>"}' +
+          '}' +
+          'var diff=Math.round((CHARGED-now-REFUNDED)*100)/100;' +
+          'h+="Charged at checkout: <b>$"+CHARGED.toFixed(2)+"</b>.";' +
+          'if(REFUNDED>0.004){h+=" Already sent back: <b>$"+REFUNDED.toFixed(2)+"</b>.";}' +
+          'if(diff>0.004){h+="<br>Send <b>$"+diff.toFixed(2)+"</b> back to the customer.";loud=true}' +
+          'else if(diff<-0.004){h+="<br>The customer owes <b>$"+Math.abs(diff).toFixed(2)+"</b> more.";loud=true}' +
+          'else if(REFUNDED>0.004){h+="<br>&#10004; The money side is already square.";}' +
+          'n.className=loud?"fee-note warn":"fee-note ok";n.innerHTML=h;' +
+          // One click to take the ZIP price, so nobody retypes a number we already know.
+          'if(table!=null&&Math.abs(table-now)>0.004){' +
+            'var b=document.createElement("a");b.className="fee-refund";b.style.background="#2563eb";b.href="#";' +
+            'b.textContent="Use $"+table.toFixed(2)+" \\u2014 the price for "+z;' +
+            'b.onclick=function(e){e.preventDefault();document.getElementById("deliveryFee").value=table.toFixed(2);updateFeeNote();refreshPreview()};' +
+            'n.appendChild(b);' +
+          '}' +
+          'if(diff>0.004){' +
+            'var a=document.createElement("a");a.className="fee-refund";' +
+            'a.href="/refund?order="+ORDERNUM+"&amount="+diff.toFixed(2)+"&why="+encodeURIComponent("Delivery fee corrected to $"+now.toFixed(2)+(z?" for ZIP "+z:""));' +
+            'a.textContent="Send $"+diff.toFixed(2)+" back \\u2192";n.appendChild(a);' +
+          '}' +
+        '}' +
+        'function getFormData(){return{' +
+          'recipientName:document.getElementById("recipientName").value,' +
+          'addr1:document.getElementById("addr1").value,' +
+          'addr2:document.getElementById("addr2").value,' +
+          'city:document.getElementById("city").value,' +
+          'province:document.getElementById("province").value,' +
+          'zip:document.getElementById("zip").value,' +
+          'deliveryType:document.getElementById("deliveryType").value,' +
+          'deliveryFee:document.getElementById("deliveryFee").value,' +
+          'deliveryDate:document.getElementById("deliveryDate").value,' +
+          'specialInstructions:document.getElementById("specialInstructions").value,' +
+          'giftMessage:document.getElementById("giftMessage").value' +
+        '}}' +
+        'function doRefresh(){' +
+          'var fd=getFormData();' +
+          'var params=new URLSearchParams(fd);' +
+          'document.getElementById("previewFrame").src="/dashboard/invoice-preview/' + order.id + '?"+params.toString();' +
+        '}' +
+        'function saveAndPrint(btn){' +
+          'var fd=getFormData();' +
+          'var msg=document.getElementById("saveMsg");' +
+          'if(btn){btn.disabled=true;btn.textContent="Saving…"}' +
+          'msg.style.color="#666";msg.textContent="Saving to Shopify…";' +
+          'fetch("/dashboard/invoice-save/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)})' +
+          '.then(function(r){return r.json()})' +
+          '.then(function(d){' +
+            'if(!d.success){throw new Error(d.error||"Shopify would not save it")}' +
+            'msg.textContent="Saved. Sending to the printer…";' +
+            'if(btn){btn.textContent="Printing…"}' +
+            'return fetch("/dashboard/invoice-print-edited/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(fd)}).then(function(r){return r.json()})' +
+          '})' +
+          '.then(function(d){' +
+            'if(!d.success){throw new Error("Saved, but the printer said: "+(d.error||"unknown error"))}' +
+            'msg.style.color="#22c55e";msg.textContent="\u2705 Saved and sent to the printer";' +
+            'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
+          '})' +
+          '.catch(function(e){' +
+            'msg.style.color="#ef4444";msg.textContent="\u274C "+e.message+" \u2014 nothing was printed";' +
+            'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
+          '})' +
+        '}' +
+        'updateFeeNote();' +
+      '</script>' +
+    '</body></html>');
   } catch (error) {
-    res.redirect('/order-lookup');
+    res.status(500).send('Error: ' + error.message);
   }
 });
 
@@ -1097,7 +1279,9 @@ app.post('/dashboard/invoice-save/:orderId', async (req, res) => {
   try {
     var body = req.body;
     var noteLines = [];
-    if (body.specialInstructions) noteLines.push('Special Instructions: ' + String(body.specialInstructions).trim());
+    if (body.specialInstructions) noteLines.push('Special Instructions: ' + body.specialInstructions);
+    if (body.giftMessage) noteLines.push('Gift Message: ' + body.giftMessage);
+    if (body.deliveryDate) noteLines.push('Delivery Date: ' + body.deliveryDate);
 
     var updatePayload = { order: { id: parseInt(req.params.orderId) } };
     if (body.recipientName || body.addr1 || body.city) {
@@ -2133,29 +2317,6 @@ function lookupShell(inner, q, hasOrder) {
   html += '.doact .t{font-size:17px;font-weight:700;line-height:1.25}';
   html += '.doact .s{display:block;font-size:14px;font-weight:600;color:#6B5F65;margin-top:3px;line-height:1.4}';
   html += '.doact .go{margin-left:auto;flex-shrink:0;font-size:19px;color:#C8A02C}';
-  html += '.f{margin-bottom:14px}';
-  html += '.f label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#9A8D93;margin-bottom:6px}';
-  html += '.f input,.f textarea{width:100%;padding:14px 15px;border:1.5px solid #E8E2E5;border-radius:10px;font-size:17px;font-family:inherit;font-weight:600;background:#fff;color:#2A2A2A}';
-  html += '.f input:focus,.f textarea:focus{outline:none;border-color:#C8A02C}';
-  html += '.f textarea{min-height:92px;resize:vertical;line-height:1.5}';
-  html += '.f2{display:flex;gap:12px}.f2>div{flex:1;margin-bottom:14px}';
-  html += '.money-row{display:flex;align-items:center;gap:9px}.money-row>span{font-size:20px;font-weight:800;color:#6B5F65}.money-row input{flex:1}';
-  html += '.fee-note{font-size:14px;line-height:1.55;margin-top:8px;color:#555}.fee-note b{color:#111}';
-  html += '.fee-note.warn{background:#FFF7ED;border:2px solid #FDBA74;border-radius:10px;padding:11px 13px;color:#7C2D12}';
-  html += '.fee-note.ok{color:#15803D;font-weight:600}';
-  html += '.fee-btn{display:block;margin-top:10px;background:#2563EB;color:#fff;text-align:center;padding:12px;border-radius:9px;font-size:15px;font-weight:800;text-decoration:none}';
-  html += '.fee-btn.red{background:#DC2626}';
-  // The save button follows you down a long form. Nobody should have to hunt for it.
-  html += '.savebar{position:sticky;bottom:0;z-index:5;background:linear-gradient(180deg,rgba(250,247,248,0) 0%,#FAF7F8 22%);padding:18px 0 10px;margin-top:4px}';
-  html += '.savebtn{display:block;width:100%;padding:21px;border:none;border-radius:13px;background:#1FA463;color:#fff;font-size:20px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(31,164,99,.28)}';
-  html += '.savebtn:disabled{opacity:.55}';
-  html += '.savemsg{text-align:center;font-size:15px;font-weight:700;margin-top:10px;min-height:21px}';
-  html += '.readonly{font-size:16px;font-weight:600;line-height:1.6}';
-  html += '.ordercard{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:6px 24px 20px;margin-bottom:18px}';
-  html += '.fld{padding:15px 0;border-bottom:1px solid #F5F1F3}.fld:last-child{border-bottom:none}';
-  html += '.fld .lbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#9A8D93;margin-bottom:5px}';
-  html += '.fld .big{font-size:17px;font-weight:700;line-height:1.55}';
-  html += '.fld .quote{font-size:16px;font-weight:600;line-height:1.6;font-style:italic;color:#3A3A3A}';
   html += '.headline{background:#fff;border:1px solid #EFEBED;border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.06);padding:22px 24px;margin-bottom:14px}';
   html += '.headline .num{font-size:31px;font-weight:800;letter-spacing:-.5px;line-height:1.1}';
   html += '.headline .who{font-size:19px;font-weight:700;margin-top:6px}';
@@ -2251,194 +2412,138 @@ app.get('/order-lookup', async (req, res) => {
     var isPickup = mLow.indexOf('pick') > -1;
     var trackings = (order.fulfillments || []).filter(function (f) { return f.tracking_number; });
 
-    var od = extractOrderData(order);
-    var esc = function (v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); };
-    // Older saves stuffed the gift message and the delivery date into the note as
-    // well. Drop those lines so the box holds instructions only.
-    var cleanInstructions = function (v) {
-      return String(v == null ? '' : v).split('\n').filter(function (line) {
-        return !/^\s*(gift\s*message|delivery\s*date|shipping\s+switched|refunded)\b\s*:?/i.test(line);
-      }).join('\n').trim();
-    };
-    var unprefix = function (v, label) {
-      var out = String(v == null ? '' : v);
-      var re = new RegExp('^\\s*' + label + '\\s*:\\s*', 'i');
-      while (re.test(out)) out = out.replace(re, '');
-      return out.trim();
-    };
     var inner = '';
 
-    // --- Who and what, small. The boxes below are the point of the page. ---
+    // --- Who and what, in big letters, straight under the search box ---
     var c = order.customer || {};
-    var custName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || (order.shipping_address && order.shipping_address.name) || '';
-    var placedWhen = new Date(order.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    var custName = ((c.first_name || '') + ' ' + (c.last_name || '')).trim() || (order.shipping_address && order.shipping_address.name) || '—';
+    var placedWhen = new Date(order.created_at).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+    // Who placed it: store-IP registered = staff typed it in; POS = rung up in store.
+    var storeIps = await getStoreIps();
+    var origin = '', originWarn = false;
+    if (order.source_name === 'pos') { origin = 'Rung up in the store'; }
+    else if (order.browser_ip && storeIps.indexOf(order.browser_ip) > -1) { origin = 'Typed in by staff on a store computer'; originWarn = true; }
+    else if (order.browser_ip && storeIps.length) { origin = 'The customer ordered it online'; }
+
     inner += '<div class="headline">';
     inner += '<div class="num">' + escapeHtml(order.name) + '</div>';
-    if (custName) inner += '<div class="who">' + escapeHtml(custName) + '</div>';
-    inner += '<div class="meta">' + escapeHtml((order.financial_status || 'unpaid').toUpperCase()) + ' &middot; $' + escapeHtml(order.total_price) + ' &middot; ordered ' + placedWhen + '</div>';
+    inner += '<div class="who">' + escapeHtml(custName) + '</div>';
+    inner += '<div class="meta">' + escapeHtml((order.financial_status || '').toUpperCase() || 'UNPAID') + ' &middot; $' + escapeHtml(order.total_price) + '<br>Ordered ' + placedWhen;
+    if (method) inner += '<br>' + escapeHtml(method);
+    if (order.email) inner += '<br>' + escapeHtml(order.email);
+    if (order.phone || c.phone) inner += '<br>&#9742; ' + escapeHtml(order.phone || c.phone);
+    inner += '</div>';
+    if (origin) inner += '<div class="' + (originWarn ? 'warnline' : 'meta') + '" style="margin-top:9px">' + (originWarn ? '&#9888;&#65039; ' : '') + escapeHtml(origin) + '</div>';
+    inner += '<a class="trackbtn" href="https://admin.shopify.com/store/thesweettoothfl/orders/' + order.id + '" target="_blank" rel="noopener">Open in Shopify</a>';
     inner += '</div>';
 
-    // --- Where is it? One loud coloured box. ---
+    // --- Where is it? One loud coloured box, so nobody has to read to find out. ---
     var banner = '', sub = '', tone = 'tone-grey';
     if (st.status === 'DELIVERED') {
-      tone = 'tone-green'; banner = '&#10004; DELIVERED';
+      tone = 'tone-green';
+      banner = '&#10004; DELIVERED';
       sub = (st.completed ? formatStCompleted(st.completed) : '') + (st.driver ? ' &middot; by ' + escapeHtml(st.driver) : '');
     } else if (isLocal) {
-      tone = 'tone-amber'; banner = 'NOT DELIVERED YET';
-      sub = st.deliveryDate ? 'Going out ' + escapeHtml(st.deliveryDate) : 'No delivery day set yet';
+      tone = 'tone-amber';
+      banner = 'NOT DELIVERED YET';
+      sub = st.deliveryDate ? 'Going out ' + escapeHtml(st.deliveryDate) : 'No delivery date set yet';
+      if (st.status) sub += ' &middot; ' + escapeHtml(st.status);
     } else if (isPickup) {
-      tone = 'tone-blue'; banner = 'PICK UP IN THE STORE';
+      tone = 'tone-blue';
+      banner = 'PICK UP IN THE STORE';
       sub = order.fulfillment_status === 'fulfilled' ? 'Already picked up' : 'Waiting for the customer to come in';
     } else if (trackings.length) {
-      tone = 'tone-blue'; banner = '&#128230; SHIPPED';
-      sub = escapeHtml(trackings[0].tracking_number || '');
+      tone = 'tone-blue';
+      banner = '&#128230; SHIPPED';
+      sub = 'Tracking number is further down this page';
     } else {
-      tone = 'tone-amber'; banner = 'NOT SHIPPED YET';
+      tone = 'tone-amber';
+      banner = 'NOT SHIPPED YET';
       sub = method ? escapeHtml(method) : 'No delivery or shipping method on this order';
     }
     inner += '<div class="status-banner ' + tone + '">' + banner + '<span class="sub">' + sub + '</span></div>';
 
-    // A label that is already printed cannot follow an address change.
-    var printedTracking = trackings.length ? trackings[0].tracking_number : null;
-    if (printedTracking && !isLocal && !isPickup) {
-      inner += '<div class="status-banner tone-amber" style="font-size:17px">A LABEL IS ALREADY PRINTED' +
-        '<span class="sub">Tracking ' + escapeHtml(printedTracking) + ' goes to the address below as it is now. ' +
-        'If you change the address here, UPS still takes the box to the old one. Use <b>Change Shipping Speed</b> under Other things to throw the old label away.</span></div>';
-    }
-
-    // --- The order itself: every box is live. Type in it and press the green button. ---
-    var a = order.shipping_address || {};
-    inner += '<div class="sectitle">' + (isLocal ? 'Where it is going' : (isPickup ? 'Who is picking it up' : 'Where it is being shipped')) + '</div>';
-    inner += '<div class="ordercard" style="padding:22px 24px">';
-    inner += '<div class="f"><label>Name</label><input type="text" id="recipientName" value="' + esc(a.name || custName) + '"></div>';
-    inner += '<div class="f"><label>Street address</label><input type="text" id="addr1" value="' + esc(a.address1) + '"></div>';
-    inner += '<div class="f"><label>Apartment, suite or company</label><input type="text" id="addr2" value="' + esc(a.address2) + '"></div>';
-    inner += '<div class="f"><label>City</label><input type="text" id="city" value="' + esc(a.city) + '"></div>';
-    inner += '<div class="f2"><div class="f"><label>State</label><input type="text" id="province" value="' + esc(a.province) + '"></div>';
-    inner += '<div class="f"><label>ZIP</label><input type="text" id="zip" inputmode="numeric" maxlength="5" value="' + esc(a.zip) + '" oninput="zipChanged()"></div></div>';
+    // --- What do you need to do? Named for the job, not for the piece of paper. ---
+    inner += '<div class="sectitle">What do you need to do?</div>';
+    inner += '<div class="doact">';
+    inner += doRow('/dashboard/invoice-edit/' + order.id, '&#9999;&#65039;', 'Edit Order',
+      'Wrong address, date, delivery price or notes. Fix it, then it prints.');
+    inner += doRow('/dashboard/reprint-invoice/' + order.id, '&#128424;&#65039;', 'Reprint Order Invoice',
+      'Prints right now. Nothing on the order changes.',
+      'return confirm(\'Print the invoice for ' + escapeHtml(order.name) + ' right now?\')');
+    inner += doRow('/dashboard/print-custom/' + order.id, '&#128140;', 'Edit Gift Message',
+      'Change what the gift card says, then print the card.');
+    inner += doRow('/reprint-label?order=' + encodeURIComponent(String(order.order_number)), '&#128230;', 'Reprint Shipping Label',
+      'Same box, same address. Prints the UPS label again.');
+    inner += doRow('/switch-shipping?order=' + encodeURIComponent(String(order.order_number)), '&#9889;', 'Change Shipping Speed',
+      'Needs to get there sooner. Buys a new label.');
     inner += '</div>';
 
-    inner += '<div class="sectitle">When and how much</div>';
-    inner += '<div class="ordercard" style="padding:22px 24px">';
-    inner += '<div class="f"><label>' + (isLocal ? 'Delivery day' : 'Ship on') + '</label><input type="text" id="deliveryDate" value="' + esc(od.deliveryDate) + '"></div>';
-    if (isLocal) {
-      inner += '<div class="f"><label>Delivery price</label>';
-      inner += '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + parseFloat(od.deliveryFee || 0).toFixed(2) + '" oninput="feeTyped()"></div>';
-      inner += '<div class="fee-note" id="feeNote"></div></div>';
-    }
-    inner += '</div>';
+    // --- Everything else is folded away. Staff open only what they came for. ---
+    inner += '<div class="sectitle">Look at the order</div>';
 
-    inner += '<div class="sectitle">What to write and how to make it</div>';
-    inner += '<div class="ordercard" style="padding:22px 24px">';
-    inner += '<div class="f"><label>Gift card message</label><textarea id="giftMessage">' + esc(unprefix(od.giftMessage, 'Gift Message')) + '</textarea></div>';
-    inner += '<div class="f" style="margin-bottom:0"><label>Special instructions for the kitchen</label><textarea id="specialInstructions">' + esc(unprefix(cleanInstructions(od.specialInstructions), 'Special Instructions')) + '</textarea></div>';
-    inner += '</div>';
-
-    // Items are not editable here — changing what is in the box is a Shopify job.
-    var itemRows = '';
+    var itemRows = '', itemCount = 0;
     (order.line_items || []).forEach(function (li) {
       if ((li.title || '').toLowerCase().indexOf('tip') > -1) return;
-      var vt = li.variant_title ? ' <span style="color:#6B5F65">— ' + escapeHtml(li.variant_title) + '</span>' : '';
+      itemCount += li.quantity;
+      var vt = li.variant_title ? ' <span style="color:#6B5F65;font-weight:700">— ' + escapeHtml(li.variant_title) + '</span>' : '';
       itemRows += '<div class="item"><span><span class="qty">' + li.quantity + '&times;</span> ' + escapeHtml(li.title) + vt + '</span><span>$' + escapeHtml(li.price) + '</span></div>';
       (li.properties || []).forEach(function (pr) {
         if (!pr || !pr.value || String(pr.name || '').charAt(0) === '_') return;
         itemRows += '<div style="padding:2px 0 8px 26px;font-size:14px;color:#6B5B62;font-weight:600">&#8627; ' + escapeHtml(pr.name) + ': ' + escapeHtml(String(pr.value)) + '</div>';
       });
     });
-    if (itemRows) {
-      inner += '<div class="sectitle">What they ordered</div>';
-      inner += '<div class="ordercard" style="padding:8px 24px 18px">' + itemRows +
-        '<div class="muted" style="margin-top:12px">To change what is in the box, open it in Shopify under Other things.</div></div>';
+    if (itemRows) inner += acc('What they ordered', itemCount + (itemCount === 1 ? ' item' : ' items'), itemRows);
+
+    var a = order.shipping_address;
+    if (a) {
+      var addrBody = '<div style="font-size:17px;line-height:1.7;font-weight:600">' + escapeHtml(a.name || '') + '<br>' + escapeHtml(a.address1 || '');
+      if (a.address2) addrBody += '<br>' + escapeHtml(a.address2);
+      addrBody += '<br>' + escapeHtml(a.city || '') + ', ' + escapeHtml(a.province_code || '') + ' ' + escapeHtml(a.zip || '');
+      if (a.phone) addrBody += '<br>&#9742; ' + escapeHtml(a.phone);
+      addrBody += '</div>';
+      addrBody += '<div class="muted" style="margin-top:12px">Wrong? Use <b>Edit Order</b> above.</div>';
+      inner += acc(isLocal ? 'Where it is going' : (isPickup ? 'Who is picking it up' : 'Where it is being shipped'),
+        escapeHtml((a.city || '') + (a.zip ? ' ' + a.zip : '')), addrBody);
     }
 
-    // --- One button. It saves everything above and prints the invoice. ---
-    inner += '<div class="savebar">';
-    inner += '<button type="button" class="savebtn" id="savebtn" onclick="saveAll(this)">Save and Print</button>';
-    inner += '<div class="savemsg" id="savemsg"></div></div>';
-
-    // --- Everything rare, folded into one place. ---
-    var others = '<div class="doact">';
-    others += doRow('/dashboard/reprint-invoice/' + order.id, '&#128424;&#65039;', 'Print the invoice again',
-      'Prints right now. Saves nothing.',
-      'return confirm(\'Print the invoice for ' + escapeHtml(order.name) + ' right now?\')');
-    others += doRow('/dashboard/print-custom/' + order.id, '&#128140;', 'Design the gift card',
-      'Change the fonts and sizes, then print the card on its own.');
-    if (!isLocal && !isPickup) {
-      others += doRow('/reprint-label?order=' + encodeURIComponent(String(order.order_number)), '&#128230;', 'Reprint the shipping label',
-        'Same box, same address. Prints the UPS label again.');
-      others += doRow('/switch-shipping?order=' + encodeURIComponent(String(order.order_number)), '&#9889;', 'Change shipping speed',
-        'Needs to get there sooner. Buys a new label.');
-    }
-    others += doRow('/dashboard/invoice-view/' + order.id, '&#128065;&#65039;', 'See what will print',
-      'Opens the invoice as it stands right now.');
-    others += doRow('https://admin.shopify.com/store/thesweettoothfl/orders/' + order.id, '&#128722;', 'Open it in Shopify',
-      'Refunds, cancelling, changing what is in the box.');
-    if (trackings.length) {
-      var turl = (trackings[0].tracking_urls && trackings[0].tracking_urls[0]) || ('https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(trackings[0].tracking_number));
-      others += doRow(turl, '&#128666;', 'Track it on UPS', escapeHtml(trackings[0].tracking_number || ''));
-    }
-    if (isLocal) {
-      others += '<div class="muted" style="padding:14px 4px 2px">Driver: ' + (st.driver ? escapeHtml(st.driver) : 'not assigned yet') +
-        ' &middot; Delivered at: ' + (st.completed ? formatStCompleted(st.completed) : 'not yet') + '</div>';
-    }
-    others += '</div>';
-    inner += '<div class="sectitle">Other things</div>' + acc('Other things you can do with this order', '', others);
-
-    // --- Page script: ZIP drives the price, one button saves and prints. ---
-    var refundedSoFar = 0;
-    (order.refunds || []).forEach(function (rf) {
-      (rf.transactions || []).forEach(function (t) {
-        if (t.kind === 'refund' && (t.status === 'success' || t.status === 'pending')) refundedSoFar += parseFloat(t.amount || 0);
+    var attrs = (order.note_attributes || []).filter(function (na) { return na && na.value && String(na.value).trim(); });
+    if (attrs.length || order.note) {
+      var giftBody = '';
+      attrs.forEach(function (na) {
+        var val = String(na.value);
+        if (val.length > 60 || /message/i.test(na.name || '')) {
+          giftBody += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">' + escapeHtml(na.name) + '</span><div style="font-weight:600;font-size:16px;line-height:1.6;margin-top:3px">' + escapeHtml(val) + '</div></div>';
+        } else {
+          giftBody += '<div class="row"><span class="k">' + escapeHtml(na.name) + '</span><span class="v">' + escapeHtml(val) + '</span></div>';
+        }
       });
-    });
+      if (order.note) giftBody += '<div style="padding:7px 0"><span class="k" style="color:#6B5F65;font-size:15px">Order note</span><div style="font-weight:600;font-size:16px;line-height:1.6;margin-top:3px">' + escapeHtml(order.note) + '</div></div>';
+      giftBody += '<div class="muted" style="margin-top:12px">Gift message wrong? Use <b>Edit Gift Message</b> above.</div>';
+      inner += acc('Gift message and order notes', '', giftBody);
+    }
 
-    inner += '<script>';
-    inner += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
-    inner += 'var CHARGED=' + parseFloat(od.deliveryFee || 0).toFixed(2) + ';';
-    inner += 'var REFUNDED=' + refundedSoFar.toFixed(2) + ';';
-    inner += 'var ORDERNUM="' + String(order.order_number) + '";';
-    inner += 'var IS_LOCAL=' + (isLocal ? 'true' : 'false') + ';';
-    inner += 'function el(i){return document.getElementById(i)}';
-    inner += 'function feeVal(){var f=el("deliveryFee");return f?(parseFloat(f.value)||0):0}';
-    // The price of a local delivery is decided by the ZIP, so it follows the ZIP.
-    inner += 'function zipChanged(){if(!IS_LOCAL)return;var z=(el("zip").value||"").replace(/\\D/g,"").slice(0,5);';
-    inner += 'if(z.length===5&&FEES[z]!=null&&el("deliveryFee")){el("deliveryFee").value=FEES[z].toFixed(2)}feeNote()}';
-    inner += 'function feeTyped(){feeNote()}';
-    inner += 'function feeNote(){var n=el("feeNote");if(!n)return;';
-    inner += 'var z=(el("zip").value||"").replace(/\\D/g,"").slice(0,5);var now=feeVal();var table=z.length===5?FEES[z]:undefined;';
-    inner += 'var h="";var loud=false;';
-    inner += 'if(z.length===5){if(table==null){h+="ZIP <b>"+z+"</b> is not in the price list. Type the price yourself.<br>";loud=true}';
-    inner += 'else if(Math.abs(table-now)>0.004){h+="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>. This order says <b>$"+now.toFixed(2)+"</b>.<br>";loud=true}';
-    inner += 'else{h+="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>.<br>"}}';
-    inner += 'var diff=Math.round((CHARGED-now-REFUNDED)*100)/100;';
-    inner += 'h+="They paid <b>$"+CHARGED.toFixed(2)+"</b> for delivery.";';
-    inner += 'if(REFUNDED>0.004){h+=" Already sent back: <b>$"+REFUNDED.toFixed(2)+"</b>."}';
-    inner += 'if(diff>0.004){h+="<br>Send <b>$"+diff.toFixed(2)+"</b> back to the customer.";loud=true}';
-    inner += 'else if(diff<-0.004){h+="<br>They owe <b>$"+Math.abs(diff).toFixed(2)+"</b> more.";loud=true}';
-    inner += 'else if(REFUNDED>0.004){h+="<br>&#10004; The money is already square."}';
-    inner += 'n.className=loud?"fee-note warn":"fee-note ok";n.innerHTML=h;';
-    inner += 'if(table!=null&&Math.abs(table-now)>0.004){var b=document.createElement("a");b.className="fee-btn";b.href="#";';
-    inner += 'b.textContent="Use $"+table.toFixed(2)+", the price for "+z;';
-    inner += 'b.onclick=function(e){e.preventDefault();el("deliveryFee").value=table.toFixed(2);feeNote()};n.appendChild(b)}';
-    inner += 'if(diff>0.004){var r=document.createElement("a");r.className="fee-btn red";';
-    inner += 'r.href="/refund?order="+ORDERNUM+"&amount="+diff.toFixed(2)+"&why="+encodeURIComponent("Delivery price corrected to $"+now.toFixed(2)+" for ZIP "+z);';
-    inner += 'r.textContent="Send $"+diff.toFixed(2)+" back \\u2192";n.appendChild(r)}}';
-    inner += 'function formData(){var d={recipientName:el("recipientName").value,addr1:el("addr1").value,addr2:el("addr2").value,';
-    inner += 'city:el("city").value,province:el("province").value,zip:el("zip").value,deliveryDate:el("deliveryDate").value,';
-    inner += 'specialInstructions:el("specialInstructions").value,giftMessage:el("giftMessage").value};';
-    inner += 'if(el("deliveryFee"))d.deliveryFee=el("deliveryFee").value;return d}';
-    inner += 'function saveAll(btn){var d=formData();var m=el("savemsg");btn.disabled=true;btn.textContent="Saving\\u2026";';
-    inner += 'm.style.color="#6B5F65";m.textContent="Saving to Shopify\\u2026";';
-    inner += 'fetch("/dashboard/invoice-save/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)})';
-    inner += '.then(function(r){return r.json()}).then(function(j){if(!j.success)throw new Error(j.error||"Shopify would not save it");';
-    inner += 'm.textContent="Saved. Sending it to the printer\\u2026";btn.textContent="Printing\\u2026";';
-    inner += 'return fetch("/dashboard/invoice-print-edited/' + order.id + '",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(d)}).then(function(r){return r.json()})})';
-    inner += '.then(function(j){if(!j.success)throw new Error("It saved, but the printer said: "+(j.error||"unknown error"));';
-    inner += 'm.style.color="#1FA463";m.textContent="\\u2705 Saved. The invoice is printing.";btn.disabled=false;btn.textContent="Save and Print";';
-    inner += 'CHARGED=feeVal();feeNote()})';
-    inner += '.catch(function(e){m.style.color="#DC2626";m.textContent="\\u274C "+e.message+" \\u2014 nothing printed";btn.disabled=false;btn.textContent="Save and Print"})}';
-    inner += 'feeNote();';
-    inner += '<\/script>';
+    if (trackings.length) {
+      var trkBody = '';
+      trackings.forEach(function (f) {
+        var num = f.tracking_number;
+        var turl = (f.tracking_urls && f.tracking_urls[0]) || f.tracking_url || ('https://www.ups.com/track?loc=en_US&tracknum=' + encodeURIComponent(num));
+        trkBody += '<div class="row"><span class="k">' + escapeHtml(f.tracking_company || 'Carrier') + '</span><span class="v">' + escapeHtml(num) + '</span></div>';
+        trkBody += '<a class="trackbtn" href="' + escapeHtml(turl) + '" target="_blank" rel="noopener">Track on UPS</a>';
+      });
+      inner += acc('Tracking', escapeHtml(trackings[0].tracking_number || ''), trkBody);
+    } else if (!isLocal && !isPickup) {
+      inner += acc('Tracking', 'none yet', '<div class="muted">No tracking number on this order yet.</div>');
+    }
+
+    if (isLocal) {
+      var locBody = '';
+      locBody += '<div class="row"><span class="k">Delivery day</span><span class="v">' + (st.deliveryDate ? escapeHtml(st.deliveryDate) : '—') + '</span></div>';
+      locBody += '<div class="row"><span class="k">Driver</span><span class="v">' + (st.driver ? escapeHtml(st.driver) : 'Not assigned yet') + '</span></div>';
+      locBody += '<div class="row"><span class="k">Delivered at</span><span class="v">' + (st.completed ? formatStCompleted(st.completed) : 'Not delivered yet') + '</span></div>';
+      inner += acc('Delivery details', st.deliveryDate ? escapeHtml(st.deliveryDate) : '', locBody);
+    }
 
     res.send(lookupShell(inner, q, true));
   } catch (err) {
