@@ -865,7 +865,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="zipChanged()">' + dtOptions + '</select></div>' +
         '<div class="field"><label>Delivery Fee</label>' +
           '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + chargedFee + '" oninput="feeTyped()"></div>' +
-          '<div class="fee-note" id="feeNote"></div>' +
+          '<div id="feeNote" style="display:none"></div>' +
         '</div>' +
         '<div class="field"><label>Delivery Date</label><input type="text" id="deliveryDate" value="' + deliveryDate + '" oninput="refreshPreview()"></div>' +
         '<div class="section-label">Notes</div>' +
@@ -899,27 +899,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         // does the fee match the ZIP, and does anyone owe anyone money.
         // One fact and one button. Three lines of arithmetic at once, including a
         // line saying the customer owes money, made this unreadable and alarming.
-        'function updateFeeNote(){' +
-          'var n=document.getElementById("feeNote");' +
-          'var z=(document.getElementById("zip").value||"").replace(/\\D/g,"").slice(0,5);' +
-          'var isLocal=document.getElementById("deliveryType").value==="local-delivery";' +
-          'var now=feeVal();var table=(isLocal&&z.length===5)?FEES[z]:undefined;' +
-          'var h="",warn=false,fix=false;' +
-          'if(isLocal&&z.length===5&&table==null){h="ZIP <b>"+z+"</b> is not in the price list. Type the price yourself.";warn=true}' +
-          'else if(table!=null&&Math.abs(table-now)>0.004){h="ZIP <b>"+z+"</b> costs <b>$"+table.toFixed(2)+"</b>.";warn=true;fix=true}' +
-          'else if(table!=null){h="&#10004; $"+now.toFixed(2)+" is the right price for ZIP <b>"+z+"</b>."}' +
-          // Money only comes up once the price itself is settled.
-          'var back=fix?0:Math.round((CHARGED-REFUNDED-now)*100)/100;' +
-          'if(back>0.004){h=(h?h+"<br>":"")+"Send <b>$"+back.toFixed(2)+"</b> back to the customer.";warn=true}' +
-          'n.className=warn?"fee-note warn":"fee-note ok";n.innerHTML=h;' +
-          'if(fix){var b=document.createElement("a");b.className="fee-refund";b.style.background="#2563eb";b.href="#";' +
-            'b.textContent="Change it to $"+table.toFixed(2);' +
-            'b.onclick=function(e){e.preventDefault();document.getElementById("deliveryFee").value=table.toFixed(2);updateFeeNote();refreshPreview()};' +
-            'n.appendChild(b)}' +
-          'if(back>0.004){var a=document.createElement("a");a.className="fee-refund";' +
-            'a.href="/refund?order="+ORDERNUM+"&amount="+back.toFixed(2)+"&why="+encodeURIComponent("Delivery price corrected to $"+now.toFixed(2)+(z?" for ZIP "+z:""));' +
-            'a.textContent="Send $"+back.toFixed(2)+" back \\u2192";n.appendChild(a)}' +
-        '}' +
+        'function updateFeeNote(){}' +
         'function getFormData(){return{' +
           'recipientName:document.getElementById("recipientName").value,' +
           'addr1:document.getElementById("addr1").value,' +
