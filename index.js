@@ -874,7 +874,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="btn-row"><button class="btn btn-green" onclick="saveAndPrint(this)">&#128190; Save &amp; Print Invoice</button></div>' +
         '<div id="saveMsg" style="font-size:12px;text-align:center;margin-top:6px;height:18px;color:#22c55e;font-weight:700"></div>' +
         labelWarningHTML +
-        '<div class="btn-row"><button class="btn btn-black" onclick="window.print()">🖥 Browser Print</button><a href="/dashboard/invoices" class="btn btn-outline">← Back</a></div>' +
+        '<div class="btn-row"><a href="/dashboard/invoices" class="btn btn-outline">&larr; Back</a></div>' +
       '</div>' +
       '<div class="preview-wrap"><iframe id="previewFrame" style="width:8.5in;height:11in;border:1px solid #ccc;background:white;box-shadow:0 4px 20px rgba(0,0,0,0.15)" src="/dashboard/invoice-view/' + order.id + '?noprint=1"></iframe></div>' +
       '<script>' +
