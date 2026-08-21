@@ -2274,17 +2274,12 @@ function lookupShell(inner, q) {
   html += '@media (max-width:620px){.doact{grid-template-columns:1fr}}';
   html += '.doact a{display:flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:8px;padding:15px 16px;font-size:15px;font-weight:600;color:#2A2A2A;text-decoration:none;line-height:1.3}';
   html += '.doact a:hover{border-color:#C8A02C;box-shadow:0 4px 12px rgba(0,0,0,.07)}';
-  html += '.zipquick{display:inline-flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:12px;padding:0 16px;height:52px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
-  html += '.zipquick .zl{font-size:13px;font-weight:600;color:#6B5F65;white-space:nowrap}';
-  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:8px;padding:9px 10px;font-size:16px;font-weight:600;text-align:center}';
-  html += '.zipquick input:focus{outline:2px solid #C8A02C}';
-  html += '.zipquick .zout{font-size:19px;font-weight:600;min-width:56px;color:#6B5F65}';
-  html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
   html += '</style></head><body>' + TOPBAR_HTML + '<div class="wrap">';
-  html += '<div style="text-align:right"><div class="zipquick"><span class="zl">&#128663; Delivery price</span>';
-  html += '<input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP">';
-  html += '<span class="zout" id="zipout">&mdash;</span></div></div>';
   html += '<h1>Order Lookup</h1>';
+  // Staff use this constantly, so it goes above the fold, not buried at the bottom.
+  html += '<div class="card"><h2>Local Delivery Price by ZIP</h2>';
+  html += '<div class="searchbar" style="margin:0"><input type="text" id="zipin" inputmode="numeric" maxlength="5" placeholder="ZIP code, like 33140"><button type="button" onclick="zipFee()">Get Price</button></div>';
+  html += '<div class="toolout" id="zipout"></div></div>';
   html += '<form class="searchbar" action="/order-lookup" method="get">';
   html += '<input type="text" name="q" placeholder="Order number, customer name, email, or phone" value="' + escapeHtml(q || '') + '" autofocus>';
   html += '<button type="submit">Look Up</button></form>';
@@ -2300,10 +2295,10 @@ function lookupShell(inner, q) {
 
   html += '<script>';
   html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
-  html += '(function(){var i=document.getElementById("zipin"),o=document.getElementById("zipout");';
-  html += 'i.addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,5);var z=this.value;';
-  html += 'if(z.length<5){o.textContent="\\u2014";o.className="zout";return}';
-  html += 'if(FEES[z]!=null){o.textContent="$"+FEES[z];o.className="zout hit"}else{o.textContent="Not our area";o.className="zout miss"}})})();';
+  html += 'function zipFee(){var z=(document.getElementById("zipin").value||"").replace(/\\D/g,"").slice(0,5);var o=document.getElementById("zipout");';
+  html += 'if(z.length<5){o.innerHTML=\'<span class="miss">Type a 5-digit ZIP code.</span>\';return}';
+  html += 'if(FEES[z]!=null){o.textContent="$"+FEES[z]}else{o.innerHTML=\'<span class="miss">\'+z+\' is not in our local delivery table.</span>\'}}';
+  html += 'document.getElementById("zipin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();zipFee()}});';
   html += 'function upsTrack(){var n=(document.getElementById("upsin").value||"").trim();if(!n)return;window.open("https://www.ups.com/track?loc=en_US&tracknum="+encodeURIComponent(n),"_blank")}';
   html += 'document.getElementById("upsin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();upsTrack()}});';
   html += '</script>';
