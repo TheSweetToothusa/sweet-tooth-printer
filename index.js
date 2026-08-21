@@ -2276,7 +2276,8 @@ function lookupShell(inner, q) {
   html += '.doact a:hover{border-color:#C8A02C;box-shadow:0 4px 12px rgba(0,0,0,.07)}';
   html += '.zipquick{display:inline-flex;align-items:center;gap:10px;background:#fff;border:1.5px solid #E8E2E5;border-radius:12px;padding:0 16px;height:52px;box-shadow:0 1px 2px rgba(0,0,0,.06)}';
   html += '.zipquick .zl{font-size:13px;font-weight:600;color:#6B5F65;white-space:nowrap}';
-  html += '.zipquick input{width:74px;border:none;background:#FAF7F8;border-radius:8px;padding:9px 10px;font-size:16px;font-weight:600;text-align:center}';
+  html += '.zipquick input{width:100px;border:2px solid #C8A02C;background:#fff;border-radius:8px;padding:10px;font-size:17px;font-weight:700;text-align:center}';
+  html += '.zipquick input::placeholder{color:#B3A48A;font-weight:700}';
   html += '.zipquick input:focus{outline:2px solid #C8A02C}';
   html += '.zipquick .zout{font-size:19px;font-weight:600;min-width:56px;color:#6B5F65}';
   html += '.zipquick .zout.hit{color:#2A2A2A}.zipquick .zout.miss{font-size:13px;color:#B3541E;min-width:80px;line-height:1.2}';
