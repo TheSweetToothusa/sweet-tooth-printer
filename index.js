@@ -864,7 +864,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
         '<div class="section-label">Delivery</div>' +
         '<div class="field"><label>Delivery Type</label><select id="deliveryType" onchange="zipChanged()">' + dtOptions + '</select></div>' +
         '<div class="field"><label>Delivery Price</label>' +
-          '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" inputmode="decimal" value="' + chargedFee + '" oninput="feeTyped()"></div>' +
+          '<div class="money-row"><span>$</span><input type="text" id="deliveryFee" value="' + chargedFee + '" readonly style="background:#f4f4f4;font-weight:800;cursor:default"></div>' +
           '<div id="feeNote" style="display:none"></div>' +
         '</div>' +
         '<div class="field"><label>Delivery Date</label><input type="text" id="deliveryDate" value="' + deliveryDate + '" oninput="refreshPreview()"></div>' +
@@ -892,8 +892,9 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
           'if(document.getElementById("deliveryType").value==="local-delivery"&&z.length===5&&FEES[z]!=null){' +
             'document.getElementById("deliveryFee").value=FEES[z].toFixed(2);' +
           '}' +
-          'updateFeeNote();refreshPreview();' +
+          'updateFeeNote();if(window.__booted)refreshPreview();' +
         '}' +
+        'window.__booted=false;setTimeout(function(){window.__booted=true},0);' +
         'function feeTyped(){updateFeeNote();refreshPreview()}' +
         // Two separate questions, and staff need both answered out loud:
         // does the fee match the ZIP, and does anyone owe anyone money.
@@ -941,7 +942,7 @@ app.get('/dashboard/invoice-edit/:orderId', async (req, res) => {
             'if(btn){btn.disabled=false;btn.textContent="\uD83D\uDCBE Save & Print Invoice"}' +
           '})' +
         '}' +
-        'updateFeeNote();' +
+        'zipChanged();' +
       '</script>' +
     '</body></html>');
   } catch (error) {
