@@ -3561,6 +3561,22 @@ app.get('/refund', async function (req, res) {
       return res.send(refundShell('<div class="card"><h2>Order ' + escapeHtml(order.name) + '</h2>' +
         '<div class="muted">There is nothing left to refund on this order. It may already be fully refunded.</div></div>', q));
     }
+    var shipLine = (order.shipping_lines || [])[0];
+    var shipTitle = String((shipLine && shipLine.title) || '').toLowerCase();
+    var shipZip = String(((order.shipping_address || {}).zip) || '').replace(/\D/g, '').slice(0, 5);
+    var rightFee = (shipTitle.indexOf('local') > -1 && shipZip.length === 5) ? DELIVERY_FEES[shipZip] : undefined;
+    var nowFee = shipLine ? parseFloat(shipLine.price || 0) : 0;
+    if (rightFee != null && Math.abs(rightFee - nowFee) > 0.004 && req.query.anyway !== '1') {
+      var warn = '<div class="card" style="border:3px solid #DC2626">';
+      warn += '<h2 style="color:#DC2626">Stop &mdash; fix the delivery price first</h2>';
+      warn += '<div style="font-size:17px;line-height:1.6;font-weight:600">Order ' + escapeHtml(order.name) + ' is going to ZIP <b>' + escapeHtml(shipZip) + '</b>, which costs <b>$' + rightFee.toFixed(2) + '</b>.<br>The order still says <b>$' + nowFee.toFixed(2) + '</b>.<br><br>';
+      warn += 'If you refund now, <b>Shopify locks the price and it can never be corrected.</b> The invoice and the driver app will stay wrong for ever.</div>';
+      warn += '<a class="btn btn-red" style="margin-top:16px" href="/dashboard/invoice-edit/' + order.id + '">Fix the delivery price first</a>';
+      warn += '<a class="btn btn-grey" href="/refund?order=' + escapeHtml(clean) + '&anyway=1' + (req.query.amount ? '&amount=' + encodeURIComponent(req.query.amount) : '') + '">This refund is not about delivery &mdash; carry on</a>';
+      warn += '</div>';
+      return res.send(refundShell(warn, q));
+    }
+
     var cust = order.customer || {};
     var who = ((cust.first_name || '') + ' ' + (cust.last_name || '')).trim() ||
       ((order.shipping_address || {}).name || 'the customer');
