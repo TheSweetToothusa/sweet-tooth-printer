@@ -2264,12 +2264,6 @@ function lookupShell(inner, q) {
   html += inner;
 
   // --- Quick tools: zip fee, UPS tracking, phones ---
-  html += '<div class="card"><h2>UPS Tracking</h2>';
-  html += '<div class="searchbar" style="margin:0"><input type="text" id="upsin" placeholder="Paste a UPS tracking number"><button type="button" onclick="upsTrack()">Track on UPS</button></div></div>';
-
-  html += '<div class="card"><h2>Phone Numbers</h2>';
-  html += '<div class="phone-row"><span>UPS</span><a href="tel:18007425877">1-800-742-5877</a></div>';
-  html += '<div class="phone-row"><span>Bernard (our UPS driver)</span><a href="tel:9545942577">(954) 594-2577</a></div></div>';
 
   html += '<script>';
   html += 'var FEES=' + JSON.stringify(DELIVERY_FEES) + ';';
@@ -2277,8 +2271,6 @@ function lookupShell(inner, q) {
   html += 'i.addEventListener("input",function(){this.value=this.value.replace(/\\D/g,"").slice(0,5);var z=this.value;';
   html += 'if(z.length<5){o.textContent="\\u2014";o.className="zout";return}';
   html += 'if(FEES[z]!=null){o.textContent="$"+FEES[z];o.className="zout hit"}else{o.textContent="Not our area";o.className="zout miss"}})})();';
-  html += 'function upsTrack(){var n=(document.getElementById("upsin").value||"").trim();if(!n)return;window.open("https://www.ups.com/track?loc=en_US&tracknum="+encodeURIComponent(n),"_blank")}';
-  html += 'document.getElementById("upsin").addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();upsTrack()}});';
   html += '</script>';
   html += '</div></body></html>';
   return html;
